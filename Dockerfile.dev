@@ -1,0 +1,25 @@
+FROM node:20-slim
+
+# Use Debian-slim to ensure compatibility with Prisma's native binaries
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Create app directory
+WORKDIR /app
+
+# Install runtime dependencies required by Prisma (OpenSSL, ca-certificates)
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends ca-certificates openssl libssl-dev && \
+	rm -rf /var/lib/apt/lists/*
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci --no-audit --prefer-offline
+
+# Copy source
+COPY . .
+
+ENV NODE_ENV=development
+EXPOSE 5173
+
+# Vite needs --host so it's reachable from host machine
+CMD ["npm", "run", "dev", "--", "--host"]

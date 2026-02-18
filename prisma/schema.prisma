@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Campus {
+  id    Int    @id
+  name  String
+  users User[]
+}
+
+model User {
+  id       Int     @id
+  login    String  @unique
+  staff    Boolean
+  campusId Int
+  image    String?
+
+  anonymize_at DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now()) @updatedAt
+
+  campus Campus? @relation(fields: [campusId], references: [id])
+}
