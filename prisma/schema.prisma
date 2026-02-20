@@ -7,22 +7,83 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// All 42 campuses
 model Campus {
   id    Int    @id
   name  String
   users User[]
 }
 
+// An account
 model User {
-  id       Int     @id
-  login    String  @unique
-  staff    Boolean
-  campusId Int
-  image    String?
+  id            Int     @id
+  login         String  @unique
+  email         String  @unique
+  password_hash String
+  image         String?
+  biography     String?
+
+  campusId Int?
 
   anonymize_at DateTime?
   created_at   DateTime  @default(now())
   updated_at   DateTime  @default(now()) @updatedAt
+  deleted_at   DateTime? // Soft delete
 
-  campus Campus? @relation(fields: [campusId], references: [id])
+  Campus    Campus?   @relation(fields: [campusId], references: [id])
+  Follower  Follow[]  @relation("Follower")
+  Following Follow[]  @relation("Following")
+  Post      Post[]
+  Comment   Comment[]
+}
+
+// many-to-many relationship between users for followers and following
+model Follow {
+  id          Int @id
+  followerId  Int // The user who follows
+  followingId Int // The user being followed
+
+  follower  User @relation("Follower", fields: [followerId], references: [id])
+  following User @relation("Following", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId]) // Ensure a user can't follow another user more than once
+  @@index([followerId]) // Fast lookup
+  @@index([followingId])
+}
+
+// A post created by a user
+model Post {
+  id      Int    @id
+  title   String
+  content String
+
+  userId Int
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now()) @updatedAt
+  deleted_at DateTime? // Soft delete (remove all post content, but keep threads intact)
+
+  user     User      @relation(fields: [userId], references: [id])
+  comments Comment[]
+}
+
+// A comment on a post, or another comment (to create threads)
+model Comment {
+  id      Int    @id
+  content String
+  likes   Int    @default(0)
+
+  parentId Int? // For nested comments (threads)
+
+  postId Int
+  userId Int
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now()) @updatedAt
+  deleted_at DateTime? // Soft delete (remove comment content, but keep threads intact)
+
+  post     Post      @relation(fields: [postId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+  parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
+  children Comment[] @relation("CommentThread")
 }
