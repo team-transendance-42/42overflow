@@ -1,0 +1,49 @@
+#<p>@42overflow   <a href="+page.svelte"></a></p>
+
+<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+
+ <p> <a href="/questions">Questions</a>   <a href="/log-in">Log-In</a>  <a href="/settings">Settings</a> </p>
+
+ <!--
+<style>
+  navbar {
+    background-color: var(--color-neutral-100);
+    color: var(--color-neutral-900);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-medium);
+	font-weight: bold;
+    padding: var(--space-xs) var(--space-lg);
+    text-align: left;
+  }
+</style>
+-->
+
+//settings code not left adjusted
+<h1>SETTINGS</h1>
+
+<p> This will have a drop down ? with profile, log out, followers? </p>
+
+<style>
+ navbar {
+    text-align: left;
+  }
+</style
+
+
+<button> Submit </button>
+
+<style>
+  button {
+    background-color: black;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  button:hover {
+    opacity: 0.85;
+  }
+</style>
