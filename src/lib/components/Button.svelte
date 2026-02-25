@@ -16,6 +16,7 @@
     border-radius: 6px;
     cursor: pointer;
     font-weight: 500;
+	margin-bottom: 1rem;
   }
 
   button:hover {
