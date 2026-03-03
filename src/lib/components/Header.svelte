@@ -1,5 +1,9 @@
 <!-- src/lib/components/header.svelte -->
 
+<script>
+	import Settingsicon from '$lib/components/Settingsicon.svelte';
+</script>
+
 <header>
 	<div class="left">
    		<a href="/" >@42overflow</a>
@@ -7,8 +11,12 @@
 
    <div class="right">
     	<a href="/log-in">Log-In | </a>
-    	<a href="/settings">Settings</a>
+    	<a href="/profile" class="profile-link">
+		Profile </a>
+	
+		<Settingsicon size="15px" on:click={() => alert('Settings clicked!')} /> 
 	</div>
+	
 </header>
 
 
@@ -32,15 +40,16 @@ header .right {
   font-weight: normal;
 }
 
-header .right a {
+.profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem; /* small gap between text and icon */
   text-decoration: none;
   color: inherit;
-  margin: 0 0.0rem;
 }
 
-header .right span {
-  margin: 0 0.25rem;
-}
+
+
 </style>
 
 

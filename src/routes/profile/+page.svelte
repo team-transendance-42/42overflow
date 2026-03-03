@@ -2,20 +2,20 @@
 	import Avatar from '$lib/components/Avatar.svelte';
 </script>
 
-<div class="settings-page">
-  <h1>SETTINGS</h1>
+<div class="profile-page">
+  <h1>PROFILE PAGE</h1>
 
 
 
 <Avatar />
 
 
-  <p>This will have a drop down? maybe?</p>
+  <p>This will have typical profile info, name, email, avatar, password, bio, etc</p>
 
 </div>
 
 <style>
-  .settings-page {
+  .profile-page {
     width: 100%;
     max-width: 800px;
     padding: 0rem;

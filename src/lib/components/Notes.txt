@@ -6,6 +6,7 @@ docker exec -it 42overflow-app-1 bash
 npx prisma generate
 npx prisma migrate deploy
 
+npx prisma studio
 
 
  <p> <a href="/questions">Questions</a>   <a href="/log-in">Log-In</a>  <a href="/settings">Settings</a> </p>
@@ -87,5 +88,14 @@ npx prisma migrate deploy
 ---------------
 
 
+header .right a {
+  text-decoration: none;
+  color: inherit;
+  margin: 0 0.0rem;
+}
+
+header .right span {
+  margin: 0 0.25rem;
+}
 
 
