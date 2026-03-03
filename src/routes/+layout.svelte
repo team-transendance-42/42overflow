@@ -7,7 +7,7 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Navbar from '$lib/components/Navbar.svelte';
-
+	import Sidebar from '$lib/components/Sidebar.svelte';
 	let { children } = $props();
 	
 </script>
@@ -15,17 +15,16 @@
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 <Header />
-<Navbar />
 
-<main>
-{@render children()}
+<div class="content">
+	<Sidebar />
 
-</main>
-
+	<main>
+		{@render children()}
+	</main>
+</div>
 
 <Footer />
-
-
 
 
 <div style="display:none">
@@ -43,14 +42,19 @@
   background-color: var(--color-neutral-500);
   color: var(--color-neutral-900);
   font-family: var(--font-family-base);
-      min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+   
   }
 
-  :global(main) {
-    flex: 1;
-  }
+  .content {
+		display: grid;
+		grid-template-columns: 150px 1fr;
+		min-height: calc(100vh -  /* header + nav height */ 120px);
+	}
 
+	main {
+		padding: 2rem;
+	}
+
+ 
 </style>
 

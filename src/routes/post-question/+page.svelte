@@ -91,7 +91,7 @@ function addTag() {
   .post-question {
     width: 100%;
     max-width: 700px;
-    padding: 2rem;
+    padding: 0rem;
     text-align: left;
   }
 </style>

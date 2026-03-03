@@ -2,6 +2,12 @@
 
 <p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
 
+docker exec -it 42overflow-app-1 bash
+npx prisma generate
+npx prisma migrate deploy
+
+
+
  <p> <a href="/questions">Questions</a>   <a href="/log-in">Log-In</a>  <a href="/settings">Settings</a> </p>
 
  <!--
@@ -60,3 +66,26 @@
   border: 1px solid #ccc;
   background: #f3f3f3;
 }
+
+
+
+
+   min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+
+	under navbar
+	<Sidebar />
+
+<main>
+{@render children()}
+
+</main>
+
+
+---------------
+
+
+
+

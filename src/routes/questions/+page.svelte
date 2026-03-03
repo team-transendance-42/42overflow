@@ -9,7 +9,7 @@
   .questions-page {
     width: 100%;
     max-width: 800px;
-    padding: 2rem;
+    padding: 0rem;
     text-align: left;
   }
 </style>
