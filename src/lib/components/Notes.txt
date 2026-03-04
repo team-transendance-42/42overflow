@@ -88,14 +88,4 @@ npx prisma studio
 ---------------
 
 
-header .right a {
-  text-decoration: none;
-  color: inherit;
-  margin: 0 0.0rem;
-}
-
-header .right span {
-  margin: 0 0.25rem;
-}
-
 

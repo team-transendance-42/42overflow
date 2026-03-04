@@ -1,7 +1,7 @@
 <script lang="ts">
-  export let size: string = '24px'; // icon size
-  export let onClick: () => void;   // click handler
+  export let size: string = '30px'; // icon size
 </script>
+
 
 <div class="settings-icon" style="width: {size}; height: {size};" on:click={onClick}>
   <span></span>
@@ -22,7 +22,6 @@
   display: block;
   height: 2px;
   background-color: var(--color-neutral-900);
- 
   margin: 2px 0;
   border-radius: 1px;
 }

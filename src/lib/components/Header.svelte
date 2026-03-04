@@ -11,10 +11,11 @@
 
    <div class="right">
     	<a href="/log-in">Log-In | </a>
-    	<a href="/profile" class="profile-link">
-		Profile </a>
-	
-		<Settingsicon size="15px" on:click={() => alert('Settings clicked!')} /> 
+    	<a href="/profile" class="profile-link">Profile </a>
+		<a href="/settings" class="settings-link">
+		<Settingsicon size="15px" />  </a>
+
+		
 	</div>
 	
 </header>
@@ -22,9 +23,9 @@
 
 <style>
   header {
-	display: flex;                 /* make left/right horizontal */
-  	justify-content: space-between; /* push right to far side */
-  	align-items: center;           /* vertically center both sides */
+	display: flex;                
+  	justify-content: space-between; 
+  	align-items: center;         
     background-color: var(--color-primary-400);
     color: var(--color-neutral-900);
     font-family: var(--font-family-base);
@@ -34,9 +35,9 @@
    
   }
 
-  /* Right side smaller */
+
 header .right {
-  font-size: 0.85rem; /* smaller font */
+  font-size: 0.85rem; 
   font-weight: normal;
 }
 
@@ -47,6 +48,16 @@ header .right {
   text-decoration: none;
   color: inherit;
 }
+
+  .settings-link {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+	vertical-align: middle;  /* add this */
+  	margin-bottom: 2px; 
+	font-weight: bold;
+	
+  }
 
 
 
