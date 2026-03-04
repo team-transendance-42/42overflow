@@ -1,31 +1,37 @@
-# sv
+*This project has been created as part of the 42 curriculum by diwang, eandela, pekatsar, and nmattos.*
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+## TRANSCENDENCE - 42OVERFLOW - DESCRIPTION
+	Transcendence is the final project for the Codam Core curriculum, and must be completed with a team of 4-5 people.  The goal is to simulate a professional software development team and environment, such that we build a product using a relevant tech stack as we would in the "real world."  Our goal was to recreate a version of Stack Overflow for Codam students, 42overflow. The key features include, posting a question, which can be answered, tagged, commented on. A robust profile including history of users, and an AI assist feature.
 
-# recreate this project template
-```sh
-npx sv create --template minimal --types ts --add prettier eslint tailwindcss="plugins:forms" mdsvex paraglide="languageTags:en, nl+demo:no" mcp="ide:vscode+setup:remote" --install npm ./
-```
+## INSTRUCTIONS
+	All prerequisites include: SvelteKit, Prisma, PostgreSQL, bycrypt, better-auth, .env setup, 
 
-## Developing
 
-Once you've created a project and installed dependencies with `npm install`, start a development server:
+## RESOURCES
+	We leveraged several resources:
 
-```sh
-npm run dev
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+## TEAM INFO
+	Diane (diwang) - Project Manager (PM) + Developer
+	Elroy (eandela) - Technical Lead + Developer
+	Petra (pekatsar) - Technical Lead + Developer
+	Noah (nmattos) - Product Owner (PO) + Developer
 
-## Building
+## PROJECT MANAGEMENT
+	Tools used for PM: Trello, Google Docs
+	Communication channels: TEAMS, WhatsApp, IRL
+	How the team organized the work: task distribution via Trello and meetings; weekly meetings (30-60 minutes)
 
-To create a production version of your app:
+## TECHNICAL STACK	
+	Frontend + Backend: SvelteKit
+	Database: PostgreSQL
+	Justification for major technical decisions:
 
-```sh
-npm run build
-```
 
-You can preview the production build with `npm run preview`.
+## DATABASE SCHEMA
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## FEATURES LIST
+
+## MODULES
+
+## INDIVIDUAL CONTRIBUTIONS

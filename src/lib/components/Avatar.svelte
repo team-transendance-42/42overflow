@@ -10,6 +10,7 @@
   {:else}
     <span>👤</span> <!-- placeholder icon -->
   {/if}
+  <img src={src} alt={alt} on:error={(e) => e.currentTarget.style.display='none'} />
 </div>
 
 <style>

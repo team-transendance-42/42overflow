@@ -88,4 +88,19 @@ npx prisma studio
 ---------------
 
 
+<Input
+  label="First Name"
+  name="firstname"
+  placeholder="First"
+  bind:value={firstname}
+/>
+
+
+<Input
+  label="Last Name"
+  name="lastname"
+  placeholder="Last"
+  bind:value={lastname}
+/>
+
 
