@@ -2,7 +2,6 @@
 import Input from '$lib/components/Input.svelte';
 import Button from '$lib/components/Button.svelte';
 
-let name = "";
 let email = "";
 let password = "";
 
@@ -12,31 +11,27 @@ let password = "";
 <div class="log-in-page">
 
 
-<h1>LOG-IN</h1>
-
-<Input
-  label="Name"
-  name="name"
-  placeholder="Enter your name"
-  bind:value={name}
-/>
-
+<h1>42Overflow </h1>
 
 <Input
   label="Email"
   name="email"
-  placeholder="Enter email here"
+  placeholder="Enter email"
   bind:value={email}
 />
+
 
 <Input
   label="Password"
   name="password"
-  placeholder="Create Password"
+  placeholder="Enter password"
   bind:value={password}
 />
 
-<Button label="Create account" type="Create account" />
+<Button label="Log In" type="Log in" />
+
+
+<p>Don’t have an account? Sign up </p>
 
 </div>
 

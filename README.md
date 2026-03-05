@@ -12,10 +12,10 @@
 
 
 ## TEAM INFO
+	Noah (nmattos) - Product Owner (PO) + Developer
 	Diane (diwang) - Project Manager (PM) + Developer
 	Elroy (eandela) - Technical Lead + Developer
 	Petra (pekatsar) - Technical Lead + Developer
-	Noah (nmattos) - Product Owner (PO) + Developer
 
 ## PROJECT MANAGEMENT
 	Tools used for PM: Trello, Google Docs

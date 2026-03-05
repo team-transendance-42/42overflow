@@ -10,7 +10,11 @@
 <Avatar />
 
 
-  <p>This will have a drop down? maybe?</p>
+  <p> Preferences</p>
+  
+<div class="editprofile">
+   		<a href="editprofile">Edit Profile </a>
+	</div>
 
 </div>
 

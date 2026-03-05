@@ -104,3 +104,9 @@ npx prisma studio
 />
 
 
+<Input
+  label="Password"
+  name="password"
+  placeholder="Create Password"
+  bind:value={password}
+/>
