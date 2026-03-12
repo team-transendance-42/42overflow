@@ -1,5 +1,5 @@
 <script>
-  import Button from '$lib/components/Button.svelte';
+  import { goto } from '$app/navigation'; 
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import Tag from '$lib/components/Tag.svelte';
@@ -11,6 +11,19 @@
    let category = "memory";
 
    let tags = [];
+
+    async function submitQuestion() {
+    const res = await fetch('/api/questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectname, topic, body })
+    });
+
+    if (res.ok) {
+      // redirect back to questions page after posting
+      goto('/questions');
+    }
+  }
 
 function addTag() {
     if (!tagInput.trim()) return;
@@ -26,6 +39,7 @@ function addTag() {
   function removeTag(index) {
     tags = tags.filter((_, i) => i !== index);
   }
+
 </script>
 
 <div class="post-question">
@@ -54,10 +68,10 @@ function addTag() {
   rows={5}
 />
 
-<p>You typed: {projectname}</p>
-
-<Button label="Submit" type="submit" />
-
+<!-- Submit question -->
+<button on:click={submitQuestion}>
+  Submit
+</button>
 
 <div class="tag-input">
   <input
@@ -70,8 +84,10 @@ function addTag() {
     <option value="webserv">Webserv</option>
     <option value="custom">Custom</option>
   </select>
-
-  <Button label="Add" type="add" />
+  
+ <button type="button" on:click={addTag}>
+    Add
+  </button>
 </div>
 
 <div class="tag-list">

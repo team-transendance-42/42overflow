@@ -31,7 +31,7 @@ let password = "";
 <Button label="Log In" type="Log in" />
 
 
-<p>Don’t have an account? Sign up </p>
+<p>Don’t have an account? Sign up or use 42Auth </p>
 
 </div>
 

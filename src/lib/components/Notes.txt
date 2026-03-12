@@ -110,3 +110,19 @@ npx prisma studio
   placeholder="Create Password"
   bind:value={password}
 />
+
+<Button label="Submit" type="submit" />
+<Button label="Submit" on:click={submitQuestion} />
+
+<script>
+  export let label = "Button";
+  export let type = "button"; // button | submit
+  export let disabled = false;
+</script>
+
+<button type={type}> disabled={disabled} {...$$restProps}>
+  {label}
+</button>
+
+
+<p>You typed: {projectname}</p>
