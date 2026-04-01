@@ -3,12 +3,19 @@
   import Postbox from '$lib/components/Postbox.svelte';
 
 let questions = [];
+  let page = 1;
+  let limit = 10;
+  let total = 0;
 
-onMount(async () => {
-    const res = await fetch('/api/questions');
-    questions = await res.json();
-  });
+async function loadQuestions() {
+    const res = await fetch(`/api/questions?page=${page}&limit=${limit}`);
+    const json = await res.json();
 
+	questions = json.data;  
+    total = json.total;
+  };
+
+  onMount(loadQuestions);
 </script>
 
 <div class="questions-page">
@@ -17,15 +24,37 @@ onMount(async () => {
 {#each questions as q}
 
     <Postbox>
-	 <h2>{q.projectname}</h2>
-      <h2>{q.topic}</h2>
-      <p>{q.body}</p>
+	 <h2>Project name: {q.projectname}</h2>
+      <h2>Topic: {q.topic}</h2>
+      <p>Summary: {q.body}</p>
     </Postbox>
   {/each}
 
 
 <p> This will have a list of questions/posts from students etc </p>
 
+</div>
+
+<div class="pagination">
+  <button on:click={() => {
+    if (page > 1) {
+      page--;
+      loadQuestions();
+    }
+  }}>
+    Prev 
+  </button>
+
+  <span> - Page {page} -</span>
+
+  <button on:click={() => {
+    if (page * limit < total) {
+      page++;
+      loadQuestions();
+    }
+  }}>
+    Next
+  </button>
 </div>
 
 

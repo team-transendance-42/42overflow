@@ -9,12 +9,24 @@ let questions = [
   }
 ];
 
-export const GET: RequestHandler = async () => {
-  return new Response(JSON.stringify(questions), {
-    headers: { 'Content-Type': 'application/json' }
+export const GET: RequestHandler = async ( {url} ) => {
+
+  const page = Number(url.searchParams.get('page')) || 1;
+  const limit = Number(url.searchParams.get('limit')) || 5;
+
+  const start = (page - 1) * limit;
+  const end = start + limit;
+
+  const paginatedQuestions = questions.slice(start, end);
+
+  return new Response(JSON.stringify({
+    data: paginatedQuestions,
+    total: questions.length
+  }),  {
+
+	headers: { 'Content-Type': 'application/json' }
   });
 };
-
 export const POST: RequestHandler = async ({ request }) => {
   const { projectname, topic, body } = await request.json();
   const newQuestion = { id: Date.now(), projectname, topic, body };
@@ -23,3 +35,4 @@ export const POST: RequestHandler = async ({ request }) => {
     headers: { 'Content-Type': 'application/json' }
   });
 };
+
