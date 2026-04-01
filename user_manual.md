@@ -11,10 +11,23 @@ source ~/.bashrc
 
 nvm --version
 
+//Installs latest LTS (Long Term Support) version of Node.js.
 nvm install --lts
 
+//Installs all project dependencies listed in package.json.
 npm install
+
+//Install Vite as a development dependency (if not already in package.json).
+npm install --save-dev vite
+---------------
+
+2. Run everytime
 npm run dev
 
-npm install --save-dev vite
-npm run dev
+
+// for ai assist in /go-backend:
+3. Run go server to make req to ai api(hide the api key)
+go run server.go
+
+4. open browser
+http://localhost:5173/ai-assist

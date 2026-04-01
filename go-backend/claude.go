@@ -1,5 +1,5 @@
 package main
-// go run main2.go; nb: need to run it from the go dir, not the root dir, since it imports main.go
+
 import (
 	"bufio"
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -88,16 +87,16 @@ type RequestBody struct {
 
 // Non-streaming response
 type ResponseBody struct {
-	Content []struct {
-		Text string `json:"text"`
+	Content []struct { // []slice(dynamic arr) of of T(hhere struct)
+		Text string `json:"text"` //json:"text" tells Go to map the JSON field "text" to this field.
 	} `json:"content"`
-	Error *APIError `json:"error,omitempty"`
+	Error *APIError `json:"error,omitempty"` //If Error is nil, omit it from the JSON output.
 }
 
 // Streaming event (Server-Sent Events)
 type StreamEvent struct {
 	Type  string `json:"type"`
-	Delta *struct {
+	Delta *struct { // anonym struct named Delta
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"delta,omitempty"`
@@ -133,7 +132,7 @@ func NewLLMClient(apiKey string) *LLMClient {
 	}
 }
 
-// buildRequest creates an HTTP POST to the Anthropic messages endpoint.
+//creates a HTTP POST to the Anthropic messages endpoint.
 func (c *LLMClient) buildRequest(messages []Message, stream bool) (*http.Request, error) {
 	body := RequestBody{
 		Model:     model,
@@ -304,69 +303,4 @@ func checkHTTPStatus(resp *http.Response) error {
 //  INTERACTIVE CLI
 // ─────────────────────────────────────────────
 
-func main() {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		fmt.Fprintln(os.Stderr, "Error: ANTHROPIC_API_KEY environment variable not set.")
-		os.Exit(1)
-	}
-
-	client := NewLLMClient(apiKey)
-	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Println("╔══════════════════════════════════════╗")
-	fmt.Println("║       LLM Interface  (Go + Claude)  ║")
-	fmt.Println("╚══════════════════════════════════════╝")
-	fmt.Println("Commands:  :stream <prompt>  |  :generate <prompt>  |  :quit")
-	fmt.Println()
-
-	for {
-		fmt.Print("you> ")
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				fmt.Println("\nGoodbye!")
-				break
-			}
-			fmt.Fprintf(os.Stderr, "Read error: %v\n", err)
-			continue
-		}
-		input = strings.TrimSpace(input)
-
-		switch {
-		case input == ":quit" || input == ":exit":
-			fmt.Println("Goodbye!")
-			return
-
-		case strings.HasPrefix(input, ":stream "):
-			prompt := strings.TrimPrefix(input, ":stream ")
-			fmt.Print("assistant> ")
-			start := time.Now()
-			if err := client.GenerateStream(prompt); err != nil {
-				fmt.Fprintf(os.Stderr, "\n[Error] %v\n", err)
-			} else {
-				fmt.Printf("[streamed in %s]\n", time.Since(start).Round(time.Millisecond))
-			}
-
-		case strings.HasPrefix(input, ":generate "):
-			prompt := strings.TrimPrefix(input, ":generate ")
-			fmt.Print("Waiting for full response...")
-			start := time.Now()
-			text, err := client.Generate(prompt)
-			fmt.Print("\r                              \r") // clear waiting line
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "[Error] %v\n", err)
-			} else {
-				fmt.Printf("assistant> %s\n[done in %s]\n", text, time.Since(start).Round(time.Millisecond))
-			}
-
-		case input == "":
-			// ignore blank lines
-
-		default:
-			fmt.Println("Unknown command. Use  :stream <prompt>  or  :generate <prompt>")
-		}
-
-		fmt.Println()
-	}
-}
+// The main function and CLI logic have been removed.
