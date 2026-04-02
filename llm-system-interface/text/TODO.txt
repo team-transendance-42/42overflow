@@ -1,0 +1,84 @@
+Here are clear steps to integrate a real LLM API call (non-streaming) in your Go backend:
+
+Get your API key
+
+Sign up for an API key from your LLM provider (e.g., OpenAI, Anthropic).
+Store your API key securely
+
+Set it as an environment variable, e.g.:
+export OPENAI_API_KEY=your-key-here
+Edit or create services/llm.go
+
+Add a function to call the LLM API synchronously (no streaming):
+
+package services
+
+import (
+    "bytes"
+    "context"
+    "encoding/json"
+    "net/http"
+    "os"
+    "llm-system-interface/models"
+    "io/ioutil"
+)
+
+func CallLLM(ctx context.Context, req models.TextRequest) (string, error) {
+    body, err := json.Marshal(map[string]interface{}{
+        "model": req.Model,
+        "messages": []map[string]string{
+            {"role": "user", "content": req.Prompt},
+        },
+    })
+    if err != nil {
+        return "", err
+    }
+
+    apiKey := os.Getenv("OPENAI_API_KEY")
+    httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+    if err != nil {
+        return "", err
+    }
+    httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+    httpReq.Header.Set("Content-Type", "application/json")
+
+    resp, err := http.DefaultClient.Do(httpReq)
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    respBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return "", err
+    }
+
+    // Parse the response as needed (simplified here)
+    return string(respBody), nil
+}
+------------
+handlers.go
+
+import (
+    // ...other imports...
+    "llm-system-interface/services"
+)
+
+r.HandleFunc("/generate", func(w http.ResponseWriter, r *http.Request) {
+    var req models.TextRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "Invalid request", http.StatusBadRequest)
+        return
+    }
+    result, err := services.CallLLM(r.Context(), req)
+    if err != nil {
+        http.Error(w, "LLM error: "+err.Error(), http.StatusBadGateway)
+        return
+    }
+    w.Write([]byte(result))
+}).Methods("POST")
+
+
+curl -X POST -H "Content-Type: application/json" -d '{"prompt":"hello"}' http://localhost:8080/generate
+
+The handler parses the request, calls the LLM API, and returns the LLM’s response.
