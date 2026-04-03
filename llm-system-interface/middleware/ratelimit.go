@@ -12,10 +12,9 @@ var (
 )
 
 /**
-*rate.Limiter is a pointer to a Limiter struct from the rate package in golang.org/x/time/rate. This package is not built-in to Go’s standard library, but is an official Go extension package.
+golang.org/x/time/rate: not built-in to Go’s standard library, but is an official Go extension package.
 Limiter is a type (struct) in that package, used for rate limiting (controlling how frequently actions can happen).
-*rate.Limiter means a pointer to a Limiter.
-You need to import "golang.org/x/time/rate" to use it. It’s commonly used for implementing rate limiting in Go web servers.
+*rate.Limiter is an instance of a struct that tracks how many "tokens" are left for a specific user.
 */
 func getLimiter(ip string) *rate.Limiter {
 	mu.Lock()

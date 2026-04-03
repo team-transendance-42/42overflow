@@ -2,8 +2,8 @@ package models
 
 type TextRequest struct {
 	Prompt string `json:"prompt"`
-	Model  string `json:"model,omitempty"` // Optional: specify model if needed (e.g., "claude-2", "gpt-4")
-	Stream bool   `json:"stream,omitempty"` // Optional: whether to use streaming responses?? is it?
+	Model  string `json:"model,omitempty"`  // app-level model selection, mapped in service
+	Stream bool   `json:"stream,omitempty"` // app-level flag; service chooses Gemini streaming or non-streaming API
 }
 
 type ImageRequest struct {
