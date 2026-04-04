@@ -31,12 +31,14 @@ It bypasses the standard buffering logic of the Go web server.
 This allows for the "typing" effect or real-time ticker updates, as the browser receives the bytes immediately after they are written.
 */
 
-func GenerateText(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GenerateText hit: method=%s path=%s", r.Method, r.URL.Path)
-	// w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+func setHeaders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
+	// w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
@@ -47,8 +49,9 @@ func GenerateText(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+}
 
-	var req models.TextRequest
+func validateTextReq(w http.ResponseWriter, r *http.Request, req models.TextRequest) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
@@ -64,19 +67,21 @@ func GenerateText(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "prompt too large", http.StatusRequestEntityTooLarge)
 		return
 	}
+}
 
-	log.Println("GenerateText: calling StreamLLM")
+func GenerateText(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GenerateText hit: method=%s path=%s", r.Method, r.URL.Path)
+	setHeaders(w, r);
+
+	var req models.TextRequest
+	validateTextReq(w, r, req);
 	ch, err := services.StreamLLM(r.Context(), req)
 	if err != nil {
 		log.Printf("GenerateText: StreamLLM error: %v", err)
 		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	log.Println("GenerateText: StreamLLM returned channel")
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	// log.Println("GenerateText: StreamLLM returned channel")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

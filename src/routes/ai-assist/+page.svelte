@@ -27,13 +27,9 @@
         font-size: 1em;
         letter-spacing: 0.05em;
     }
-    form {
-        margin: 2em auto;
-        text-align: center;
-        /* max-width: 500px; */
-    }
+
     .form-input {
-        width: 60%;
+        width: 80%;
         /* max-width: 400px; */
         padding: 0.5em;
         font-size: 1em;
@@ -54,33 +50,76 @@
         loading = true;
         error = '';
         answer = '';
-        try {
-            const res = await fetch('http://localhost:8081/api/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: question })
-            });
-            if (!res.ok) throw new Error('Server error');
-            const data = await res.json();
-            answer = data.response;
-        } catch (e) {
-            error = e.message;
-        } finally {
-            loading = false;
+
+    try {
+        const res = await fetch('/api/ai-assist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: question })
+        });
+        // console.log('status:', res.status);
+        // console.log('content-type:', res.headers.get('content-type'));
+
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(txt || 'Server error');
         }
+
+        if (!res.body) {
+            throw new Error('No response body');
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    if (answer && !answer.endsWith(' ') && !answer.startsWith(' ') && !/^[.,!?;:)]/.test(line.slice(6))) {
+                        answer += ' ';
+                    }
+                    answer += line.slice(6);
+                } else if (line.startsWith('event: end')) {
+                    break;
+                }
+            }
+        }
+    } catch (e) {
+        error = e instanceof Error ? e.message : 'Unknown error';
+    } finally {
+        loading = false;
     }
+}
+
 </script>
 
 <div class="container">
     <h1>🐈‍⬛Zombie Kittens Know It All<span class="kitten">🧟</span></h1>
     <hr>
     <p style="text-align: center; font-size: 1.2em; margin-top: 1em;">
-        Welcome to the AI Assist page! Here, you can ask our AI assistant anything about our project, and it will provide you with accurate and helpful information. Whether you have questions about the codebase, project structure, or any specific functionality, just type your query below and let our AI assistant do the rest!
+        Welcome to the AI Assist page! Here, if really stuck you can ask a question and hope the <b>Zombie Kittens</b> will share their infinite wisdom with you. The catch is that you have a limit of 3 questions a day.
     </p>
-    <form on:submit|preventDefault={askQuestion} >
-        <input class="form-input" type="text" bind:value={question} placeholder="Ask a question..."/>
-        <button type="submit" disabled={loading || !question.trim()}>Ask</button>
-    </form>
+
+     <div>
+        <input
+            class="form-input"
+            type="text"
+            bind:value={question}
+            placeholder="Ask a question..."
+        />
+        <button type="button" on:click={askQuestion} disabled={loading || !question.trim()}>
+            Ask
+        </button>
+     </div>
     {#if loading}
         <div style="text-align:center;">Loading...</div>
     {/if}

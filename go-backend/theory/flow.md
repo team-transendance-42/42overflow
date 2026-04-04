@@ -1,3 +1,5 @@
+https://trello.com/b/cWIga2JI/transcendence
+
 1.run app:
 npm run dev
 ------------------------------
@@ -6,4 +8,4 @@ npm run dev
 go run server.go
 ------------------------------
 3. currently missing index.html, in browser:
-http://127.0.0.1:5173/ai-assist
+http://127.0.0.1:5173/generate

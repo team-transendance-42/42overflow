@@ -1,6 +1,7 @@
 package main
+
 //go run ./
-// http://localhost:8081/api/ask
+// http://localhost:8081/ai-assist
 import (
 	"encoding/json"
 	"fmt"
@@ -9,21 +10,22 @@ import (
 	"os"
 )
 
-/**
+/*
+*
 The OPTIONS method is an HTTP request used by browsers to ask the server which HTTP methods and headers are allowed for a specific resource. It’s mostly used for CORS (Cross-Origin Resource Sharing) preflight requests.
 
 Prompt is a field name
 */
 func askHandler(w http.ResponseWriter, r *http.Request) {
-	 // CORS(cross-origin resource sharing) headers for api endpoint
-    w.Header().Set("Access-Control-Allow-Origin", "*")
-    w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-    w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	// CORS(cross-origin resource sharing) headers for api endpoint
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-    if r.Method == "OPTIONS" {
-        w.WriteHeader(http.StatusOK)
-        return
-    }
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -57,7 +59,7 @@ func main() {
 	if port == "" {
 		port = "8081" // swelte runs on 5173
 	}
-	http.HandleFunc("/api/ask", askHandler)
+	http.HandleFunc("/ai-assist", askHandler)
 	fmt.Println("Go API server running on http://localhost:" + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

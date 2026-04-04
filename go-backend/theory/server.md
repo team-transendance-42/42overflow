@@ -1,6 +1,6 @@
 
 You should NOT call the Anthropic API directly from your Svelte frontend. This would expose your secret API key to anyone using your site, which is a security risk.
-server.go acts as a backend “middleman.” Your Svelte frontend sends the user’s question to your Go server, which then safely calls the Anthropic API (with your secret key) and returns the answer.
+server.go acts as a backend “middleman.” Your Svelte frontend sends the user's question to your Go server, which then safely calls the Anthropic API (with your secret key) and returns the answer.
 This keeps your API key secure and lets you add rate limiting, logging, or other backend logic.
 
 
