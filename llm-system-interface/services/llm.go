@@ -85,7 +85,7 @@ func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiK
 	// 2.5: Free limits (realistic) ~100–1000 requests/day, ~5–15 requests/min, Sometimes ~250/day typical: use this in prod?
 	// url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"
 	// url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?alt=sse"
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:streamGenerateContent?alt=sse"
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:streamGenerateContent?alt=sse" // gives more answers but not good
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("build Gemini request: %w", err)

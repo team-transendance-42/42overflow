@@ -27,7 +27,7 @@ func main() {
 
 	router := mux.NewRouter()
 
-	router.Use(middleware.ErrorRecovery)
+	router.Use(middleware.ErrorRecovery) //ErrorRecovery lets execution flow to RateLimiter only if no panic occurs.
 	router.Use(middleware.RateLimiter)
 
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")

@@ -102,8 +102,70 @@ This is usually much better than 5 per day or 1 per hour.
 *** Global limits: ***
 Protect server and upstream quota.
 Example policy:
-60 requests per minute global cap
+60 requests per minute global cap (meaining at the same 1 minute, only 30 students can be active if burst is 2)
 burst 20
-max in-flight Gemini streams 10 to 20
+max in-flight Gemini streams 10 to 20 -> what  means that?
 
+*** Overload behavior: ***
+When full, fail fast with clear message.
+Return 429 for user quota exceeded. ("Too many requests, try again later") -> todo; give how many requests per minute are allowed and when quota resets.
+Return 503 when server queue/concurrency is full. ("Server busy, try again in a few seconds") ->todo;
+Include Retry-After header.
 
+*** What to key limits on ***
+Primary key should be student identity, not IP.
+IP-only is unfair in schools because many users share one NAT IP.
+Keep IP limiter as backup abuse guard.
+Store quotas in shared storage if you run multiple instances.
+
+!!NB!!
+Realistic free-tier expectation
+Because free limits change by model/account/region, treat docs as starting point and verify empirically.
+--
+
+Caching repeated questions.-> is it easy to implement? Yes, you can add a simple in-memory cache with a map[string]string where key is the question and value is the answer. Before calling Gemini, check if the question exists in the cache. If yes, return cached answer. If no, call Gemini, store the result in cache, and return it. This can save tokens and speed up responses for common questions. Just be mindful of memory usage and cache eviction policy for a real app.
+
+Asynchronous jobs for heavy requests.
+Multi-model fallback routing.
+Strong prompt/output limits to reduce duration. can we implement all these? Yes, but they add complexity. Caching is usually the easiest and most effective first step. Asynchronous jobs and multi-model routing require more architecture changes. Strong prompt/output limits can be implemented in the handler before calling Gemini, but you need to balance user experience with cost control. Start with caching and rate limiting, then consider adding more features as needed.
+============================
+
+Rate limiting design for robust LLM UI
+
+Student quota:
+Track count per student per day, reset at UTC midnight.
+Minute limiter:
+Token bucket for burst control.
+Concurrency semaphore:
+Cap active upstream streams.
+Queue timeout:
+Wait max 2 to 3 seconds, then 503.
+Unified error contract:
+Consistent JSON or SSE error events with code and retry hint.
+User feedback:
+Show remaining quota and cooldown messages in UI.
+Observability:
+Track 429 rate, 503 rate, queue wait, active streams, upstream latency, upstream 429.
+=========================
+Recommended starter numbers for your project
+
+Per student:
+2 requests per minute
+burst 2
+20 per day
+Global:
+40 to 60 requests per minute
+burst 15 to 20
+max concurrent upstream streams 12
+Queue:
+max queued 30
+max wait 2 seconds
+Prompt guard:
+keep max prompt size bounded
+How to tune after launch
+
+Start strict for one week.
+Measure rejected requests and latency.
+If 429 is high but upstream stable, raise per-student daily limit first.
+If upstream 429/5xx rises, lower global cap and concurrency.
+Publish a transparent fair-use policy to students.
