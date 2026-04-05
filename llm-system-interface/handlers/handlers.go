@@ -31,7 +31,7 @@ It bypasses the standard buffering logic of the Go web server.
 This allows for the "typing" effect or real-time ticker updates, as the browser receives the bytes immediately after they are written.
 */
 
-func setHeaders(w http.ResponseWriter, r *http.Request) {
+func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
 	// w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -42,46 +42,51 @@ func setHeaders(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
-		return
+		return false
 	}
-
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+		return false
 	}
+	return true
 }
 
-func validateTextReq(w http.ResponseWriter, r *http.Request, req models.TextRequest) {
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+func validateTextReq(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+		return false
 	}
 
-	log.Printf("GenerateText: received prompt len=%d", len(req.Prompt))
+	log.Printf("GenerateText: received prompt len=%d", len(req.Prompt)) // debug, remove later
 	req.Prompt = strings.TrimSpace(req.Prompt)
 	if req.Prompt == "" {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
-		return
+		return false
 	}
 	if len(req.Prompt) > 20000 {
 		http.Error(w, "prompt too large", http.StatusRequestEntityTooLarge)
-		return
+		return false
 	}
+	return true
 }
 
+/**
+context.Context is an object that carries:
+cancellation signal, timeout / deadline, request-scoped values
+In web servers, every incoming HTTP request has its own context.
+*/
 func GenerateText(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GenerateText hit: method=%s path=%s", r.Method, r.URL.Path)
-	setHeaders(w, r);
+	if !setHeaders(w, r) { return }
 
 	var req models.TextRequest
-	validateTextReq(w, r, req);
+	if !validateTextReq(w, r, &req) { return }
 	ch, err := services.StreamLLM(r.Context(), req)
 	if err != nil {
 		log.Printf("GenerateText: StreamLLM error: %v", err)
 		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	// log.Println("GenerateText: StreamLLM returned channel")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
