@@ -5,10 +5,10 @@
 ◦ Implement proper context retrieval and response generation.
 ===
 ****** Major: ***** IN PROGRESS *****
- Implement a complete LLM system interface.
+Implement a complete LLM system interface.
 ◦ Generate text and/or images based on user input. ✓ todo: sometimes words come glued together
 ◦ Handle streaming responses properly. -> todo
-◦ Implement error handling and rate limiting. -> todo: see ratelimit.go and handlers.go
+◦ Implement error handling and rate limiting. -> todo: in progress
 ===
 • Major:
 Recommendation system using machine learning.

@@ -116,6 +116,7 @@ RateLimiter enforces a fair policy for the AI endpoint:
 - Minute window: 2 requests/minute (burst 2)
 - Daily window: 20 requests/day (UTC)
 It also writes quota headers so the frontend can display remaining allowance.
+in development, options is counted as 1 request, in production, options is free(doesnt reach our server: nginx handles it before req comes here) and doesn't hit the limiter.
 */
 func RateLimiter(next http.Handler) http.Handler {
 	startCleanupWorker.Do(func() {
@@ -123,6 +124,14 @@ func RateLimiter(next http.Handler) http.Handler {
 	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// OPTIONS preflight should not consume rate-limit quota.
+		// This can be removed if production nginx handles OPTIONS and preflight
+		// never reaches the Go LLM server.
+		if r.Method == http.MethodOptions {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		entry := getLimiter(extractClientKey(r))
 		now := time.Now().UTC()
 
@@ -136,14 +145,14 @@ func RateLimiter(next http.Handler) http.Handler {
 			entry.dailyCnt = 0
 		}
 
-		if entry.dailyCnt >= perStudentDailyMax {
-			remaining := 0
-			mu.Unlock()
-			w.Header().Set("X-RateLimit-Day-Remaining", strconv.Itoa(remaining))
-			w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
-			http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
-			return
-		}
+		// if entry.dailyCnt >= perStudentDailyMax {
+		// 	remaining := 0
+		// 	mu.Unlock()
+		// 	w.Header().Set("X-RateLimit-Day-Remaining", strconv.Itoa(remaining))
+		// 	w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
+		// 	http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
+		// 	return
+		// } commented out for testing, re-enable in prod
 
 		if !entry.limiter.Allow() {
 			remaining := perStudentDailyMax - entry.dailyCnt

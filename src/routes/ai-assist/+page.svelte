@@ -1,5 +1,11 @@
 <style>
     .container {
+        --olive-text: #F4FFE8;
+        --panel-bg: #1b231b;
+        --panel-border: rgba(244, 255, 232, 0.12);
+        --soft-shadow: 0 0 12px #F4FFE8, 0 0 8px #F4FFE8;
+        --focus-border: rgba(168, 188, 132, 0.9);
+        --focus-glow: rgba(168, 188, 132, 0.22);
         background: #001a00;
         color: white;
         min-height: 100vh;
@@ -8,18 +14,21 @@
         display: flex;
         flex-direction: column;
     }
-    h1 {
-        color: #F4FFE8;
-        text-shadow: 0 0 12px #F4FFE8, 0 0 8px #F4FFE8;
-        font-size: 2.8em;
-        margin-top: 32px;
+
+    h1,
+    .info {
+        color: var(--olive-text);
+        text-shadow: var(--soft-shadow);
         text-align: center;
     }
+
+    h1 {
+        font-size: 2.8em;
+        margin-top: 32px;
+    }
+
     .info {
-        color: #F4FFE8;
-        text-align: center;
         margin: 1rem 0;
-        text-shadow: 0 0 12px #F4FFE8, 0 0 8px #F4FFE8;
     }
     /* footer {
         width: 100%;
@@ -39,8 +48,8 @@
         display: inline-block;
         margin: 20px auto;
         max-width: 780px;
-        background: #1b231b;
-        border: 1px solid rgba(244, 255, 232, 0.12);
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
         border-radius: 14px;
         padding: 1.25rem 1.25rem;
         text-align: left;
@@ -65,11 +74,11 @@
         min-width: 0;
         display: block;
         margin: 0;
-        background: #1b231b;
-        border: 1px solid rgba(244, 255, 232, 0.12);
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
         border-radius: 14px;
         padding: 1.25rem 1.25rem;
-        color: #f4ffe8;
+        color: var(--olive-text);
         line-height: 1.6;
         box-sizing: border-box;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -78,8 +87,8 @@
     .form-input:focus,
     .form-input:focus-visible {
         outline: none;
-        border-color: rgba(168, 188, 132, 0.9);
-        box-shadow: 0 0 0 3px rgba(168, 188, 132, 0.22);
+        border-color: var(--focus-border);
+        box-shadow: 0 0 0 3px var(--focus-glow);
     }
 
     .form-input-parent button {
@@ -441,7 +450,7 @@ let history = $state<HistoryEntry[]>([]);
     <h1>
         Welcome to <b>Zombie Kittens</b> AI Assist page 🐈‍⬛ 
     </h1>
-    <p class="info"> You can ask 2 questions a minute and 20 per day</p>
+    <p class="info"> You can ask 2 questions a minute and 20 a day</p>
     <hr>
      <form class="form-input-parent" onsubmit={askQuestion}>
         <input

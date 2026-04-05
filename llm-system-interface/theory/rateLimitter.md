@@ -146,15 +146,14 @@ User feedback:
 Show remaining quota and cooldown messages in UI.
 Observability:
 Track 429 rate, 503 rate, queue wait, active streams, upstream latency, upstream 429.
-=========================
-Recommended starter numbers for your project
+=============================
+Recommended starter numbers
+=============================
 
 Per student:
-2 requests per minute
-burst 2
-20 per day
-Global:
-40 to 60 requests per minute
+2 requests per minute: burst 2
+20 per day: burst 20
+Global: 40 to 60 requests per minute
 burst 15 to 20
 max concurrent upstream streams 12
 Queue:
@@ -169,3 +168,414 @@ Measure rejected requests and latency.
 If 429 is high but upstream stable, raise per-student daily limit first.
 If upstream 429/5xx rises, lower global cap and concurrency.
 Publish a transparent fair-use policy to students.
+
+==============================================
+TTL Cleanup - Prevents Unbounded Map Growth
+==============================================
+
+// In ratelimit.go, every student who asks a question creates an entry:
+limiters[clientKey] = &ClientLimiter{...}
+
+// Problem: If 1000 different students ask questions, the map grows to 1000.
+// If server runs for months, limiters map could have 100,000+ entries.
+// Each entry consumes memory → **unbounded growth = memory leak**
+
+cleanupStaleLimiters() // Runs every 5 minutes, removes entries without activity for 30 min is curr fix: fter 30 minutes of inactivity, a student's entry is deleted, freeing memory.
+
+=====================================================
+Identity Spoofable - Secure Authentication with DB
+=====================================================
+
+// Anyone can send: X-Student-ID: 999
+// Server trusts it blindly
+func extractClientKey(r *http.Request) string {
+    if sid := r.Header.Get("X-Student-ID"); sid != "" {
+        return sid  // ❌ SPOOFABLE
+    }
+    return r.RemoteAddr
+} not good securitywise: 
+
+est practice with student DB auth:
+
+Before rate limiter, add an authentication middleware that runs first:
+// middleware/auth.go
+package middleware
+
+import (
+    "context"
+    "net/http"
+)
+
+// Middleware that validates JWT/session and sets authenticated user
+func AuthRequired(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Extract JWT from Authorization header or session cookie
+        token := r.Header.Get("Authorization") // or r.Cookie("session")
+        
+        // Verify token against your DB/auth provider
+        userID, err := validateTokenWithDB(token)
+        if err != nil {
+            http.Error(w, "Unauthorized", http.StatusUnauthorized)
+            return
+        }
+        
+        // Store verified identity in request context
+        ctx := context.WithValue(r.Context(), "userID", userID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+// Then in ratelimit.go, extract from verified context (NOT headers):
+func extractClientKey(r *http.Request) string {
+    userID := r.Context().Value("userID")
+    if userID != nil {
+        return userID.(string)  // ✅ SECURE - verified by auth middleware
+    }
+    return r.RemoteAddr // Fallback to IP if no auth
+}
+Middleware chain in your main handler:
+
+router.Use(middleware.AuthRequired)      // Run first: verify identity
+router.Use(middleware.RateLimit)         // Run second: check limits using verified identity
+router.HandleFunc("/api/ai-assist", handleAIRequest)
+=============================================
+In-Memory Only - Data Loss & Multi-Instance Problem
+==============================================
+Server restart:
+  Map: {student_123: limiter_obj, student_456: limiter_obj}
+       ↓ (server crashes)
+  Map: {} (EMPTY - all data lost!)
+  
+Result: Any student can send unlimited requests for a few seconds until rate limiter state rebuilds.
+Multi-instance problem (if you scale to 2+ containers):
+Container A:                Container B:
+{student_123: 1 req}      {student_123: 1 req}
+{student_456: 2 req}      {student_456: 2 req}
+
+Each container tracks independently. Student can send 2 reqs/min on A + 2 reqs/min on B = 4 req/min total.
+Rate limit is BROKEN across instances.
+
+Best practice fix: Use Redis (persistent + shared across containers)
+
+// middleware/ratelimit_redis.go
+package middleware
+
+import (
+    "context"
+    "fmt"
+    "github.com/redis/go-redis/v9"
+    "net/http"
+    "time"
+)
+
+var redisClient *redis.Client
+
+func init() {
+    redisClient = redis.NewClient(&redis.Options{
+        Addr: "localhost:6379", // or from env
+    })
+}
+
+func RateLimitRedis(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        userID := r.Context().Value("userID").(string)
+        
+        // Per-minute limit: 2 requests
+        perMinKey := fmt.Sprintf("rl:min:%s", userID)
+        count, err := redisClient.Incr(context.Background(), perMinKey).Val()
+        if err != nil {
+            http.Error(w, "Rate limiter error", http.StatusInternalServerError)
+            return
+        }
+        
+        // Set TTL on first request
+        if count == 1 {
+            redisClient.Expire(context.Background(), perMinKey, 1*time.Minute)
+        }
+        
+        if count > 2 {
+            w.Header().Set("Retry-After", "60")
+            http.Error(w, "Rate limited", http.StatusTooManyRequests)
+            return
+        }
+        
+        // Per-day limit: 20 requests
+        dayKey := fmt.Sprintf("rl:day:%s:%s", userID, time.Now().Format("2006-01-02"))
+        dayCount, _ := redisClient.Incr(context.Background(), dayKey).Val()
+        
+        if dayCount == 1 {
+            redisClient.Expire(context.Background(), dayKey, 24*time.Hour)
+        }
+        
+        if dayCount > 20 {
+            w.Header().Set("Retry-After", fmt.Sprintf("%d", secondsUntilMidnight()))
+            http.Error(w, "Daily quota exceeded", http.StatusTooManyRequests)
+            return
+        }
+        
+        next.ServeHTTP(w, r)
+    })
+}
+
+// middleware/ratelimit_redis.go
+package middleware
+
+import (
+    "context"
+    "fmt"
+    "github.com/redis/go-redis/v9"
+    "net/http"
+    "time"
+)
+
+var redisClient *redis.Client
+
+func init() {
+    redisClient = redis.NewClient(&redis.Options{
+        Addr: "localhost:6379", // or from env
+    })
+}
+
+func RateLimitRedis(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        userID := r.Context().Value("userID").(string)
+        
+        // Per-minute limit: 2 requests
+        perMinKey := fmt.Sprintf("rl:min:%s", userID)
+        count, err := redisClient.Incr(context.Background(), perMinKey).Val()
+        if err != nil {
+            http.Error(w, "Rate limiter error", http.StatusInternalServerError)
+            return
+        }
+        
+        // Set TTL on first request
+        if count == 1 {
+            redisClient.Expire(context.Background(), perMinKey, 1*time.Minute)
+        }
+        
+        if count > 2 {
+            w.Header().Set("Retry-After", "60")
+            http.Error(w, "Rate limited", http.StatusTooManyRequests)
+            return
+        }
+        
+        // Per-day limit: 20 requests
+        dayKey := fmt.Sprintf("rl:day:%s:%s", userID, time.Now().Format("2006-01-02"))
+        dayCount, _ := redisClient.Incr(context.Background(), dayKey).Val()
+        
+        if dayCount == 1 {
+            redisClient.Expire(context.Background(), dayKey, 24*time.Hour)
+        }
+        
+        if dayCount > 20 {
+            w.Header().Set("Retry-After", fmt.Sprintf("%d", secondsUntilMidnight()))
+            http.Error(w, "Daily quota exceeded", http.StatusTooManyRequests)
+            return
+        }
+        
+        next.ServeHTTP(w, r)
+    })
+}
+
+================================================
+###  No Global Protection - Add Concurrency Cap
+================================================
+You have 100 students, each with limit of 2 req/min.
+They all ask at same time → 100 requests hit Gemini API simultaneously.
+Gemini API overloads → 503 errors for everyone.
+
+Individual limits don't protect the shared upstream service.
+
+solution: global concurrency semaphore
+// In handlers/handlers.go
+package handlers
+
+import (
+    "sync"
+    "net/http"
+)
+
+var (
+    // Allow max 10 concurrent requests to Gemini
+    concurrencySemaphore = make(chan struct{}, 10)
+)
+
+func HandleAIAssist(w http.ResponseWriter, r *http.Request) {
+    // Acquire slot (blocking if all 10 are in use)
+    concurrencySemaphore <- struct{}{}
+    defer func() { <-concurrencySemaphore }()  // Release when done
+    
+    // Now call Gemini with at most 10 concurrent goroutines
+    answer, err := services.CallGemini(r.Context(), prompt)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    // Stream response...
+}
+
+Channel with buffer size 10:
+  concurrencySemaphore <- struct{}{}  // Block here if 10+ in use
+  
+Request 1-10:   Proceeds immediately (slots available)
+Request 11:     BLOCKS until Request 1-10 finishes (then slot frees)
+Request 12-100: Queue up, wait their turn
+
+Result: Max 10 concurrent Gemini calls = protected upstream.
+
+=============================================
+OPTIONS/CORS Preflight - Explain & Your Case
+=============================================
+Browser sends OPTIONS request before POST:
+
+POST /api/ai-assist with credentials
+  ↓ (browser security check)
+OPTIONS /api/ai-assist  ← Preflight to check CORS headers
+  ↓
+POST /api/ai-assist     ← Actual request
+
+If your rate limiter counts OPTIONS requests:
+  - Student hits preflight limit
+  - Can't even send actual request
+  - Rate limiter blocks unintentionally
+
+  But to be safe, skip non-AI-assist endpoints:
+  func RateLimitMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Skip rate limiting for non-AI routes
+        if r.URL.Path != "/api/ai-assist" {
+            next.ServeHTTP(w, r)
+            return
+        }
+        
+        // Skip rate limiting for OPTIONS (preflight)
+        if r.Method == http.MethodOptions {
+            next.ServeHTTP(w, r)
+            return
+        }
+        
+        // Apply rate limiting only to POST /api/ai-assist
+        userID := r.Context().Value("userID").(string)
+        // ... rate limit logic ...
+        
+        next.ServeHTTP(w, r)
+    })
+}
+==================================
+Add auth middleware (secure identity) ✅ Most urgent
+Add global concurrency semaphore (protect Gemini) ✅ Prevents 503 cascades
+Add Redis persistence (survive restarts + multi-instance) ⚠️ Medium priority
+Skip OPTIONS / non-AI routes (clean rate limiting) ✅ Quick win
+======================================
+
+==========================
+architecture:
+========================
+Browser (127.0.0.1:5173)
+  ↓
+Vite proxy (rewrites /api → localhost:8081)
+  ↓
+Middleware chain:
+  1. ErrorRecovery
+  2. RateLimiter    ← Applies to OPTIONS too!
+  3. Handler (GenerateText)
+  -------------------------------
+Browser: OPTIONS /api/ai-assist (preflight)
+  ↓ (vite proxy: /api/ai-assist → localhost:8081/api/ai-assist)
+RateLimiter: "Student sent request" → counter++ (2/2)
+  ↓
+Handler: if Method==OPTIONS return 204
+  ↓
+Result: NOW when actual POST comes, student is at 2/2 limit!
+        Preflight wasted 1 slot.
+        =========================
+        What is Vite?
+Vite is a development build tool for frontend projects. It:
+
+Bundles your Svelte/TypeScript code
+Serves it on http://127.0.0.1:5173 (dev server)
+Hot-reloads when you edit files
+Has a built-in dev proxy to redirect API calls
+
+Is This Best Practice?
+For development? YES, standard practice
+
+All Node.js/Vite projects use dev proxies
+Keeps frontend and backend separate during development
+Simulates production-like API calls
+
+For production? ⚠️ NO, need real reverse proxy
+
+In production, you should have:
+
+Vite builds a static .svelte-kit/build/ folder (HTML/JS/CSS)
+A real reverse proxy (Nginx, Apache, or Docker) serves:
+Static files from .svelte-kit/build/
+API requests forwarded to Go backend on same domain
+
+prod architecture:
+Client (browser)
+  ↓
+Nginx (reverse proxy on port 80/443)
+  ├─ GET /          → Serve SvelteKit HTML
+  ├─ GET /js/...    → Serve SvelteKit JavaScript
+  └─ POST /api/...  → Forward to Go backend on port 8081
+
+  Quick answer: You have 1 proxy (Vite), it's correctly configured for development. For production, you'll need to add a real Nginx/Docker reverse proxy, but that's a separate deployment step.
+
+  In production with a proper reverse proxy (Nginx), OPTIONS requests typically DON'T reach your backend at all.
+  Browser: OPTIONS /api/ai-assist
+  ↓
+Nginx (reverse proxy)
+  ├─ Sees it's OPTIONS
+  ├─ Checks CORS headers in config
+  ├─ Sends back 200 OK directly
+  └─ Never forwards to Go backend!
+
+Browser: POST /api/ai-assist (actual request)
+  ↓
+Nginx: Forwards to Go backend
+  ↓
+Rate limiter counts this
+=============================
+Your Nginx config would look like:
+
+server {
+    listen 80;
+    
+    location /api/ {
+        # Nginx handles OPTIONS automatically
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*';
+            add_header 'Access-Control-Allow-Methods' 'POST, OPTIONS';
+            add_header 'Access-Control-Allow-Headers' 'Content-Type';
+            return 204;
+        }
+        
+        # Only POST requests reach backend
+        proxy_pass http://localhost:8081;
+    }
+}
+===============================
+Why You NEED Nginx (in production)?
+Your current development setup (works fine):
+Browser: http://127.0.0.1:5173
+  ↓ (Vite proxy: /api → :8081)
+Go server: http://127.0.0.1:8081
+
+Production setup (you'll need Nginx):
+
+Browser: https://example.com
+  ↓
+Nginx (on port 443)
+  ├─ GET /           → Serve SvelteKit static files
+  ├─ GET /js/*       → Serve JavaScript
+  └─ POST /api/*     → Forward to Go server on :8081 (internal, not exposed)
+
+Result:
+  ✓ Single domain (no CORS issues)
+  ✓ Single port (80/443)
+  ✓ Handle SSL/TLS certificates
+  ✓ Go server stays internal (port 8081 not exposed to internet)
+
