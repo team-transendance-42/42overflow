@@ -16,7 +16,7 @@ package main
 
 import ("fmt"
 "time"
-)
+)sud
 
 func sayHello() {
 fmt.Println("Hello from Goroutine!")
