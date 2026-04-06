@@ -1,3 +1,11 @@
+Here arethe answers to your questions:
+
+Howit works: Models use a process called
+
+The calculation: Whenyou send a prompt, 
+
+f you are asking for a cumulative count across our entire historytogether, I cannot track that. I d
+===============================
 Re-enable daily cap immediately.
 Use authenticated user ID from session/JWT, not raw header.
 Add global semaphore for active Gemini calls (for example 10-20 max).

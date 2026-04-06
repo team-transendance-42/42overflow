@@ -2,7 +2,8 @@ package main
 
 // go run llm_server.go
 //https://github.com/team-transendance-42/42overflow
-// /api/ai-assist route accepts a POST request with JSON like {"prompt": "your text"}, parse it, and return the prompt as the response. Under the hood, Go’s net/http decodes the JSON body into a struct.
+/* /api/ai-assist route accepts a POST req with JSON like {"prompt": "text"}, parse it, and return the prompt as the response. Under the hood, Go’s net/http decodes the JSON body into a struct.
+*/
 //curl -X POST -H "Content-Type: application/json" -d '{"prompt":"hello world"}' http://localhost:8081/api/ai-assist
 import (
 	"llm-system-interface/handlers"
@@ -27,11 +28,12 @@ func main() {
 
 	router := mux.NewRouter()
 
+	middleware.StartCleanup() // Without cleanup:map grows forever,memory leak risk,attacker can fill map with fake IPs
 	router.Use(middleware.ErrorRecovery) //ErrorRecovery lets execution flow to RateLimiter only if no panic occurs.
 	router.Use(middleware.RateLimiter)
 
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/generate-image", handlers.GenerateImage).Methods("POST", "OPTIONS") // placeholder for future image generation endpoint: todo: implement handlers.GenerateImage
+	//router.HandleFunc("/api/generate-image", handlers.GenerateImage).Methods("POST", "OPTIONS") // placeholder for future image generation endpoint: todo: implement handlers.GenerateImage
 
 	log.Println("Server running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", router))

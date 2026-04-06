@@ -15,12 +15,12 @@ import (
 )
 
 /**
-validateUnmarshal parses a single Gemini SSE "data:" JSON payload and extracts text content.
+parses a single Gemini SSE "data:" JSON payload and extracts text content.
 It validates the nested Candidates > Content > Parts > Text structure and returns true only if
 text is successfully extracted and non-empty. On failure, it logs the reason and returns false.
-The extracted text is written to the provided pointer; callers must pass a valid *string.
+The extracted text is written to the provided pointer &text; callers must pass a valid *string.
 */
-func validateUnmarshal(data string, text *string) bool {
+func extractTextFromJSON(data string, text *string) bool {
 	var chunk struct {
 		Candidates []struct {
 			Content struct {
@@ -32,32 +32,32 @@ func validateUnmarshal(data string, text *string) bool {
 	}
 
 	if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-		log.Printf("StreamLLM: unmarshal failed: %v, data=%q", err, data)
+		log.Printf("extractTextFromJSON() failed: %v, data=%q", err, data)
 		return false
 	}
 
 	if len(chunk.Candidates) == 0 || len(chunk.Candidates[0].Content.Parts) == 0 {
-		log.Println("StreamLLM: no candidates or parts in chunk")
+		log.Println("extractTextFromJSON(): no candidates or parts in chunk")
 		return false
 	}
 
-	*text = strings.TrimSpace(chunk.Candidates[0].Content.Parts[0].Text)
+	*text = strings.TrimSpace(chunk.Candidates[0].Content.Parts[0].Text) // assign val to where text points to
 	if *text == "" {
-		log.Println("StreamLLM: empty text chunk")
+		log.Println("extractTextFromJSON(): empty text chunk")
 		return false
 	}
 	return true
 }
 
 /**
-readGeminiSSEToChannel reads the Gemini streaming HTTP response line by line,
-filters for "data:" SSE events, validates each payload via validateUnmarshal,
+reads the Gemini streaming HTTP response line by line,
+filters for "data:" SSE events, validates each payload via extractTextFromJSON,
 and sends successfully parsed text chunks to ch. Both resp.Body and ch are closed
 (via defer) when the scanner reaches EOF or errors, allowing receiver to detect stream end.
 */
 func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 	defer close(ch)
-	defer resp.Body.Close()
+	defer resp.Body.Close() // we get opened resp
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -67,7 +67,7 @@ func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 		data := strings.TrimPrefix(line, "data: ")
 
 		text := ""
-		if !validateUnmarshal(data, &text) { continue }
+		if !extractTextFromJSON(data, &text) { continue }
 
 		log.Printf("StreamLLM: sending chunk=%q", text) // debug, remove later
 		ch <- text
@@ -85,7 +85,9 @@ func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiK
 	// 2.5: Free limits (realistic) ~100–1000 requests/day, ~5–15 requests/min, Sometimes ~250/day typical: use this in prod?
 	// url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"
 	// url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?alt=sse"
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:streamGenerateContent?alt=sse" // gives more answers but not good
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:streamGenerateContent?alt=sse" // use this in prod
+	//url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:streamGenerateContent?alt=sse"
+
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("build Gemini request: %w", err)
@@ -123,6 +125,7 @@ It validates the API key, marshals the prompt into Gemini's JSON format, calls d
 launches readGeminiSSEToChannel in a non-blocking goroutine, and returns a read-only channel
 of text chunks. Callers should iterate over the returned channel to receive streamed output.
 On error (missing key, marshal failure, HTTP error), returns nil channel and error.
+Customized prompts to reply with less words, specific
 
 TODO: Implement app-side limits: max prompt size per request, per-user daily quota, and
 consider summarized history instead of sending full conversation each time.
@@ -130,6 +133,7 @@ consider summarized history instead of sending full conversation each time.
 func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, error) {
 	ch := make(chan string)
 	apiKey := os.Getenv("GEMINI_API_KEY")
+	const conciseInstruction = "Reply with fewer words. Be straight to the point.";
 
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY is not set in environment")
@@ -138,7 +142,7 @@ func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, erro
 		"contents": []map[string]any{
 			{
 				"parts": []map[string]string{
-					{"text": req.Prompt},
+					{"text": conciseInstruction + "\n" + req.Prompt},
 				},
 			},
 		},

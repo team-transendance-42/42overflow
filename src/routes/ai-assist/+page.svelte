@@ -206,6 +206,8 @@ Each object has: question: string; blocks: AnswerBlock[] So history is not a sin
 equal to: type HistoryEntry = {
   question: string;
   blocks: AnswerBlock[];
+
+  streaming APIs: the server may split text at any point, even in the middle of a word.
 };
 
 let history = $state<HistoryEntry[]>([]);
@@ -424,7 +426,12 @@ let history = $state<HistoryEntry[]>([]);
                 if (dataParts.length) {
                     // Join data lines within the same SSE event with newlines,
                     // but do not force a newline between separate events.
-                    answer += dataParts.join('\n');
+					let newText = dataParts.join('\n');
+					// If the last char of answer and first char of newText are both non-whitespace, add a space
+					if (answer && newText && /\S$/.test(answer) && /^\S/.test(newText)) {
+						answer += ' ';
+					}
+					answer += newText;
                 }
 
                 if (isEndEvent) {
@@ -463,6 +470,9 @@ let history = $state<HistoryEntry[]>([]);
             Ask
         </button>
      </form>
+	{#if error}
+        <div style="color:tomato;text-align:center;">{error}</div>
+    {/if}
     {#if loading}
         <div style="text-align:center;">Loading...</div>
     {/if}
@@ -637,9 +647,6 @@ let history = $state<HistoryEntry[]>([]);
                 </article>
             {/each}
         </section>
-    {/if}
-    {#if error}
-        <div style="color:red;text-align:center;">{error}</div>
     {/if}
 </div>
     <!-- <footer class="footer">

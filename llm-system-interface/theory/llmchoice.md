@@ -12,7 +12,7 @@ REST API slightly more complex
 Data used for training (free tier)
 ======================================================
 
-Step 1 — Get the key (5 minutes, no card needed)The first step is to open Google AI Studio weDevs at aistudio.google.com, sign in with any Google account, and:
+Step 1 — Get the key: open Google AI Studio weDevs at aistudio.google.com, sign in with any Google account, and:
 Accept Terms of Service on first visit — a default project and key are created automatically
 In the left sidebar → API Keys
 Click Create API Key → select your project

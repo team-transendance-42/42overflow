@@ -1,3 +1,94 @@
+Client request arrives
+        │
+        ▼
+[1] Body size check         ← MaxBytesReader, reject >8KB
+        │
+        ▼
+[2] Extract client key      ← RemoteAddr only (your fixed version)
+        │
+        ▼
+[3] Daily token quota? per person     ← reject if over token budget
+        │
+        ▼
+[4] Daily request quota?    ← reject if over 20/day: todo: better skip this step???
+        │
+        ▼
+[5] Per-minute rate check   ← reject if >2/min
+        │
+        ▼
+[6] Global rate check       ← reject if global cap hit
+        │
+        ▼
+[7] Call Gemini             ← with retry + backoff on 429/5xx
+        │
+        ▼
+[8] Stream or buffer        ← errors after this point go via SSE
+        │
+        ▼
+[9] Record token usage      ← update entry.dailyTokens from response
+        │
+        ▼
+Client receives response
+
+========================================
+Metric                    Limit (Free Tier)    Notes
+RPD (Requests Per Day)     100 – 1,000       Resets at Midnight Pacific Time                                (PT). Limits vary significantly by model.
+RPM (Requests Per Minute)     5 – 15        How many times you can hit the API                                         in 60 seconds.
+TPM (Tokens Per Minute)    250,000 – 1,000,000   Total input + output tokens                                           allowed per minute.
+Data PrivacyUsed for TrainingIn the Free Tier, Google may use your inputs/outputs to improve their models.
+
+
+
+========================================
+main -> router -> middleware -> handler -> llm.callGeminiWithRetry
+main() only wires routes + middleware
+RateLimiter does checks before Gemini
+GenerateText calls llm.callGeminiWithRetry(...)
+after Gemini returns, handler records token usage
+
+========================================
+two separate problems that both get called "rate limiting":
+
+Your App
+    │
+    ├── 1. YOUR server limiting YOUR users
+    │       "students can't spam the endpoint"
+    │
+    └── 2. Gemini/OpenAI limiting YOU
+            "you can't spam their API"
+
+Layer 1 — You limiting your users
+This is what your current middleware does. The full list of things to consider:
+What to track:
+Per user:   requests/minute  (burst protection)
+Per user:   requests/day     (quota fairness)
+Global:     requests/minute  (protect your Gemini quota)
+Per user:   tokens/day       (LLMs charge by token, not request)
+Per user:   request body size (prompt stuffing)
+
+======================================
+TODO:
+	// 1. Body size limit — a student sends a 1MB prompt, costs you money
+// Add this BEFORE your rate limiter even runs:
+r.Body = http.MaxBytesReader(w, r.Body, 8_000) // ~8KB max prompt
+---
+// 2. Token tracking — you currently count requests, not tokens.
+// A student sends 1 request with 50k tokens = same as 1 "hello".
+// Fix: read token count from Gemini response and track it per user.
+tokensUsed := geminiResp.UsageMetadata.TotalTokenCount
+entry.dailyTokens += tokensUsed
+---
+Layer 2 — Gemini limiting you (the hard part)
+When Gemini returns HTTP 429, you have three choices:
+
+429 received
+     │
+     ├── retry-after header present? ──yes──▶ wait exactly that long, retry once
+     │
+     ├── no header, first retry? ──────────▶ exponential backoff
+     │
+     └── retries exhausted? ────────────────▶ return error to user immediately
+===================================
 Think of rate limiter like a candy machine.
 
 The machine has a bucket that can hold up to b candies.
