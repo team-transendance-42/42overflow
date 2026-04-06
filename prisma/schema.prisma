@@ -7,84 +7,128 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// All 42 campuses
-model Campus {
-  id    Int    @id
-  name  String
-  users User[]
+// ─── better-auth required tables ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+  profile  Profile?
 }
 
-// An account
-model User {
-  id            Int     @id
-  login         String  @unique
-  email         String  @unique
-  password_hash String
-  name			String?
-  image         String?
-  biography     String?
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  campusId Int?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id            String    @id @default(cuid())
+  userId        String
+  accountId     String
+  providerId    String
+  accessToken   String?
+  refreshToken  String?
+  idToken       String?
+  expiresAt     DateTime?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── your app models ──────────────────────────────────────────────────────────
+
+model Profile {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  login     String? @unique
+  biography String?
+  campusId  Int?
 
   anonymize_at DateTime?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @default(now()) @updatedAt
-  deleted_at   DateTime? // Soft delete
+  deleted_at   DateTime?
 
-  Campus    Campus?   @relation(fields: [campusId], references: [id])
-  Follower  Follow[]  @relation("Follower")
-  Following Follow[]  @relation("Following")
-  Post      Post[]
-  Comment   Comment[]
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campus Campus? @relation(fields: [campusId], references: [id])
+
+  followers  Follow[] @relation("Follower")
+  following  Follow[] @relation("Following")
+  posts      Post[]
+  comments   Comment[]
 }
 
-// many-to-many relationship between users for followers and following
+model Campus {
+  id       Int       @id
+  name     String
+  profiles Profile[]
+}
+
 model Follow {
-  id          Int @id
-  followerId  Int // The user who follows
-  followingId Int // The user being followed
+  id          Int    @id @default(autoincrement())
+  followerId  String
+  followingId String
 
-  follower  User @relation("Follower", fields: [followerId], references: [id])
-  following User @relation("Following", fields: [followingId], references: [id])
+  follower  Profile @relation("Follower", fields: [followerId], references: [id])
+  following Profile @relation("Following", fields: [followingId], references: [id])
 
-  @@unique([followerId, followingId]) // Ensure a user can't follow another user more than once
-  @@index([followerId]) // Fast lookup
+  @@unique([followerId, followingId])
+  @@index([followerId])
   @@index([followingId])
 }
 
-// A post created by a user
 model Post {
-  id      Int    @id
+  id      Int    @id @default(autoincrement())
   title   String
   content String
 
-  userId Int
+  profileId String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
-  deleted_at DateTime? // Soft delete (remove all post content, but keep threads intact)
+  deleted_at DateTime?
 
-  user     User      @relation(fields: [userId], references: [id])
+  profile  Profile   @relation(fields: [profileId], references: [id])
   comments Comment[]
 }
 
-// A comment on a post, or another comment (to create threads)
 model Comment {
-  id      Int    @id
+  id      Int    @id @default(autoincrement())
   content String
   likes   Int    @default(0)
 
-  parentId Int? // For nested comments (threads)
-
-  postId Int
-  userId Int
+  parentId  Int?
+  postId    Int
+  profileId String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
-  deleted_at DateTime? // Soft delete (remove comment content, but keep threads intact)
+  deleted_at DateTime?
 
   post     Post      @relation(fields: [postId], references: [id])
-  user     User      @relation(fields: [userId], references: [id])
+  profile  Profile   @relation(fields: [profileId], references: [id])
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }
