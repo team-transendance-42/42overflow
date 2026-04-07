@@ -1,5 +1,8 @@
-1. how to stop gemini and qwen ->
+1. LLM Service Error: do Gemini request: Gemini HTTP 503: { "error": { "code": 503, "message": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.", "status": "UNAVAILABLE" } }
 
+Rate limit exceeded (2/min)
+
+3. in history: add new q, even if no reply(limit exceed)
 ==============================
 Here arethe answers to your questions:
 

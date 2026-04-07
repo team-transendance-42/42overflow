@@ -547,48 +547,6 @@
         {/if}
     {/snippet}
 
-    {#snippet renderBlocks(blocks: AnswerBlock[])}
-        {#each blocks as block, index (index)}
-            {#if block.type === 'paragraph'}
-                <p>
-                    {#each block.tokens as token, tokenIndex (tokenIndex)}
-                        {@render renderToken(token)}
-                    {/each}
-                </p>
-            {:else if block.type === 'heading'}
-                <svelte:element this={`h${block.level}`}>
-                    {#each block.tokens as token, tokenIndex (tokenIndex)}
-                        {@render renderToken(token)}
-                    {/each}
-                </svelte:element>
-            {:else if block.type === 'list'}
-                {#if block.ordered}
-                    <ol>
-                        {#each block.items as item, itemIndex (itemIndex)}
-                            <li>
-                                {#each item as token, tokenIndex (tokenIndex)}
-                                    {@render renderToken(token)}
-                                {/each}
-                            </li>
-                        {/each}
-                    </ol>
-                {:else}
-                    <ul>
-                        {#each block.items as item, itemIndex (itemIndex)}
-                            <li>
-                                {#each item as token, tokenIndex (tokenIndex)}
-                                    {@render renderToken(token)}
-                                {/each}
-                            </li>
-                        {/each}
-                    </ul>
-                {/if}
-            {:else if block.type === 'code'}
-                <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
-            {/if}
-        {/each}
-    {/snippet}
-
     <h1>
         Welcome to <b>Zombie Kittens</b> AI Assist page 🐈‍⬛ 
     </h1>
@@ -634,7 +592,45 @@
     {/if}
     {#if answer}
         <div class="answer-card">
-            {@render renderBlocks(renderedAnswer)}
+            {#each renderedAnswer as block, index (index)}
+                {#if block.type === 'paragraph'}
+                    <p>
+                        {#each block.tokens as token, tokenIndex (tokenIndex)}
+                            {@render renderToken(token)}
+                        {/each}
+                    </p>
+                {:else if block.type === 'heading'}
+                    <svelte:element this={`h${block.level}`}>
+                        {#each block.tokens as token, tokenIndex (tokenIndex)}
+                            {@render renderToken(token)}
+                        {/each}
+                    </svelte:element>
+                {:else if block.type === 'list'}
+                    {#if block.ordered}
+                        <ol>
+                            {#each block.items as item, itemIndex (itemIndex)}
+                                <li>
+                                    {#each item as token, tokenIndex (tokenIndex)}
+                                        {@render renderToken(token)}
+                                    {/each}
+                                </li>
+                            {/each}
+                        </ol>
+                    {:else}
+                        <ul>
+                            {#each block.items as item, itemIndex (itemIndex)}
+                                <li>
+                                    {#each item as token, tokenIndex (tokenIndex)}
+                                        {@render renderToken(token)}
+                                    {/each}
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                {:else if block.type === 'code'}
+                    <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
+                {/if}
+            {/each}
         </div>
     {/if}
     {#if history.length}
@@ -643,9 +639,49 @@
             {#each history as entry, entryIndex (entryIndex)}
                 <article>
                     <h3>Q {entryIndex + 1}: {entry.question}</h3>
-                    {@render renderBlocks(entry.blocks)}
+                    {#each entry.blocks as block, blockIndex (blockIndex)}
+                        {#if block.type === 'paragraph'}
+                            <p>
+                                {#each block.tokens as token, tokenIndex (tokenIndex)}
+                                    {@render renderToken(token)}
+                                {/each}
+                            </p>
+                        {:else if block.type === 'heading'}
+                            <svelte:element this={`h${block.level}`}>
+                                {#each block.tokens as token, tokenIndex (tokenIndex)}
+                                    {@render renderToken(token)}
+                                {/each}
+                            </svelte:element>
+                        {:else if block.type === 'list'}
+                            {#if block.ordered}
+                                <ol>
+                                    {#each block.items as item, itemIndex (itemIndex)}
+                                        <li>
+                                            {#each item as token, tokenIndex (tokenIndex)}
+                                                {@render renderToken(token)}
+                                            {/each}
+                                        </li>
+                                    {/each}
+                                </ol>
+                            {:else}
+                                <ul>
+                                    {#each block.items as item, itemIndex (itemIndex)}
+                                        <li>
+                                            {#each item as token, tokenIndex (tokenIndex)}
+                                                {@render renderToken(token)}
+                                            {/each}
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
+                        {:else if block.type === 'code'}
+                            <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
+                        {/if}
+                    {/each}
                 </article>
             {/each}
         </section>
     {/if}
 </div>
+
+

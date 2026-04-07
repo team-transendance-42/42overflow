@@ -133,7 +133,7 @@ consider summarized history instead of sending full conversation each time.
 func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, error) {
 	ch := make(chan string)
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	const conciseInstruction = "Be my tutor: use less words,dry";
+	const conciseInstruction = "use less words, dont repeat yourself";
 
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY is not set in environment")
@@ -142,7 +142,7 @@ func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, erro
 		"contents": []map[string]any{
 			{
 				"parts": []map[string]string{
-					{"text": conciseInstruction + "." + req.Prompt},
+					{"text": conciseInstruction + "\n" + req.Prompt},
 				},
 			},
 		},
