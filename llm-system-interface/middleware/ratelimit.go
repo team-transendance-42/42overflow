@@ -14,24 +14,34 @@ import (
 type limiterEntry struct {
 	limiter  	*rate.Limiter
 	dayUTC   	string
-	dailyCnt	int // tokens
-	cntPerMin	int // tokens: todo
+	dailyCnt	int
 	lastSeen 	time.Time
 }
 
+/** limiter:
+Imagine a bucket that holds up to 5 tokens.
+One request needs 1 token.
+Tokens are added continuously at 10/60 tokens per second (about 1 token every 6 seconds).
+If a request arrives and bucket has at least 1 token:
+request is allowed, 1 token is removed
+If no token is available:request is denied 429
+globalLimiter is one shared object for the whole process.
+Every request hits this check first.
+Then per-client limiter runs after tha
+*/
 var (
 	mu            sync.Mutex
 	limiters      = make(map[string]*limiterEntry)
-	globalLimiter = rate.NewLimiter(rate.Limit(10.0/60.0), 5)
+	globalLimiter = rate.NewLimiter(rate.Limit(10.0/60.0), 5) // tocken bucket algorithm:Average: 10 requests/minute across all clients; Burst: up to 5 immediate requests before throttling starts
 )
 
 // todo: clean: waht we really use
 const (
-	perStudentRateLimit = rate.Limit(2.0 / 60.0) // 2 requests/minute per student
+	perStudentRateLimit = rate.Limit(5.0 / 60.0) // todo: revert to 2 requests/minute per student?
 	perStudentBurst     = 2                       // short burst allowance
 	perStudentDailyMax  = 20                      // 20 requests/day per student
-	limiterTTL          = 30 * time.Minute // not used
-	cleanupInterval     = 5 * time.Minute // not used
+	limiterTTL          = 30 * time.Minute // remove inactive limiter entries after this idle time
+	cleanupInterval     = 5 * time.Minute  // background cleanup cadence
 	maxLimiters         = 10_000 // safety cap: prevents unbounded map growth from bot/fake IDs -> used
 )
 
@@ -49,7 +59,7 @@ func getLimiter(key string) (*limiterEntry, bool) {
 
 	// cap map size to prevent memory exhaustion from bots rotating fake student IDs
 	if len(limiters) >= maxLimiters {
-		return nil, false // signal to caller: reject this request
+		return nil, false
 	}
 
 	entry := &limiterEntry{
@@ -62,6 +72,10 @@ func getLimiter(key string) (*limiterEntry, bool) {
 	return entry, true
 }
 
+/**
+todo: Add JWT auth middleware that verifies the Bearer token and writes the user ID into context.
+Change limiter key selection to use context user ID first, IP second.
+*/
 func extractClientKey(r *http.Request) string {
     host, _, err := net.SplitHostPort(r.RemoteAddr)
     if err != nil {

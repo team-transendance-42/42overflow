@@ -1,3 +1,6 @@
+1. how to stop gemini and qwen ->
+
+==============================
 Here arethe answers to your questions:
 
 Howit works: Models use a process called

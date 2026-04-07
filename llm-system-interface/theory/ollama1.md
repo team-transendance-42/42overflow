@@ -1,3 +1,7 @@
+14b = about 14 billion parameters.
+===========================
+
+===========================
 Ollama is a platform that allows users to run large language models (LLMs) locally on their machines, offering privacy, speed, and full control over AI workflows.
 
 Ollama, short for Omni-Layer Learning Language Acquisition Model, is designed to democratize access to LLMs by enabling local execution on personal or organizational devices. Unlike cloud-based AI services, Ollama allows models to run entirely offline, ensuring data privacy, low latency, and cost efficiency. It supports a wide range of pre-trained models, including Llama 2, Llama 3, Mistral, Code Llama, Gemma, and LLaVA, catering to text, code, and multimodal tasks.

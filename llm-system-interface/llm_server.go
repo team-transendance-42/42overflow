@@ -28,11 +28,12 @@ func main() {
 
 	router := mux.NewRouter()
 
-	middleware.StartCleanup() // Without cleanup:map grows forever,memory leak risk,attacker can fill map with fake IPs
+	middleware.StartCleanup() // background go routine with infinate loop, sleeps 5 min, cleans
 	router.Use(middleware.ErrorRecovery) //ErrorRecovery lets execution flow to RateLimiter only if no panic occurs.
 	router.Use(middleware.RateLimiter)
 
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST", "OPTIONS")
 	//router.HandleFunc("/api/generate-image", handlers.GenerateImage).Methods("POST", "OPTIONS") // placeholder for future image generation endpoint: todo: implement handlers.GenerateImage
 
 	log.Println("Server running on port 8081")

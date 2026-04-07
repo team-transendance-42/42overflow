@@ -102,11 +102,29 @@
         white-space: nowrap;
     }
 
+    .toggle-button {
+        flex: 0 0 auto;
+        border: 1px solid rgba(244, 255, 232, 0.18);
+        border-radius: 14px;
+        background: #1a2e1a;
+        color: #a8bc84;
+        padding: 1.25rem 1.5rem;
+        cursor: pointer;
+        white-space: nowrap;
+        font-size: 0.9em;
+        transition: background-color 0.2s ease;
+    }
+
+    .toggle-button.active {
+        background: #2d4d2d;
+        color: #f4ffe8;
+        border-color: rgba(168, 188, 132, 0.6);
+    }
+
     .form-input-parent button:disabled {
         cursor: not-allowed;
         opacity: 0.55;
     }
-
     .answer-card :global(h1),
     .answer-card :global(h2),
     .answer-card :global(h3) {
@@ -194,27 +212,16 @@
 
 </style>
 <script lang="ts">
+    // STATE
     let question = $state('');
     let answer = $state('');
     let loading = $state(false);
     let error = $state('');
-    /**
-     *  $state(...) In Svelte 5, $state makes the variable reactive rune/function. When history changes, the UI that depends on it updates automatically. <{ question: string; blocks: AnswerBlock[] }[]> 
-This is a TypeScript generic type annotation for the state value. It says history must be an array of objects.
-Each object has: question: string; blocks: AnswerBlock[] So history is not a single object. It is a list of chat entries.
-= [] The initial value is an empty array. So at startup, there is no saved conversation history yet.
-equal to: type HistoryEntry = {
-  question: string;
-  blocks: AnswerBlock[];
-
-  streaming APIs: the server may split text at any point, even in the middle of a word.
-};
-
-let history = $state<HistoryEntry[]>([]);
-     */
+    let llmMode = $state<'gemini' | 'ollama'>('gemini');
     let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]);
+    let activeStreamController: AbortController | null = null;
 
-    // | can be exactly one of those object shapes.
+    // TYPES
     type InlineToken =
         | { type: 'text'; value: string }
         | { type: 'strong'; value: string }
@@ -228,238 +235,384 @@ let history = $state<HistoryEntry[]>([]);
         | { type: 'list'; ordered: boolean; items: InlineToken[][] }
         | { type: 'code'; lang: string; code: string };
 
+    /**
+     * Creates a plain text token and strips inline markdown markers.
+     */
     function createTextToken(value: string): InlineToken {
         return { type: 'text', value: value.replaceAll('**', '').replaceAll('`', '') };
     }
 
-    function parseInlineTokens(text: string) {
+    /**
+     * Parses inline markdown-like syntax into structured tokens.
+     * Supported: code, bold, italic, and links.
+     */
+    function parseInlineTokens(text: string): InlineToken[] {
         const tokens: InlineToken[] = [];
         const pattern = /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_|\[(.+?)\]\((.+?)\)/g;
-
         let lastIndex = 0;
+
         for (const match of text.matchAll(pattern)) {
             const index = match.index ?? 0;
-
-            if (index > lastIndex) {
-                tokens.push(createTextToken(text.slice(lastIndex, index)));
-            }
-
-            if (match[1]) {
-                tokens.push({ type: 'code', value: match[1] });
-            } else if (match[2]) {
-                tokens.push({ type: 'strong', value: match[2] });
-            } else if (match[3]) {
-                tokens.push({ type: 'strong', value: match[3] });
-            } else if (match[4]) {
-                tokens.push({ type: 'em', value: match[4] });
-            } else if (match[5]) {
-                tokens.push({ type: 'em', value: match[5] });
-            } else if (match[6] && match[7]) {
-                tokens.push({ type: 'link', value: match[6], href: match[7] });
-            }
-
+            if (index > lastIndex) tokens.push(createTextToken(text.slice(lastIndex, index)));
+            if (match[1]) tokens.push({ type: 'code', value: match[1] });
+            else if (match[2] || match[3]) tokens.push({ type: 'strong', value: match[2] || match[3] });
+            else if (match[4] || match[5]) tokens.push({ type: 'em', value: match[4] || match[5] });
+            else if (match[6] && match[7]) tokens.push({ type: 'link', value: match[6], href: match[7] });
             lastIndex = index + match[0].length;
         }
 
-        if (lastIndex < text.length) {
-            tokens.push(createTextToken(text.slice(lastIndex)));
-        }
-
+        if (lastIndex < text.length) tokens.push(createTextToken(text.slice(lastIndex)));
         return tokens;
     }
 
+    type ParserState = {
+        blocks: AnswerBlock[];
+        paragraph: string[];
+        listItems: string[];
+        listType: 'ul' | 'ol' | null;
+        codeLines: string[];
+        codeLang: string;
+        inCodeBlock: boolean;
+    };
+
+    /**
+     * Initializes parser state used while walking answer lines.
+     */
+    function createParserState(): ParserState {
+        return {
+            blocks: [],
+            paragraph: [],
+            listItems: [],
+            listType: null,
+            codeLines: [],
+            codeLang: '',
+            inCodeBlock: false
+        };
+    }
+
+    /**
+     * Pushes buffered paragraph lines as a paragraph block.
+     */
+    function flushParagraph(state: ParserState) {
+        if (!state.paragraph.length) return;
+        state.blocks.push({
+            type: 'paragraph',
+            tokens: parseInlineTokens(state.paragraph.join(' ').replace(/\s+/g, ' ').trim())
+        });
+        state.paragraph = [];
+    }
+
+    /**
+     * Pushes buffered list items as ordered or unordered list block.
+     */
+    function flushList(state: ParserState) {
+        if (!state.listItems.length || !state.listType) return;
+        state.blocks.push({
+            type: 'list',
+            ordered: state.listType === 'ol',
+            items: state.listItems.map((item) => parseInlineTokens(item))
+        });
+        state.listItems = [];
+        state.listType = null;
+    }
+
+    /**
+     * Pushes buffered fenced-code lines as a code block.
+     */
+    function flushCode(state: ParserState) {
+        state.blocks.push({
+            type: 'code',
+            lang: state.codeLang.replace(/[^a-z0-9_-]/gi, ''),
+            code: state.codeLines.join('\n')
+        });
+        state.codeLines = [];
+        state.codeLang = '';
+    }
+
+    /**
+     * Handles lines when parser is currently inside a fenced code block.
+     * Returns true if the line was consumed by code-block handling.
+     */
+    function handleCodeState(line: string, trimmed: string, state: ParserState): boolean {
+        if (!state.inCodeBlock) return false;
+        if (trimmed.startsWith('```')) {
+            state.inCodeBlock = false;
+            flushCode(state);
+        } else {
+            state.codeLines.push(line);
+        }
+        return true;
+    }
+
+    /**
+     * Handles non-code lines: code fences, blank lines, headings, lists, and paragraph text.
+     */
+    function handleRegularLine(trimmed: string, state: ParserState) {
+        if (trimmed.startsWith('```')) {
+            flushParagraph(state);
+            flushList(state);
+            state.inCodeBlock = true;
+            state.codeLang = trimmed.slice(3).trim();
+            return;
+        }
+
+        if (!trimmed) {
+            flushParagraph(state);
+            flushList(state);
+            return;
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+        if (headingMatch) {
+            flushParagraph(state);
+            flushList(state);
+            state.blocks.push({
+                type: 'heading',
+                level: headingMatch[1].length as 1 | 2 | 3,
+                tokens: parseInlineTokens(headingMatch[2])
+            });
+            return;
+        }
+
+        const unorderedMatch = trimmed.match(/^[-*•]\s+(.+)$/);
+        if (unorderedMatch) {
+            flushParagraph(state);
+            if (state.listType === 'ol') flushList(state);
+            state.listType = 'ul';
+            state.listItems.push(unorderedMatch[1]);
+            return;
+        }
+
+        const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+        if (orderedMatch) {
+            flushParagraph(state);
+            if (state.listType === 'ul') flushList(state);
+            state.listType = 'ol';
+            state.listItems.push(orderedMatch[1]);
+            return;
+        }
+
+        state.paragraph.push(trimmed);
+    }
+
+    /**
+     * Converts raw LLM text into renderable blocks (paragraphs, headings, lists, code).
+     */
     function renderAnswer(text: string): AnswerBlock[] {
         const lines = text.replaceAll('\r\n', '\n').trim().split('\n');
-        const blocks: AnswerBlock[] = [];
-        let paragraph: string[] = [];
-        let listItems: string[] = [];
-        let listType: 'ul' | 'ol' | null = null;
-        let codeLines: string[] = [];
-        let codeLang = '';
-        let inCodeBlock = false;
-
-        const flushParagraph = () => {
-            if (!paragraph.length) return;
-            blocks.push({ type: 'paragraph', tokens: parseInlineTokens(paragraph.join(' ').replace(/\s+/g, ' ').trim()) });
-            paragraph = [];
-        };
-
-        const flushList = () => {
-            if (!listItems.length || !listType) return;
-            blocks.push({
-                type: 'list',
-                ordered: listType === 'ol',
-                items: listItems.map((item) => parseInlineTokens(item))
-            });
-            listItems = [];
-            listType = null;
-        };
-
-        const flushCode = () => {
-            blocks.push({ type: 'code', lang: codeLang.replace(/[^a-z0-9_-]/gi, ''), code: codeLines.join('\n') });
-            codeLines = [];
-            codeLang = '';
-        };
+        const state = createParserState();
 
         for (const rawLine of lines) {
             const line = rawLine.trimEnd();
             const trimmed = line.trim();
-
-            if (inCodeBlock) {
-                if (trimmed.startsWith('```')) {
-                    inCodeBlock = false;
-                    flushCode();
-                } else {
-                    codeLines.push(line);
-                }
-                continue;
-            }
-
-            if (trimmed.startsWith('```')) {
-                flushParagraph();
-                flushList();
-                inCodeBlock = true;
-                codeLang = trimmed.slice(3).trim();
-                continue;
-            }
-
-            if (!trimmed) {
-                flushParagraph();
-                flushList();
-                continue;
-            }
-
-            const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
-            if (headingMatch) {
-                flushParagraph();
-                flushList();
-                const level = headingMatch[1].length;
-                blocks.push({ type: 'heading', level: level as 1 | 2 | 3, tokens: parseInlineTokens(headingMatch[2]) });
-                continue;
-            }
-
-            const unorderedMatch = trimmed.match(/^[-*•]\s+(.+)$/);
-            if (unorderedMatch) {
-                flushParagraph();
-                if (listType === 'ol') flushList();
-                listType = 'ul';
-                listItems.push(unorderedMatch[1]);
-                continue;
-            }
-
-            const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
-            if (orderedMatch) {
-                flushParagraph();
-                if (listType === 'ul') flushList();
-                listType = 'ol';
-                listItems.push(orderedMatch[1]);
-                continue;
-            }
-
-            paragraph.push(trimmed);
+            if (handleCodeState(line, trimmed, state)) continue;
+            handleRegularLine(trimmed, state);
         }
 
-        flushParagraph();
-        flushList();
-        if (inCodeBlock) flushCode();
-
-        return blocks;
+        flushParagraph(state);
+        flushList(state);
+        if (state.inCodeBlock) flushCode(state);
+        return state.blocks;
     }
 
-    let renderedAnswer = $derived(renderAnswer(answer));
+    /**
+     * Reads an SSE response stream and appends emitted data chunks to the live answer.
+     */
+    async function parseSSEStream(response: Response): Promise<string> {
+        if (!response.body) throw new Error('No response body');
 
-    async function askQuestion(event?: SubmitEvent) {
-        event?.preventDefault();
-
-        const prompt = question.trim();
-        if (!prompt || loading) return;
-
-        loading = true;
-        error = '';
-        answer = '';
-        question = '';
-
-    try {
-        const res = await fetch('/api/ai-assist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
-        // console.log('status:', res.status);
-        // console.log('content-type:', res.headers.get('content-type'));
-
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(txt || 'Server error');
-        }
-
-        if (!res.body) {
-            throw new Error('No response body');
-        }
-
-        const reader = res.body.getReader();
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let fullText = '';
 
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
-
             const events = buffer.split('\n\n');
             buffer = events.pop() || '';
 
             for (const event of events) {
                 const lines = event.split('\n');
                 const dataParts: string[] = [];
-                let isEndEvent = false;
 
                 for (const line of lines) {
-                    if (line.startsWith('event:') && line.slice(6).trim() === 'end') {
-                        isEndEvent = true;
-                    } else if (line.startsWith('data:')) {
-                        dataParts.push(line.slice(5).trimStart());
+                    if (line.startsWith('data:')) {
+                        dataParts.push(line.slice(5).replace(/^ /, ''));
                     }
                 }
 
                 if (dataParts.length) {
-                    // Join data lines within the same SSE event with newlines,
-                    // but do not force a newline between separate events.
-					let newText = dataParts.join('\n');
-					// If the last char of answer and first char of newText are both non-whitespace, add a space
-					if (answer && newText && /\S$/.test(answer) && /^\S/.test(newText)) {
-						answer += ' ';
-					}
-					answer += newText;
-                }
-
-                if (isEndEvent) {
-                    break;
+                    let newText = dataParts.join('\n');
+                    fullText += newText;
+                    answer = fullText;
                 }
             }
         }
 
-        const completedAnswer = answer.trim();
-        if (completedAnswer) {
-            history = [...history, { question: prompt, blocks: renderAnswer(completedAnswer) }];
+        return fullText;
+    }
+
+    /**
+     * Calls the selected backend endpoint and parses streamed response text.
+     */
+    async function callLLM(endpoint: string, prompt: string, fallbackError: string, signal?: AbortSignal): Promise<string> {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt }),
+            signal
+        });
+
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(txt || fallbackError);
         }
-    } catch (e) {
-        error = e instanceof Error ? e.message : 'Unknown error';
-    } finally {
+
+        return parseSSEStream(res);
+    }
+
+    /**
+     * Aborts the active model stream and leaves any partial answer visible.
+     */
+    function stopStreaming() {
+        if (!loading || !activeStreamController) return;
+        activeStreamController.abort();
+        activeStreamController = null;
         loading = false;
     }
-}
+
+    // DERIVED
+    let renderedAnswer = $derived(renderAnswer(answer));
+
+    /**
+     * Handles submit: validates prompt, calls selected provider, updates history and UI state.
+     */
+    async function askQuestion(event?: SubmitEvent) {
+        event?.preventDefault();
+
+        const prompt = question.trim();
+        if (!prompt) return;
+
+        if (loading && activeStreamController) {
+            activeStreamController.abort();
+            activeStreamController = null;
+        }
+
+        loading = true;
+        error = '';
+        answer = '';
+        question = '';
+        const controller = new AbortController();
+        activeStreamController = controller;
+
+        try {
+            const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
+            const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
+            const result = await callLLM(endpoint, prompt, fallbackError, controller.signal);
+
+            const completedAnswer = result.trim();
+            if (completedAnswer) {
+                history = [...history, { question: prompt, blocks: renderAnswer(completedAnswer) }];
+            }
+        } catch (e) {
+            if (e instanceof Error && e.name === 'AbortError') {
+                return;
+            }
+            error = e instanceof Error ? e.message : 'Unknown error';
+        } finally {
+            if (activeStreamController === controller) {
+                activeStreamController = null;
+                loading = false;
+            }
+        }
+    }
 
 </script>
 
 <div class="container">
+    {#snippet renderToken(token: InlineToken)}
+        {#if token.type === 'text'}
+            {token.value}
+        {:else if token.type === 'strong'}
+            <strong>{token.value}</strong>
+        {:else if token.type === 'em'}
+            <em>{token.value}</em>
+        {:else if token.type === 'code'}
+            <code>{token.value}</code>
+        {:else if token.type === 'link'}
+            <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
+        {/if}
+    {/snippet}
+
+    {#snippet renderBlocks(blocks: AnswerBlock[])}
+        {#each blocks as block, index (index)}
+            {#if block.type === 'paragraph'}
+                <p>
+                    {#each block.tokens as token, tokenIndex (tokenIndex)}
+                        {@render renderToken(token)}
+                    {/each}
+                </p>
+            {:else if block.type === 'heading'}
+                <svelte:element this={`h${block.level}`}>
+                    {#each block.tokens as token, tokenIndex (tokenIndex)}
+                        {@render renderToken(token)}
+                    {/each}
+                </svelte:element>
+            {:else if block.type === 'list'}
+                {#if block.ordered}
+                    <ol>
+                        {#each block.items as item, itemIndex (itemIndex)}
+                            <li>
+                                {#each item as token, tokenIndex (tokenIndex)}
+                                    {@render renderToken(token)}
+                                {/each}
+                            </li>
+                        {/each}
+                    </ol>
+                {:else}
+                    <ul>
+                        {#each block.items as item, itemIndex (itemIndex)}
+                            <li>
+                                {#each item as token, tokenIndex (tokenIndex)}
+                                    {@render renderToken(token)}
+                                {/each}
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            {:else if block.type === 'code'}
+                <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
+            {/if}
+        {/each}
+    {/snippet}
+
     <h1>
         Welcome to <b>Zombie Kittens</b> AI Assist page 🐈‍⬛ 
     </h1>
-    <p class="info"> You can ask 2 questions a minute and 20 a day</p>
+    <p class="info">You can ask 2 questions a minute and 20 a day</p>
     <hr>
-     <form class="form-input-parent" onsubmit={askQuestion}>
+    <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 1rem;">
+        <button 
+            class="toggle-button" 
+            class:active={llmMode === 'gemini'}
+            onclick={() => llmMode = 'gemini'}
+            disabled={loading}
+        >
+            🔵 Gemini
+        </button>
+        <button 
+            class="toggle-button" 
+            class:active={llmMode === 'ollama'}
+            onclick={() => llmMode = 'ollama'}
+            disabled={loading}
+        >
+            🦙 Ollama
+        </button>
+    </div>
+    <form class="form-input-parent" onsubmit={askQuestion}>
         <input
             class="form-input"
             type="text"
@@ -469,7 +622,10 @@ let history = $state<HistoryEntry[]>([]);
         <button type="submit" disabled={loading || !question.trim()}>
             Ask
         </button>
-     </form>
+        <button type="button" onclick={stopStreaming} disabled={!loading}>
+            Stop
+        </button>
+    </form>
 	{#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
     {/if}
@@ -478,85 +634,7 @@ let history = $state<HistoryEntry[]>([]);
     {/if}
     {#if answer}
         <div class="answer-card">
-            {#each renderedAnswer as block, index (index)}
-                {#if block.type === 'paragraph'}
-                    <p>
-                        {#each block.tokens as token, tokenIndex (tokenIndex)}
-                            {#if token.type === 'text'}
-                                {token.value}
-                            {:else if token.type === 'strong'}
-                                <strong>{token.value}</strong>
-                            {:else if token.type === 'em'}
-                                <em>{token.value}</em>
-                            {:else if token.type === 'code'}
-                                <code>{token.value}</code>
-                            {:else if token.type === 'link'}
-                                <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                            {/if}
-                        {/each}
-                    </p>
-                {:else if block.type === 'heading'}
-                    <svelte:element this={`h${block.level}`}>
-                        {#each block.tokens as token, tokenIndex (tokenIndex)}
-                            {#if token.type === 'text'}
-                                {token.value}
-                            {:else if token.type === 'strong'}
-                                <strong>{token.value}</strong>
-                            {:else if token.type === 'em'}
-                                <em>{token.value}</em>
-                            {:else if token.type === 'code'}
-                                <code>{token.value}</code>
-                            {:else if token.type === 'link'}
-                                <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                            {/if}
-                        {/each}
-                    </svelte:element>
-                {:else if block.type === 'list'}
-                    {#if block.ordered}
-                        <ol>
-                            {#each block.items as item, itemIndex (itemIndex)}
-                                <li>
-                                    {#each item as token, tokenIndex (tokenIndex)}
-                                        {#if token.type === 'text'}
-                                            {token.value}
-                                        {:else if token.type === 'strong'}
-                                            <strong>{token.value}</strong>
-                                        {:else if token.type === 'em'}
-                                            <em>{token.value}</em>
-                                        {:else if token.type === 'code'}
-                                            <code>{token.value}</code>
-                                        {:else if token.type === 'link'}
-                                            <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                                        {/if}
-                                    {/each}
-                                </li>
-                            {/each}
-                        </ol>
-                    {:else}
-                        <ul>
-                            {#each block.items as item, itemIndex (itemIndex)}
-                                <li>
-                                    {#each item as token, tokenIndex (tokenIndex)}
-                                        {#if token.type === 'text'}
-                                            {token.value}
-                                        {:else if token.type === 'strong'}
-                                            <strong>{token.value}</strong>
-                                        {:else if token.type === 'em'}
-                                            <em>{token.value}</em>
-                                        {:else if token.type === 'code'}
-                                            <code>{token.value}</code>
-                                        {:else if token.type === 'link'}
-                                            <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                                        {/if}
-                                    {/each}
-                                </li>
-                            {/each}
-                        </ul>
-                    {/if}
-                {:else if block.type === 'code'}
-                    <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
-                {/if}
-            {/each}
+            {@render renderBlocks(renderedAnswer)}
         </div>
     {/if}
     {#if history.length}
@@ -565,91 +643,9 @@ let history = $state<HistoryEntry[]>([]);
             {#each history as entry, entryIndex (entryIndex)}
                 <article>
                     <h3>Q {entryIndex + 1}: {entry.question}</h3>
-                    {#each entry.blocks as block, blockIndex (blockIndex)}
-                        {#if block.type === 'paragraph'}
-                            <p>
-                                {#each block.tokens as token, tokenIndex (tokenIndex)}
-                                    {#if token.type === 'text'}
-                                        {token.value}
-                                    {:else if token.type === 'strong'}
-                                        <strong>{token.value}</strong>
-                                    {:else if token.type === 'em'}
-                                        <em>{token.value}</em>
-                                    {:else if token.type === 'code'}
-                                        <code>{token.value}</code>
-                                    {:else if token.type === 'link'}
-                                        <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                                    {/if}
-                                {/each}
-                            </p>
-                        {:else if block.type === 'heading'}
-                            <svelte:element this={`h${block.level}`}>
-                                {#each block.tokens as token, tokenIndex (tokenIndex)}
-                                    {#if token.type === 'text'}
-                                        {token.value}
-                                    {:else if token.type === 'strong'}
-                                        <strong>{token.value}</strong>
-                                    {:else if token.type === 'em'}
-                                        <em>{token.value}</em>
-                                    {:else if token.type === 'code'}
-                                        <code>{token.value}</code>
-                                    {:else if token.type === 'link'}
-                                        <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                                    {/if}
-                                {/each}
-                            </svelte:element>
-                        {:else if block.type === 'list'}
-                            {#if block.ordered}
-                                <ol>
-                                    {#each block.items as item, itemIndex (itemIndex)}
-                                        <li>
-                                            {#each item as token, tokenIndex (tokenIndex)}
-                                                {#if token.type === 'text'}
-                                                    {token.value}
-                                                {:else if token.type === 'strong'}
-                                                    <strong>{token.value}</strong>
-                                                {:else if token.type === 'em'}
-                                                    <em>{token.value}</em>
-                                                {:else if token.type === 'code'}
-                                                    <code>{token.value}</code>
-                                                {:else if token.type === 'link'}
-                                                    <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                                                {/if}
-                                            {/each}
-                                        </li>
-                                    {/each}
-                                </ol>
-                            {:else}
-                                <ul>
-                                    {#each block.items as item, itemIndex (itemIndex)}
-                                        <li>
-                                            {#each item as token, tokenIndex (tokenIndex)}
-                                                {#if token.type === 'text'}
-                                                    {token.value}
-                                                {:else if token.type === 'strong'}
-                                                    <strong>{token.value}</strong>
-                                                {:else if token.type === 'em'}
-                                                    <em>{token.value}</em>
-                                                {:else if token.type === 'code'}
-                                                    <code>{token.value}</code>
-                                                {:else if token.type === 'link'}
-                                                    <a href={token.href} target="_blank" rel="noreferrer noopener">{token.value}</a>
-                                                {/if}
-                                            {/each}
-                                        </li>
-                                    {/each}
-                                </ul>
-                            {/if}
-                        {:else if block.type === 'code'}
-                            <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
-                        {/if}
-                    {/each}
+                    {@render renderBlocks(entry.blocks)}
                 </article>
             {/each}
         </section>
     {/if}
 </div>
-    <!-- <footer class="footer">
-        <span class="footer">🐈‍⬛</span> <b>Zombie Kittens</b> are always watching... &copy; {new Date().getFullYear()}<span class="kitten">🧟‍</span>
-    </footer> -->
-
