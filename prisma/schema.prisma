@@ -30,6 +30,8 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String? 
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

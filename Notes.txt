@@ -102,3 +102,213 @@ model Comment {
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }
+
+
+
+
+OLD LOG IN PAGE
+<script>
+import Input from '$lib/components/Input.svelte';
+import Button from '$lib/components/Button.svelte';
+
+let email = "";
+let password = "";
+
+</script>
+
+
+<div class="log-in-page">
+
+
+<h1>42Overflow </h1>
+
+<Input
+  label="Email"
+  name="email"
+  placeholder="Enter email"
+  bind:value={email}
+/>
+
+
+<Input
+  label="Password"
+  name="password"
+  placeholder="Enter password"
+  bind:value={password}
+/>
+
+<Button label="Log In" type="Log in" />
+
+
+<p>Don’t have an account? Sign up or use 42Auth </p>
+
+</div>
+
+
+
+<style>
+  .log-in-page {
+    width: 100%;
+    max-width: 400px;
+    padding: 0rem;
+    text-align: left;
+  }
+</style>
+
+
+
+AVATAR OLD CommentThread
+<script lang="ts">
+  export let src: string = '';       // image URL
+  export let size: string = '50px';  // diameter
+  export let alt: string = 'Avatar'; // alt text
+</script>
+
+<div class="avatar" style="width: {size}; height: {size};">
+  {#if src}
+    <img src={src} alt={alt} />
+  {:else}
+    <span>👤</span> <!-- placeholder icon -->
+  {/if}
+  <img src={src} alt={alt} on:error={(e) => e.currentTarget.style.display='none'} />
+</div>
+
+<style>
+.avatar {
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-neutral-300);
+  flex-shrink: 0; /* don’t shrink if used in a flex row */
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar span {
+  font-size: calc(var(--font-size-medium) * 1.2);
+}
+</style>
+
+
+OLD PROFILE
+
+
+<script>
+  import Button from '$lib/components/Button.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Avatar from '$lib/components/Avatar.svelte';
+  
+  let avatarimage = "";
+  let firstname = "";
+  let lastname = "";
+  let email = "";
+  let password = "";
+  let campus = "";
+  let intraprofile = "";
+
+</script>
+
+<div class="profile-page">
+  <h1>PROFILE</h1>
+
+
+<div class="avatar-wrapper">
+  <Avatar />
+</div>
+
+<div class="name-row">
+  <Input
+    label="First Name"
+    name="firstname"
+    placeholder="First"
+    bind:value={firstname} />
+  <Input
+    label="Last Name"
+    name="lastname"
+    placeholder="Last"
+    bind:value={lastname} />
+</div>
+
+<Input
+  label="E-mail"
+  name="email"
+  placeholder="E-mail"
+  bind:value={email}
+/>
+
+<Input
+  label="Password"
+  name="password"
+  placeholder="Password"
+  bind:value={password}
+/>
+
+<Input
+  label="Image"
+  name="avatarimage"
+  placeholder="Link for profile picture"
+  bind:value={avatarimage}
+/>
+
+<Input
+  label="Campus"
+  name="campus"
+  placeholder="Campus"
+  bind:value={campus}
+/>
+
+<Input
+  label="Intra Profile"
+  name="intraprofile"
+  placeholder="Intra profile"
+  bind:value={intraprofile}
+/>
+
+<Button label="Update" type="update" />
+
+</div>
+
+
+<style>
+
+.avatar-wrapper {
+  margin-top: .5rem;
+  margin-bottom: .5rem;
+}
+  .profile-page {
+    width: 100%;
+    max-width: 490px;
+    padding: 0rem;
+    text-align: left;
+
+  }
+
+  .name-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.name-row :global(.input-wrapper) {
+  flex: 1; /* each takes equal half of the row */
+}
+</style>
+
+
+
+----------------------------
+OLD AVATAR CODE  
+
+    <Avatar src={previewUrl} size="80px" />
+      <input
+        type="file"
+        name="avatarimage"
+        accept="image/*"
+        on:change={handleFileChange}
+      />
+

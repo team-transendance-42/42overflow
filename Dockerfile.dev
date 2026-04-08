@@ -22,4 +22,4 @@ ENV NODE_ENV=development
 EXPOSE 5173
 
 # Vite needs --host so it's reachable from host machine
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npm run dev -- --host"]

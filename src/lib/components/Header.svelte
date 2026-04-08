@@ -10,7 +10,7 @@
 	</div>
 
    <div class="right">
-    	<a href="/log-in">Log-In | </a>
+    	<a href="/login">Log-In | </a>
     	<a href="/profile" class="profile-link">Profile </a>
 		<a href="/settings" class="settings-link">
 		<Settingsicon size="15px" />  </a>
