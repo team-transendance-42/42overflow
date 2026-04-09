@@ -27,6 +27,10 @@ func main() {
 	log.Println("Successfully loaded API Key.")
 
 	router := mux.NewRouter()
+	router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}).Methods(http.MethodGet)
 
 	middleware.StartCleanup() // background go routine with infinate loop, sleeps 5 min, cleans
 	router.Use(middleware.ErrorRecovery) //ErrorRecovery lets execution flow to RateLimiter only if no panic occurs.

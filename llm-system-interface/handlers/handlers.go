@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"llm-system-interface/models"
 	"llm-system-interface/services"
+	"log"
 	"net/http"
 	"strings"
-	"log"
 )
 
 /**
@@ -33,7 +33,7 @@ This allows for the "typing" effect or real-time ticker updates, as the browser 
 
 func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5173") // todo: vite dev server, in prod: need to update to match the real frontend URL
-	// w.Header().Set("Access-Control-Allow-Origin", "*") // only for testing: 
+	// w.Header().Set("Access-Control-Allow-Origin", "*") // only for testing:
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -70,7 +70,8 @@ func validateTextReq(w http.ResponseWriter, r *http.Request, req *models.TextReq
 	return true
 }
 
-/**
+/*
+*
 context.Context is an object that carries:
 cancellation signal, timeout / deadline, request-scoped values
 In web servers, every incoming HTTP request has its own context.
@@ -98,10 +99,14 @@ Second flush: for the final “end” event, to guarantee delivery.
 */
 func GenerateText(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GenerateText(): method=%s path=%s", r.Method, r.URL.Path)
-	if !setHeaders(w, r) { return }
+	if !setHeaders(w, r) {
+		return
+	}
 
 	var req models.TextRequest
-	if !validateTextReq(w, r, &req) { return }
+	if !validateTextReq(w, r, &req) {
+		return
+	}
 	ch, err := services.StreamLLM(r.Context(), req)
 	if err != nil {
 		log.Printf("GenerateText: StreamLLM error: %v", err)

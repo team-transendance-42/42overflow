@@ -42,8 +42,8 @@ func extractTextFromJSON(data string, text *string) bool {
 		return false
 	}
 
-	*text = strings.TrimSpace(chunk.Candidates[0].Content.Parts[0].Text) // assign val to where text points to
-	if *text == "" {
+	*text = chunk.Candidates[0].Content.Parts[0].Text
+	if strings.TrimSpace(*text) == "" {
 		log.Println("extractTextFromJSON(): empty text chunk")
 		return false
 	}
@@ -88,8 +88,12 @@ for testing; in production, pass http.DefaultClient.
 */
 func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiKey string) (*http.Response, error) {
 	url := os.Getenv("GEMINI_URL")
+	model := os.Getenv("GEMINI_MODEL")
+	if model == "" {
+		model = "gemini-2.0-flash"
+	}
 	if url == "" {
-		url = "https://gemini.googleapis.com/v1/models/gpt-4.0-pro:generateContent"
+		url = fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?alt=sse", model)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
