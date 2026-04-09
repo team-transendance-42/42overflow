@@ -2,10 +2,20 @@ Svelte is a UI framework like React or Vue, but with a key difference: instead o
 Here's a quick mental model:
 React/Vue → ships a runtime library → does DOM diffing in the browser
 Svelte → compiles away at build time → ships plain JS that directly updates the DOM
+
+nvm (Node Version Manager) is a tool that lets you easily install, manage, and switch between multiple versions of Node.js on your system. This is useful if you need to use different Node.js versions for different projects or want to quickly upgrade or downgrade Node.js without affecting other setups.
+
+npm (Node Package Manager) is the default package manager for Node.js. It is used to install, manage, and share JavaScript packages (libraries, tools, frameworks) for your projects. With npm, you can easily add dependencies, run scripts, and manage project configurations.
+
+nvm is recommended to easily manage and switch Node.js versions, ensuring compatibility with Svelte and its tools.
+npm is required to install Svelte, its dependencies, and development tools (like Vite) since Svelte projects rely on npm packages.
+In summary: nvm is optional but helpful, while npm is essential for Svelte development.
 --------------------
 
-1. Install nvm (Node Version Manager)
+1. Install nvm (Node Version Manager) run the bash script after curl download
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+//apply any changes made to env variables, aliases, or functions—such as adding nvm to your PATH—without needing to open a new terminal window. 
 
 source ~/.bashrc
 

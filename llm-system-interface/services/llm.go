@@ -14,7 +14,8 @@ import (
 	"strings"
 )
 
-/**
+/*
+*
 parses a single Gemini SSE "data:" JSON payload and extracts text content.
 It validates the nested Candidates > Content > Parts > Text structure and returns true only if
 text is successfully extracted and non-empty. On failure, it logs the reason and returns false.
@@ -49,7 +50,8 @@ func extractTextFromJSON(data string, text *string) bool {
 	return true
 }
 
-/**
+/*
+*
 reads the Gemini streaming HTTP response line by line,
 filters for "data:" SSE events, validates each payload via extractTextFromJSON,
 and sends successfully parsed text chunks to ch. Both resp.Body and ch are closed
@@ -67,14 +69,17 @@ func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 		data := strings.TrimPrefix(line, "data: ")
 
 		text := ""
-		if !extractTextFromJSON(data, &text) { continue }
+		if !extractTextFromJSON(data, &text) {
+			continue
+		}
 
 		log.Printf("StreamLLM: sending chunk=%q", text) // debug, remove later
 		ch <- text
 	}
 }
 
-/**
+/*
+*
 doGEMINIRequest builds and performs an HTTP POST to the Gemini API streaming endpoint.
 It constructs the request with the provided body and API key, sets required headers,
 and returns either the open response (caller must close) or an error if the request
@@ -82,11 +87,10 @@ fails or returns a non-200 status. The client parameter allows injection of a mo
 for testing; in production, pass http.DefaultClient.
 */
 func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiKey string) (*http.Response, error) {
-	// 2.5: Free limits (realistic) ~100–1000 requests/day, ~5–15 requests/min, Sometimes ~250/day typical: use this in prod?
-	// url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"
-	// url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?alt=sse"
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:streamGenerateContent?alt=sse" // use this in prod
-	//url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:streamGenerateContent?alt=sse"
+	url := os.Getenv("GEMINI_URL")
+	if url == "" {
+		url = "https://gemini.googleapis.com/v1/models/gpt-4.0-pro:generateContent"
+	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
@@ -133,12 +137,12 @@ consider summarized history instead of sending full conversation each time.
 func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, error) {
 	ch := make(chan string)
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	const conciseInstruction = "use less words, dont repeat yourself";
+	const conciseInstruction = "use less words, dont repeat yourself"
 
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY is not set in environment")
 	}
-	body, err := json.Marshal(map[string]any{  //// Gemini-specific JSON structure
+	body, err := json.Marshal(map[string]any{ //// Gemini-specific JSON structure
 		"contents": []map[string]any{
 			{
 				"parts": []map[string]string{

@@ -18,7 +18,7 @@ import (
 func main() {
 	err := godotenv.Load() // Load the .env file
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("No .env file loaded, using container/runtime environment variables")
 	}
 	apiKey := os.Getenv("GEMINI_API_KEY") // todo: rmv, this is for testing
 	if apiKey == "" {

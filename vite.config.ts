@@ -3,6 +3,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:8081';
+
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
@@ -12,7 +14,7 @@ export default defineConfig({
 	server: {
 		proxy: {
 			'/api': {
-				target: 'http://localhost:8081',
+				target: apiProxyTarget,
 				changeOrigin: true
 			}
 		}

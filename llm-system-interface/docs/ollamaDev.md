@@ -8,15 +8,16 @@ ollama serve
 qwen3:8b = the actual LLM model (the application/software)
 
 * 2
-New terminal:
-ollama pull qwen3:8b
-ollama run qwen3:8b
+New terminal: (less smart model: however, the only one i could find to be able to run on my machine)
 
-// specialized coding llm:
-ollama pull codellama
+ollama pull qwen2.5-coder:7b
+ollama run qwen2.5-coder:7b
 
-<!--ollama pull gemma3
-ollama run gemma3-->
+Best picks in Ollama right now: april 2026
+
+General talk: ollama pull qwen2.5:14b // too heavy for most laptops, can try for powerful remote server, best 32/72b models: qwen2.5:32b or qwen2.5:72b
+Coding: qwen2.5-coder:32b // too heavy for my laptop
+
 
 * 3
 Then test API:
