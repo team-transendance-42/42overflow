@@ -312,3 +312,122 @@ OLD AVATAR CODE
         on:change={handleFileChange}
       />
 
+
+old avatar
+	<Avatar src={previewUrl} size="80px" />
+  
+  		<label class="upload-btn">
+    		<strong>Upload photo</strong>
+    		<input
+      			type="file"
+      			name="avatarimage"
+      			accept="image/*"
+      			on:change={handleFileChange}
+    		/>
+  		</label>
+	
+	{#if previewUrl}
+      <button type="button" class="remove-btn" on:click={() => previewUrl = ''}>
+        Remove
+      </button>
+    {/if}
+
+
+  <input type="hidden" name="removeAvatar" value={previewUrl ? 'false' : 'true'} />
+  </div>
+
+
+  --------------------
+
+  saveing profile +page.server.ts
+  import { fail, redirect } from '@sveltejs/kit';
+import { auth } from '$lib/server/auth';
+import type { Actions } from './$types';
+
+export const actions: Actions = {
+  login: async ({ request, cookies }) => {
+    const data = await request.formData();
+    const email = data.get('email') as string;
+    const password = data.get('password') as string;
+
+    if (!email || !password) {
+      return fail(400, { error: 'Email and password are required' });
+    }
+
+    try {
+      const response = await auth.api.signInEmail({
+        body: { email, password },
+        asResponse: true,
+      });
+
+      if (!response.ok) {
+        return fail(401, { error: 'Invalid email or password' });
+      }
+
+      // extract the session cookie from better-auth's response and set it
+      const setCookie = response.headers.get('set-cookie');
+      if (setCookie) {
+        const match = setCookie.match(/better-auth\.session_token=([^;]+)/);
+        if (match) {
+          cookies.set('better-auth.session_token', match[1], {
+            path: '/',
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: false,
+            maxAge: 60 * 60 * 24 * 7,
+          });
+        }
+      }
+
+    } catch (e) {
+      console.error('Login error:', e);
+      return fail(401, { error: 'Invalid email or password' });
+    }
+
+    throw redirect(303, '/profile');
+  }
+};
+
+
+and sign up
+import { fail, redirect } from '@sveltejs/kit';
+import { auth } from '$lib/server/auth';
+import type { Actions } from './$types';
+
+export const actions: Actions = {
+  signup: async ({ request }) => {
+    const data = await request.formData();
+    const email = data.get('email') as string;
+    const password = data.get('password') as string;
+    const name = data.get('name') as string;
+
+    if (!email || !password) {
+      return fail(400, { error: 'Email and password are required' });
+    }
+
+    try {
+      await auth.api.signUpEmail({
+        body: { email, password, name },
+      });
+    } catch (e) {
+	  console.error('Signup error:', e);  
+      return fail(400, { error: 'Could not create account. Email may already be in use.' });
+    }
+
+    throw redirect(303, '/login');
+  }
+};
+
+
+--------------------
+
+<script>
+  export let label = "Button";
+  export let type = "button"; // button | submit
+</script>
+
+<button type={type}>
+  {label}
+</button>
+
+button code 

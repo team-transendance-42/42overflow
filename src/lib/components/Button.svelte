@@ -1,9 +1,10 @@
 <script>
   export let label = "Button";
-  export let type = "button"; // button | submit
+  export let type = "button";
+  export let onClick = () => {};
 </script>
 
-<button type={type}>
+<button {type} on:click={onClick}>
   {label}
 </button>
 

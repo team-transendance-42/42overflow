@@ -2,64 +2,81 @@
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
-  import { enhance } from '$app/forms';
+  import { authClient } from '$lib/auth-client';
 
   export let data;
-  export let form;
 
   let firstname = data.user?.name?.split(' ')[0] ?? '';
   let lastname = data.user?.name?.split(' ')[1] ?? '';
   let email = data.user?.email ?? '';
-  let intraprofile = '';
-  let campus = '';
-
+  let intraprofile = data.profile?.login ?? '';
+  let campus = data.profile?.campus ?? '';
   let previewUrl = data.user?.image ?? '';
+  let error = '';
+  let success = false;
+  let loading = false;
 
   function handleFileChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) previewUrl = URL.createObjectURL(file);
   }
+
+  async function handleUpdate() {
+    error = '';
+    success = false;
+    loading = true;
+
+    const { error: err } = await authClient.updateUser({
+      name: `${firstname} ${lastname}`.trim(),
+      image: previewUrl || '',
+    });
+
+    loading = false;
+
+    if (err) {
+      error = err.message ?? 'Could not update profile';
+      return;
+    }
+
+    success = true;
+  }
 </script>
 
 <form method="POST" action="?/update" use:enhance enctype="multipart/form-data">
-  <div class="profile-page">
-    <h1>PROFILE</h1>
+<div class="profile-page">
+  <h1><strong>PROFILE PAGE</strong></h1>
 
-    {#if form?.error}
-      <p class="error">{form.error}</p>
+  {#if error}
+    <p class="error">{error}</p>
+  {/if}
+  {#if success}
+    <p class="success">Profile updated!</p>
+  {/if}
+
+  <div class="avatar-wrapper">
+    <Avatar src={previewUrl} size="80px" />
+    <label class="upload-btn">
+      <strong>Upload avatar</strong>
+      <input type="file" name="avatarimage" accept="image/*" on:change={handleFileChange} />
+    </label>
+    {#if previewUrl}
+      <button type="button" class="remove-btn" on:click={() => previewUrl = ''}>
+        <strong>Remove avatar</strong>
+      </button>
     {/if}
-    {#if form?.success}
-      <p class="success">Profile updated!</p>
-    {/if}
-
-    <div class="avatar-wrapper">
-  		<Avatar src={previewUrl} size="80px" />
-  
-  		<label class="upload-btn">
-    		<strong>Upload photo</strong>
-    		<input
-      			type="file"
-      			name="avatarimage"
-      			accept="image/*"
-      			on:change={handleFileChange}
-    		/>
-  		</label>
-
-
-
-    </div>
-
-    <div class="name-row">
-      <Input label="First Name" name="firstname" placeholder="First" bind:value={firstname} />
-      <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
-    </div>
-
-    <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
-    <Input label="Campus" name="campus" placeholder="Campus" bind:value={campus} />
-    <Input label="Intra Profile" name="intraprofile" placeholder="Intra profile" bind:value={intraprofile} />
-
-    <Button label="Update" type="submit" />
   </div>
+
+  <div class="name-row">
+    <Input label="First Name" name="firstname" placeholder="First" bind:value={firstname} />
+    <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
+  </div>
+
+  <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
+  <Input label="Campus" name="campus" placeholder="Campus" bind:value={campus} />
+  <Input label="Intra Profile" name="intraprofile" placeholder="Intra profile" bind:value={intraprofile} />
+
+  <Button label={loading ? 'Saving...' : 'Update'} type="button" onClick={handleUpdate} />
+</div>
 </form>
 
 <style>
@@ -73,13 +90,24 @@
   .upload-btn {
   cursor: pointer;
   font-size: 0.875rem;
-  padding: 6px 14px;
   border: 0.5px solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
   display: inline-block;
 }
 
 .upload-btn input {
+  display: none;
+}
+
+.remove-btn  {
+  cursor: pointer;
+  font-size: 0.875rem;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  display: flex;
+}
+
+.remove-btn input {
   display: none;
 }
 
