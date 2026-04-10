@@ -9,7 +9,7 @@
   let firstname = data.user?.name?.split(' ')[0] ?? '';
   let lastname = data.user?.name?.split(' ')[1] ?? '';
   let email = data.user?.email ?? '';
-  let interests = data.user?.interests ?? '';
+  let interests = data.profile?.interests ?? '';
   let intraprofile = data.profile?.login ?? '';
   let campus = data.profile?.campus ?? '';
   let previewUrl = data.user?.image ?? '';
@@ -22,6 +22,7 @@
   function handleFileChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) previewUrl = URL.createObjectURL(file);
+
   }
 
   function removeAvatar() {

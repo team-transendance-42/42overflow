@@ -23,14 +23,17 @@ export const actions: Actions = {
   update: async ({ request, locals }) => {
     if (!locals.user) return fail(401, { error: 'Not logged in' });
 
+
     const data = await request.formData();
+
+	
     const firstname = data.get('firstname') as string;
     const lastname = data.get('lastname') as string;
+	const interests = data.get('interests') as string;
     const removeAvatar = data.get('removeAvatar') === 'true';
     const avatarFile = data.get('avatarimage') as File;
 
     let imageUrl: string | undefined;
-
     if (removeAvatar) {
       imageUrl = '';
     } else if (avatarFile && avatarFile.size > 0) {
@@ -57,17 +60,31 @@ export const actions: Actions = {
       return fail(400, { error: 'Could not update profile' });
     }
 
-    await db.profile.upsert({
-      where: { userId: locals.user.id },
-      update: {
-        login: data.get('intraprofile') as string || undefined,
-      },
-      create: {
-        userId: locals.user.id,
-        login: data.get('intraprofile') as string || undefined,
-      },
-    });
 
-    return { success: true };
+try {
+  const intraprofile = data.get('intraprofile');
+  const interestsRaw = data.get('interests');
+
+  const interests = typeof interestsRaw === 'string' ? interestsRaw : null;
+  const login = typeof intraprofile === 'string' && intraprofile !== '' ? intraprofile : null;
+
+  const profile = await db.profile.upsert({
+    where: { userId: locals.user.id },
+    update: {
+      login,
+      interests,
+    },
+    create: {
+      userId: locals.user.id,
+      login,
+      interests,
+    },
+  });
+
+  console.log('PROFILE SAVED:', profile);
+} catch (err) {
+  console.error('UPDATING PROFILE FAILED:', err);
+  return fail(400, { error: 'Could not update profile' });
+}
   }
 };

@@ -69,6 +69,7 @@ model Profile {
   login     String? @unique
   biography String?
   campusId  Int?
+  interests String?
 
   anonymize_at DateTime?
   deleted_at   DateTime?
