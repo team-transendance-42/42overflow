@@ -8,6 +8,7 @@ import (
 	"llm-system-interface/services"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -31,11 +32,31 @@ It bypasses the standard buffering logic of the Go web server.
 This allows for the "typing" effect or real-time ticker updates, as the browser receives the bytes immediately after they are written.
 */
 
+func allowedOrigin(origin string) string {
+	if origin == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return ""
+	}
+
+	host := parsed.Hostname()
+	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+		return ""
+	}
+
+	return origin
+}
+
 func setHeaders(w http.ResponseWriter, r *http.Request) bool {
-	w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:5173") // todo: vite dev server, in prod: need to update to match the real frontend URL
-	// w.Header().Set("Access-Control-Allow-Origin", "*") // only for testing:
+	if origin := allowedOrigin(r.Header.Get("Origin")); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+	}
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
