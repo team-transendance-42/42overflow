@@ -82,12 +82,12 @@ services:
       - app-net
     restart: "no"
 
-  nginx:
-    image: nginx:1.27-alpine
+  caddy:
+    image: caddy:2.9-alpine
     ports:
       - "8080:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - app
       - llm-server

@@ -77,11 +77,25 @@ todo: Add JWT auth middleware that verifies the Bearer token and writes the user
 Change limiter key selection to use context user ID first, IP second.
 */
 func extractClientKey(r *http.Request) string {
-    host, _, err := net.SplitHostPort(r.RemoteAddr)
-    if err != nil {
-        return "ip:" + strings.TrimSpace(r.RemoteAddr)
-    }
-    return "ip:" + host
+	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+		// X-Forwarded-For may contain a comma-separated chain: client,proxy1,proxy2
+		first := strings.TrimSpace(strings.Split(xff, ",")[0])
+		if ip := net.ParseIP(first); ip != nil {
+			return "ip:" + ip.String()
+		}
+	}
+
+	if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+		if ip := net.ParseIP(xri); ip != nil {
+			return "ip:" + ip.String()
+		}
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return "ip:" + strings.TrimSpace(r.RemoteAddr)
+	}
+	return "ip:" + host
 }
 
 /**
