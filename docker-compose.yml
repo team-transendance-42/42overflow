@@ -28,4 +28,9 @@ services:
 
 volumes:
   postgres-data:
+<<<<<<< Updated upstream
   uploads-data:
+=======
+
+
+>>>>>>> Stashed changes
