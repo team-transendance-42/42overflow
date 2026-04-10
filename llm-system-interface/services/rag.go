@@ -1,5 +1,4 @@
 package services
-package services
 
 import (
 	"bytes"
@@ -197,7 +196,7 @@ func queryContexts(ctx context.Context, collection, question string, topK int) (
 
 func askOllama(ctx context.Context, prompt string) (string, error) {
 	payload := map[string]any{
-		"model": chatModelName(),
+		"model":  chatModelName(),
 		"stream": false,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
