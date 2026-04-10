@@ -10,6 +10,7 @@ style="width: {width};">
     <a href="/questions">Questions</a>
     <a href="/post-question">Post Question</a>
     <a href="/ai-assist">AI Assist</a>
+	<a href="/users">Users</a>
   </div>
 </aside>
 
