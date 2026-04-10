@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
 // ─── better-auth required tables ─────────────────────────────────────────────
 
 model User {
@@ -17,6 +23,7 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  role          Role      @default(USER)
 
   sessions Session[]
   accounts Account[]
