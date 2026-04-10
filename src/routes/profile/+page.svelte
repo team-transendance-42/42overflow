@@ -9,8 +9,8 @@
   let firstname = data.user?.name?.split(' ')[0] ?? '';
   let lastname = data.user?.name?.split(' ')[1] ?? '';
   let email = data.user?.email ?? '';
-  let interests = data.user?.interests ?? '';
-  let quote = data.user?.quote ?? '';
+  let interests = data.profile?.interests ?? '';
+  let quote = data.profile?.quote ?? '';
   let intraprofile = data.profile?.login ?? '';
   let campus = data.profile?.campus ?? '';
   let previewUrl = data.user?.image ?? '';
@@ -40,15 +40,25 @@
       image: previewUrl || '',
     });
 
-    loading = false;
-
     if (err) {
+	  loading = false;
       error = err.message ?? 'Could not update profile';
       return;
     }
 
-    success = true;
-  }
+   const formData = new FormData();
+  formData.append('intraprofile', intraprofile);
+  formData.append('interests', interests);
+  formData.append('quote', quote);
+
+  await fetch('?/update', {
+    method: 'POST',
+    body: formData,
+  });
+
+  loading = false;
+  success = true;
+}
 </script>
 
 <form method="POST" action="?/update" use:enhance enctype="multipart/form-data">
