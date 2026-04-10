@@ -97,6 +97,7 @@ services:
 volumes:
   postgres-data:
   ollama-data:
+  uploads-data:
 
 networks:
   app-net:
