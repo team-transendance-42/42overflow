@@ -44,7 +44,7 @@
 
   <Button label={loading ? 'Creating account...' : 'Sign Up'} type="button" onClick={handleSignup} />
 
-  <p>Already have an account? <a href="/login">Log in</a></p>
+  <p>Already have an account? <a href="/login"><strong>Log in</strong></a></p>
 </div>
 
 <style>
