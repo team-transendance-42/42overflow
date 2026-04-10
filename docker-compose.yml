@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: transcendance_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - app-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    expose:
+      - "5173"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/transcendance_db"
+      VITE_API_PROXY_TARGET: "http://llm-server:8081"
+    depends_on:
+      # - postgres
+      - llm-server
+    networks:
+      - app-net
+
+  llm-server:
+    build:
+      context: ./llm-system-interface
+      dockerfile: Dockerfile
+    expose:
+      - "8081"
+    env_file:
+      - ./llm-system-interface/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    networks:
+      - app-net
+
+  ollama:
+    image: ollama/ollama:0.20.5
+    expose:
+      - "11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ollama-init:
+    build:
+      context: ./ollama-init
+      dockerfile: Dockerfile
+    env_file:
+      - ./llm-system-interface/.env
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - app-net
+    restart: "no"
+
+  caddy:
+    image: caddy:2.9-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - app
+      - llm-server
+    networks:
+      - app-net
+
+volumes:
+  postgres-data:
+  ollama-data:
+
+networks:
+  app-net:
+    driver: bridge
