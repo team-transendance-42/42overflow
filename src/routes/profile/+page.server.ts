@@ -26,6 +26,8 @@ export const actions: Actions = {
     const data = await request.formData();
     const firstname = data.get('firstname') as string;
     const lastname = data.get('lastname') as string;
+	const quote = data.get('quote') as string;
+	const interests = data.get('interests') as string;
     const removeAvatar = data.get('removeAvatar') === 'true';
     const avatarFile = data.get('avatarimage') as File;
 
@@ -61,10 +63,14 @@ export const actions: Actions = {
       where: { userId: locals.user.id },
       update: {
         login: data.get('intraprofile') as string || undefined,
+		interests: data.get('interests') as string || undefined,
+        quote: data.get('quote') as string || undefined,
       },
       create: {
         userId: locals.user.id,
         login: data.get('intraprofile') as string || undefined,
+		interests: data.get('interests') as string || undefined,
+        quote: data.get('quote') as string || undefined,
       },
     });
 

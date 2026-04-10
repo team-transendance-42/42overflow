@@ -10,6 +10,7 @@
   let lastname = data.user?.name?.split(' ')[1] ?? '';
   let email = data.user?.email ?? '';
   let interests = data.user?.interests ?? '';
+  let quote = data.user?.quote ?? '';
   let intraprofile = data.profile?.login ?? '';
   let campus = data.profile?.campus ?? '';
   let previewUrl = data.user?.image ?? '';
@@ -80,6 +81,7 @@
   </div>
 
   <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
+  <Input label="Favorite Quote" name="quote" placeholder="Quote" bind:value={quote} />
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
   <Input label="Campus" name="campus" placeholder="Campus" bind:value={campus} />
   <Input label="Intra Profile" name="intraprofile" placeholder="Intra profile" bind:value={intraprofile} />
