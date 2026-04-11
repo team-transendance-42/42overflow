@@ -17,9 +17,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    volumes:
-      - ./:/app # bind mount mapping: live code sync: editing files locally updates files in the container instantly: good for dev,
-      - /app/node_modules
     expose:
       - "5173"
     environment:
