@@ -23,6 +23,8 @@ def main():
 
 #If this file is being run directly, then __name__ is set to "__main__", so Python calls main().
 #If this file is imported from another file, __name__ is set to the module’s name instead, so main() does not run automatically.
+#If another file does:import hello
+#then hello.py is loaded, but main() does not run unless you call it yourself.
 if __name__ == "__main__":
 	main()
 

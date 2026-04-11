@@ -4,6 +4,10 @@ services:
       - ./:/app
       - /app/node_modules
 
+  llm-server:
+    ports:
+      - "8081:8081"
+
   rag-python:
     command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8090", "--reload"]
     volumes:
