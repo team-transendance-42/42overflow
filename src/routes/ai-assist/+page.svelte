@@ -6,7 +6,6 @@
         --soft-shadow: 0 0 12px #F4FFE8, 0 0 8px #F4FFE8;
         --focus-border: rgba(168, 188, 132, 0.9);
         --focus-glow: rgba(168, 188, 132, 0.22);
-        background: #001a00;
         color: white;
         min-height: 100vh;
         min-width: 100vw;
@@ -30,20 +29,8 @@
     .info {
         margin: 1rem 0;
     }
-    /* footer {
-        width: 100%;
-        background: #222;
-        color: #F4FFE8;
-        text-align: center;
-        padding: .5em 0;
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        font-size: 1em;
-        letter-spacing: 0.05em;
-    } */
 
-    .answer-card {
+	.answer-card {
         width: 100%;
         display: inline-block;
         margin: 20px auto;
@@ -73,7 +60,6 @@
         flex: 1 1 auto;
         min-width: 0;
         display: block;
-        margin: 0;
         background: var(--panel-bg);
         border: 1px solid var(--panel-border);
         border-radius: 14px;
@@ -87,7 +73,7 @@
     .form-input:focus,
     .form-input:focus-visible {
         outline: none;
-        border-color: var(--focus-border);
+        border-color: var(--olive-text);
         box-shadow: 0 0 0 3px var(--focus-glow);
     }
 
@@ -102,13 +88,19 @@
         white-space: nowrap;
     }
 
+	.parent-llms {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+	}
+
     .toggle-button {
         flex: 0 0 auto;
         border: 1px solid rgba(244, 255, 232, 0.18);
         border-radius: 14px;
-        background: #1a2e1a;
         color: #a8bc84;
-        padding: 1.25rem 1.5rem;
+        padding: .75rem 1.5rem;
+		margin-top: 1rem;
         cursor: pointer;
         white-space: nowrap;
         font-size: 0.9em;
@@ -116,7 +108,7 @@
     }
 
     .toggle-button.active {
-        background: #2d4d2d;
+        /*background: #2d4d2d;*/
         color: #f4ffe8;
         border-color: rgba(168, 188, 132, 0.6);
     }
@@ -552,7 +544,7 @@
     </h1>
     <p class="info">You can ask 2 questions a minute and 20 a day</p>
     <hr>
-    <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 1rem;">
+    <div class="parent-llms">
         <button 
             class="toggle-button" 
             class:active={llmMode === 'gemini'}
