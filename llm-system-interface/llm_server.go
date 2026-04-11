@@ -38,6 +38,8 @@ func main() {
 
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
 	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/rag/index", handlers.RagIndex).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/rag/ask", handlers.RagAsk).Methods("POST", "OPTIONS")
 	//router.HandleFunc("/api/generate-image", handlers.GenerateImage).Methods("POST", "OPTIONS") // placeholder for future image generation endpoint: todo: implement handlers.GenerateImage
 
 	log.Println("Server running on port 8081")
