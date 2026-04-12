@@ -7,23 +7,15 @@
         --focus-border: rgba(168, 188, 132, 0.9);
         --focus-glow: rgba(168, 188, 132, 0.22);
         color: white;
-        min-height: 100vh;
-        min-width: 100vw;
-        width: 100%;
         display: flex;
         flex-direction: column;
     }
 
-    h1,
+    h2,
     .info {
         color: var(--olive-text);
         text-shadow: var(--soft-shadow);
         text-align: center;
-    }
-
-    h1 {
-        font-size: 2.8em;
-        margin-top: 32px;
     }
 
     .info {
@@ -108,7 +100,6 @@
     }
 
     .toggle-button.active {
-        /*background: #2d4d2d;*/
         color: #f4ffe8;
         border-color: rgba(168, 188, 132, 0.6);
     }
@@ -117,6 +108,7 @@
         cursor: not-allowed;
         opacity: 0.55;
     }
+
     .answer-card :global(h1),
     .answer-card :global(h2),
     .answer-card :global(h3) {
@@ -124,7 +116,7 @@
         line-height: 1.2;
         color: #f4ffe8;
     }
-
+/* 
     .answer-card :global(h1) {
         font-size: 1.5rem;
     }
@@ -139,7 +131,7 @@
 
     .answer-card :global(p) {
         margin: 0.75rem 0;
-    }
+    } */
 
     .answer-card :global(ul),
     .answer-card :global(ol) {
@@ -209,9 +201,9 @@
     let answer = $state('');
     let loading = $state(false);
     let error = $state('');
+    let activeStreamController = $state<AbortController | null>(null);
     let llmMode = $state<'gemini' | 'ollama'>('gemini');
     let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]);
-    let activeStreamController: AbortController | null = null;
 
     // TYPES
     type InlineToken =
@@ -539,9 +531,7 @@
         {/if}
     {/snippet}
 
-    <h1>
-        Welcome to <b>Zombie Kittens</b> AI Assist page 🐈‍⬛ 
-    </h1>
+    <h2><b>Zombie Kittens</b> AI Assist 🐈‍⬛ </h2>
     <p class="info">You can ask 2 questions a minute and 20 a day</p>
     <hr>
     <div class="parent-llms">
@@ -675,5 +665,3 @@
         </section>
     {/if}
 </div>
-
-
