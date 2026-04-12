@@ -45,6 +45,11 @@ const (
 	maxLimiters         = 10_000 // safety cap: prevents unbounded map growth from bot/fake IDs -> used
 )
 
+func secondsUntilUTCMidnight(now time.Time) int {
+	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+	return int(time.Until(midnight).Seconds())
+}
+
 func getLimiter(key string) (*limiterEntry, bool) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -158,13 +163,13 @@ func RateLimiter(next http.Handler) http.Handler {
 
 		// --- daily quota check ---
 		// todo: re-enable in production — commented out for testing only
-		// if entry.dailyCnt >= perStudentDailyMax {
-		// 	w.Header().Set("X-RateLimit-Day-Remaining", "0")
-		// 	w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
-		// 	mu.Unlock()
-		// 	http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
-		// 	return
-		// }
+		if entry.dailyCnt >= perStudentDailyMax {
+			w.Header().Set("X-RateLimit-Day-Remaining", "0")
+			w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
+			mu.Unlock()
+			http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
+			return
+		}
 
 		// --- per-minute rate check --- todo: test do we see this text?
 		if !entry.limiter.Allow() {

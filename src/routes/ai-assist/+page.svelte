@@ -116,22 +116,6 @@
         line-height: 1.2;
         color: #f4ffe8;
     }
-/* 
-    .answer-card :global(h1) {
-        font-size: 1.5rem;
-    }
-
-    .answer-card :global(h2) {
-        font-size: 1.25rem;
-    }
-
-    .answer-card :global(h3) {
-        font-size: 1.1rem;
-    }
-
-    .answer-card :global(p) {
-        margin: 0.75rem 0;
-    } */
 
     .answer-card :global(ul),
     .answer-card :global(ol) {
@@ -193,8 +177,8 @@
     .answer-card :global(em) {
         color: #dbe9d2;
     }
-
 </style>
+
 <script lang="ts">
     // STATE
     let question = $state('');
@@ -204,6 +188,55 @@
     let activeStreamController = $state<AbortController | null>(null);
     let llmMode = $state<'gemini' | 'ollama'>('gemini');
     let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]);
+    let dictating = $state(false);
+    let recognition: any = null;
+    let interimTranscript = '';
+
+    function startDictation() {
+        if (dictating) {
+            if (recognition) recognition.stop();
+            dictating = false;
+            return;
+        }
+
+        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+        if (!SpeechRecognition) {
+            error = 'Speech recognition not supported in this browser.';
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+
+        interimTranscript = '';
+        dictating = true;
+        error = '';
+
+        recognition.onresult = (event: any) => {
+            let final = '';
+            interimTranscript = '';
+            for (let i = 0; i < event.results.length; ++i) {
+                const res = event.results[i];
+                if (res.isFinal) final += res[0].transcript;
+                else interimTranscript += res[0].transcript;
+            }
+            question = (final + interimTranscript).trim();
+        };
+
+        recognition.onerror = (event: any) => {
+            error = 'Dictation error: ' + (event.error || 'Unknown');
+            dictating = false;
+        };
+
+        recognition.onend = () => {
+            dictating = false;
+            recognition = null;
+        };
+
+        recognition.start();
+    }
 
     // TYPES
     type InlineToken =
@@ -219,17 +252,10 @@
         | { type: 'list'; ordered: boolean; items: InlineToken[][] }
         | { type: 'code'; lang: string; code: string };
 
-    /**
-     * Creates a plain text token and strips inline markdown markers.
-     */
     function createTextToken(value: string): InlineToken {
         return { type: 'text', value: value.replaceAll('**', '').replaceAll('`', '') };
     }
 
-    /**
-     * Parses inline markdown-like syntax into structured tokens.
-     * Supported: code, bold, italic, and links.
-     */
     function parseInlineTokens(text: string): InlineToken[] {
         const tokens: InlineToken[] = [];
         const pattern = /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_|\[(.+?)\]\((.+?)\)/g;
@@ -259,9 +285,6 @@
         inCodeBlock: boolean;
     };
 
-    /**
-     * Initializes parser state used while walking answer lines.
-     */
     function createParserState(): ParserState {
         return {
             blocks: [],
@@ -274,9 +297,6 @@
         };
     }
 
-    /**
-     * Pushes buffered paragraph lines as a paragraph block.
-     */
     function flushParagraph(state: ParserState) {
         if (!state.paragraph.length) return;
         state.blocks.push({
@@ -286,9 +306,6 @@
         state.paragraph = [];
     }
 
-    /**
-     * Pushes buffered list items as ordered or unordered list block.
-     */
     function flushList(state: ParserState) {
         if (!state.listItems.length || !state.listType) return;
         state.blocks.push({
@@ -300,9 +317,6 @@
         state.listType = null;
     }
 
-    /**
-     * Pushes buffered fenced-code lines as a code block.
-     */
     function flushCode(state: ParserState) {
         state.blocks.push({
             type: 'code',
@@ -313,10 +327,6 @@
         state.codeLang = '';
     }
 
-    /**
-     * Handles lines when parser is currently inside a fenced code block.
-     * Returns true if the line was consumed by code-block handling.
-     */
     function handleCodeState(line: string, trimmed: string, state: ParserState): boolean {
         if (!state.inCodeBlock) return false;
         if (trimmed.startsWith('```')) {
@@ -328,9 +338,6 @@
         return true;
     }
 
-    /**
-     * Handles non-code lines: code fences, blank lines, headings, lists, and paragraph text.
-     */
     function handleRegularLine(trimmed: string, state: ParserState) {
         if (trimmed.startsWith('```')) {
             flushParagraph(state);
@@ -379,9 +386,6 @@
         state.paragraph.push(trimmed);
     }
 
-    /**
-     * Converts raw LLM text into renderable blocks (paragraphs, headings, lists, code).
-     */
     function renderAnswer(text: string): AnswerBlock[] {
         const lines = text.replaceAll('\r\n', '\n').trim().split('\n');
         const state = createParserState();
@@ -399,9 +403,6 @@
         return state.blocks;
     }
 
-    /**
-     * Reads an SSE response stream and appends emitted data chunks to the live answer.
-     */
     async function parseSSEStream(response: Response): Promise<string> {
         if (!response.body) throw new Error('No response body');
 
@@ -439,14 +440,42 @@
         return fullText;
     }
 
+    const MAX_HISTORY = 10;
+
     /**
-     * Calls the selected backend endpoint and parses streamed response text.
+     * Skip code blocks in history — token-expensive and low context value.
+     * Cap paragraphs and lists at 300 chars. Headings are always short.
      */
-    async function callLLM(endpoint: string, prompt: string, fallbackError: string, signal?: AbortSignal): Promise<string> {
+    function blockToText(block: AnswerBlock): string {
+        const tokensToText = (tokens: InlineToken[]) =>
+            tokens.map(t => ('value' in t ? t.value : '')).join('').trim();
+
+        if (block.type === 'code')      return '';
+        if (block.type === 'paragraph') return tokensToText(block.tokens).slice(0, 300);
+        if (block.type === 'heading')   return tokensToText(block.tokens);
+        if (block.type === 'list')      return block.items.map(tokensToText).join(' ').slice(0, 300);
+        return '';
+    }
+
+    async function callLLM(
+            endpoint: string,
+            prompt: string,
+            fallbackError: string,
+            signal?: AbortSignal,
+            historySnapshot: typeof history = []
+        ): Promise<string> {
+        const messages = [
+            ...historySnapshot.flatMap(entry => [
+                { role: 'user', content: entry.question },
+                { role: 'assistant', content: entry.blocks.map(blockToText).join(' ') }
+            ]),
+            { role: 'user', content: prompt }
+        ];
+
         const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt }),
+            body: JSON.stringify({ messages, prompt }), // keep prompt for backend fallback
             signal
         });
 
@@ -458,22 +487,22 @@
         return parseSSEStream(res);
     }
 
-    /**
-     * Aborts the active model stream and leaves any partial answer visible.
-     */
     function stopStreaming() {
         if (!loading || !activeStreamController) return;
         activeStreamController.abort();
         activeStreamController = null;
         loading = false;
+        // Save partial answer and question to history if not empty: todo: doesnt work
+        if (question.trim() || answer.trim()) {
+            history = [...history, { question: question.trim(), blocks: renderAnswer(answer) }];
+            question = '';
+            answer = '';
+        }
     }
 
     // DERIVED
     let renderedAnswer = $derived(renderAnswer(answer));
 
-    /**
-     * Handles submit: validates prompt, calls selected provider, updates history and UI state.
-     */
     async function askQuestion(event?: SubmitEvent) {
         event?.preventDefault();
 
@@ -495,7 +524,8 @@
         try {
             const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
             const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
-            const result = await callLLM(endpoint, prompt, fallbackError, controller.signal);
+            const historySnapshot = history.slice(-MAX_HISTORY);
+            const result = await callLLM(endpoint, prompt, fallbackError, controller.signal, historySnapshot);
 
             const completedAnswer = result.trim();
             if (completedAnswer) {
@@ -513,7 +543,6 @@
             }
         }
     }
-
 </script>
 
 <div class="container">
@@ -535,16 +564,16 @@
     <p class="info">You can ask 2 questions a minute and 20 a day</p>
     <hr>
     <div class="parent-llms">
-        <button 
-            class="toggle-button" 
+        <button
+            class="toggle-button"
             class:active={llmMode === 'gemini'}
             onclick={() => llmMode = 'gemini'}
             disabled={loading}
         >
             🔵 Gemini
         </button>
-        <button 
-            class="toggle-button" 
+        <button
+            class="toggle-button"
             class:active={llmMode === 'ollama'}
             onclick={() => llmMode = 'ollama'}
             disabled={loading}
@@ -559,6 +588,9 @@
             bind:value={question}
             placeholder="Ask a question..."
         />
+        <button type="button" onclick={startDictation} aria-pressed={dictating}>
+            {dictating ? 'Stop Dictate' : 'Dictate'}
+        </button>
         <button type="submit" disabled={loading || !question.trim()}>
             Ask
         </button>
@@ -566,7 +598,7 @@
             Stop
         </button>
     </form>
-	{#if error}
+    {#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
     {/if}
     {#if loading}

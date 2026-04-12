@@ -5,7 +5,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="rag-python-service")
+app = FastAPI(title="python-rag-service")
 
 
 def _env(name: str, default: str) -> str:

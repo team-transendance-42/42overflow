@@ -12,12 +12,12 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --quiet-bui
 
 Then follow only the services you care about:
 
-docker compose logs -f app llm-server rag-python
+docker compose logs -f app llm-server python-rag
 ================================
 restart only app service:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml restart app
 
-if changed dependencies or dockerfiles, also restart llm-server and rag-python:
+if changed dependencies or dockerfiles, also restart llm-server and python-rag:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build app
 ================================
 
@@ -29,3 +29,39 @@ Use --build only when you changed:
 Dockerfile/base image
 package.json or lockfile
 Anything copied during image build that is not from the live mount
+================================
+sudo systemctl start docker
+===
+sudo dockerd &
+
+It manually starts the Docker daemon process in the background (& = background).
+
+The daemon is the service that actually runs containers — the docker CLI you have installed is just a client that talks to it. Without the daemon running, the CLI can't do anything.
+
+====
+docker ps -a
+docker images
+docker volume ls
+
+Remove all stopped containers:
+docker container prune
+
+Remove unused images:
+docker image prune
+Remove unused volumes:
+docker volume prune
+
+// for development
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build llm-server
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f llm-server
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f llm-server
+=================================
+
+docker container prune -f
+docker image prune -a -f
+docker volume prune -f
+docker network prune -f
+===================================
+(Optional) Remove everything (be careful!):
+docker system prune -a -f --volumes

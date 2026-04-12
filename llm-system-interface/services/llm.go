@@ -1,3 +1,4 @@
+// services/llm.go
 package services
 
 import (
@@ -6,21 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"llm-system-interface/models"
 	"log"
 	"net/http"
-	"os" // for os.Getenv to read environment variables
+	"os"
 	"strings"
 )
 
-/*
-*
-parses a single Gemini SSE "data:" JSON payload and extracts text content.
-It validates the nested Candidates > Content > Parts > Text structure and returns true only if
-text is successfully extracted and non-empty. On failure, it logs the reason and returns false.
-The extracted text is written to the provided pointer &text; callers must pass a valid *string.
-*/
 func extractTextFromJSON(data string, text *string) bool {
 	var chunk struct {
 		Candidates []struct {
@@ -36,12 +29,10 @@ func extractTextFromJSON(data string, text *string) bool {
 		log.Printf("extractTextFromJSON() failed: %v, data=%q", err, data)
 		return false
 	}
-
 	if len(chunk.Candidates) == 0 || len(chunk.Candidates[0].Content.Parts) == 0 {
 		log.Println("extractTextFromJSON(): no candidates or parts in chunk")
 		return false
 	}
-
 	*text = chunk.Candidates[0].Content.Parts[0].Text
 	if strings.TrimSpace(*text) == "" {
 		log.Println("extractTextFromJSON(): empty text chunk")
@@ -50,42 +41,24 @@ func extractTextFromJSON(data string, text *string) bool {
 	return true
 }
 
-/*
-*
-reads the Gemini streaming HTTP response line by line,
-filters for "data:" SSE events, validates each payload via extractTextFromJSON,
-and sends successfully parsed text chunks to ch. Both resp.Body and ch are closed
-(via defer) when the scanner reaches EOF or errors, allowing receiver to detect stream end.
-*/
 func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 	defer close(ch)
-	defer resp.Body.Close() // we get opened resp
+	defer resp.Body.Close()
+	sender := &chunkSender{}
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
-		data := strings.TrimPrefix(line, "data: ")
-
 		text := ""
-		if !extractTextFromJSON(data, &text) {
+		if !extractTextFromJSON(strings.TrimPrefix(line, "data: "), &text) {
 			continue
 		}
-
-		log.Printf("StreamLLM: sending chunk=%q", text) // debug, remove later
-		ch <- text
+		sender.send(ch, text)
 	}
 }
 
-/*
-*
-doGEMINIRequest builds and performs an HTTP POST to the Gemini API streaming endpoint.
-It constructs the request with the provided body and API key, sets required headers,
-and returns either the open response (caller must close) or an error if the request
-fails or returns a non-200 status. The client parameter allows injection of a mock
-for testing; in production, pass http.DefaultClient.
-*/
 func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiKey string) (*http.Response, error) {
 	url := os.Getenv("GEMINI_URL")
 	model := os.Getenv("GEMINI_MODEL")
@@ -96,72 +69,74 @@ func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiK
 		url = fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?alt=sse", model)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build Gemini request: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-goog-api-key", apiKey)
-
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Gemini HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-	}
-	return resp, nil
+	return withRetry(ctx, func() (*http.Response, error) {
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("build Gemini request: %w", err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("x-goog-api-key", apiKey)
+		return client.Do(httpReq)
+	})
 }
 
-/**
-tutorial: context.Context "A request bubble that travels through all your functions, telling them 'stop working if I get cancelled' and 'here's some shared data.'" Cancellation propagation – If a client disconnects or a timeout expires, all goroutines using that context know to stop immediately
-Timeout management – Enforce "this entire operation must complete in 5 seconds"
-Avoid resource leaks – No hanging goroutines waiting forever
-Request tracking – Pass request IDs, user info, or other metadata down the call stack
-type Context interface {
-    Deadline() (deadline time.Time, ok bool)    // When should this context stop?
-    Done() <-chan struct{}                       // Signal channel: closes when cancelled
-    Err() error                                  // Why was it cancelled? (ctx.Canceled or ctx.DeadlineExceeded)
-    Value(key interface{}) interface{}           // Get a stored value by key
+func buildGeminiContents(msgs []models.Message) []map[string]any {
+	contents := make([]map[string]any, 0, len(msgs))
+	for _, m := range msgs {
+		role := string(m.Role)
+		if role == "assistant" {
+			role = "model"
+		}
+		contents = append(contents, map[string]any{
+			"role": role,
+			"parts": []map[string]string{
+				{"text": m.Content},
+			},
+		})
+	}
+	return contents
 }
-*/
-/**
-StreamLLM orchestrates a streaming LLM request to the Gemini API.
-It validates the API key, marshals the prompt into Gemini's JSON format, calls doGEMINIRequest,
-launches readGeminiSSEToChannel in a non-blocking goroutine, and returns a read-only channel
-of text chunks. Callers should iterate over the returned channel to receive streamed output.
-On error (missing key, marshal failure, HTTP error), returns nil channel and error.
-Customized prompts to reply with less words, specific
 
-TODO: Implement app-side limits: max prompt size per request, per-user daily quota, and
-consider summarized history instead of sending full conversation each time.
-*/
+func buildGeminiContentsFromRequest(req models.TextRequest) []map[string]any {
+	msgs := make([]models.Message, 0, len(req.Messages)+1)
+	msgs = append(msgs, req.Messages...)
+
+	if strings.TrimSpace(req.Prompt) != "" {
+		msgs = append(msgs, models.Message{
+			Role:    "user",
+			Content: req.Prompt,
+		})
+	}
+
+	return buildGeminiContents(msgs)
+}
+
+const geminiSystemPrompt = "reply with less words, dont repeat info"
+
 func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, error) {
-	ch := make(chan string)
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	const conciseInstruction = "use less words, dont repeat yourself"
-
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY is not set in environment")
 	}
-	body, err := json.Marshal(map[string]any{ //// Gemini-specific JSON structure
-		"contents": []map[string]any{
-			{
-				"parts": []map[string]string{
-					{"text": conciseInstruction + "\n" + req.Prompt},
-				},
+
+	body, err := json.Marshal(map[string]any{
+		"system_instruction": map[string]any{
+			"parts": []map[string]string{
+				{"text": geminiSystemPrompt},
 			},
 		},
+		"contents": buildGeminiContentsFromRequest(req),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal Gemini request: %w", err)
 	}
+
 	resp, err := doGEMINIRequest(ctx, http.DefaultClient, body, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("do Gemini request: %w", err)
 	}
+
+	ch := make(chan string)
 	go readGeminiSSEToChannel(resp, ch)
 	return ch, nil
 }

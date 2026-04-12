@@ -6,6 +6,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: transcendance_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
@@ -23,8 +28,12 @@ services:
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/transcendance_db"
       VITE_API_PROXY_TARGET: "http://llm-server:8081"
     depends_on:
-      - postgres
-      - llm-server
+      postgres:
+        condition: service_healthy
+      llm-server:
+        condition: service_healthy
+      python-rag:
+        condition: service_healthy
     networks:
       - app-net
 
@@ -38,7 +47,7 @@ services:
       - ./llm-system-interface/.env
     environment:
       RAG_BACKEND: "python"
-      PY_RAG_URL: "http://rag-python:8090"
+      PY_RAG_URL: "http://python-rag:8090"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/healthz >/dev/null || exit 1"]
       interval: 10s
@@ -51,9 +60,9 @@ services:
       ollama-init:
         condition: service_completed_successfully
       chromadb:
-        condition: service_started
-      rag-python:
-        condition: service_started
+        condition: service_healthy
+      python-rag:
+        condition: service_healthy
     networks:
       - app-net
 
@@ -64,12 +73,17 @@ services:
     volumes:
       - chroma-data:/chroma/chroma
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - app-net
 
-  rag-python:
+  python-rag:
     build:
-      context: ./llm-system-interface/rag/python-service
+      context: ./python-services/rag
       dockerfile: Dockerfile
     expose:
       - "8090"
@@ -79,13 +93,30 @@ services:
       ollama:
         condition: service_healthy
       chromadb:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8090/healthz >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - app-net
+
+  python-stt:
+    build:
+      context: ./python-services/speach-to-text
+    command: ["uv", "run", "python", "main.py"]
+    volumes:
+      - ./python-services/speach-to-text:/app
+    ports:
+      - "8091:8091"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8091/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - app-net
 

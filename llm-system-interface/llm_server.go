@@ -22,7 +22,7 @@ func main() {
 	}
 	apiKey := os.Getenv("GEMINI_API_KEY") // todo: rmv, this is for testing
 	if apiKey == "" {
-		log.Fatal("GEMINI_API_KEY not found in environment after loading .env")
+		log.Println("GEMINI_API_KEY not found in environment after loading .env")
 	}
 	log.Println("Successfully loaded API Key.")
 

@@ -24,7 +24,7 @@ func ragBackend() string {
 func pyRagURL() string {
 	v := os.Getenv("PY_RAG_URL")
 	if strings.TrimSpace(v) == "" {
-		return "http://rag-python:8090"
+		return "http://python-rag:8090"
 	}
 	return strings.TrimRight(v, "/")
 }

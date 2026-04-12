@@ -1,103 +1,118 @@
 package services
 
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-    "net/http"
-    "os"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"llm-system-interface/models"
+	"log"
+	"net/http"
+	"os"
+	"strings"
 )
 
-// Ollama request/response structs
-type OllamaMessage struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
+type OllamaRequest struct {
+	Model    string      `json:"model"`
+	Messages []ollamaMsg `json:"messages"`
+	Stream   bool        `json:"stream"`
 }
 
-type OllamaRequest struct {
-    Model    string          `json:"model"`
-    Messages []OllamaMessage `json:"messages"`
-    Stream   bool            `json:"stream"`
+type ollamaMsg struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type OllamaResponse struct {
-    Message OllamaMessage `json:"message"`
-    Done    bool          `json:"done"`
+	Message ollamaMsg `json:"message"`
+	Done    bool      `json:"done"`
 }
 
-/* StreamOllama sends a prompt to Ollama and returns chunks via channel */
-func StreamOllama(ctx context.Context, prompt string) (<-chan string, error) {
-    ch := make(chan string)
-	const conciseInstruction = "Be my tutor: use less words,dry";
+const ollamaSystemPrompt = "reply with less words, dont repeat info"
 
-    model := os.Getenv("OLLAMA_MODEL")
-    if model == "" {
-        model = "codellama"
-    }
-    
-    ollamaURL := os.Getenv("OLLAMA_URL")
-    if ollamaURL == "" {
-        ollamaURL = "http://localhost:11434"
-    }
-    
-    reqBody := OllamaRequest{
-        Model: model,
-        Messages: []OllamaMessage{
-            {Role: "user", Content: conciseInstruction + "." + prompt},
-        },
-        Stream: true,
-    }
-    
-    body, err := json.Marshal(reqBody)
-    if err != nil {
-        return nil, err
-    }
-    
-    // Make HTTP request to Ollama with configurable URL
-    req, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/api/chat", bytes.NewReader(body))
-    if err != nil {
-        return nil, err
-    }
-    req.Header.Set("Content-Type", "application/json")
-    
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("Ollama request failed: %w", err)
-    }
-    
-    if resp.StatusCode != http.StatusOK {
-        defer resp.Body.Close()
-        respBody, _ := io.ReadAll(resp.Body)
-        return nil, fmt.Errorf("Ollama HTTP %d: %s", resp.StatusCode, string(respBody))
-    }
-    
-    // Stream response in background
-    go func() {
-        defer close(ch)
-        defer resp.Body.Close()
-        
-        decoder := json.NewDecoder(resp.Body)
-        for {
-            var ollamaResp OllamaResponse
-            if err := decoder.Decode(&ollamaResp); err != nil {
-                if err != io.EOF {
-                    log.Printf("Ollama decode error: %v", err)
-                }
-                break
-            }
-            
-            if ollamaResp.Message.Content != "" {
-                ch <- ollamaResp.Message.Content
-            }
-            
-            if ollamaResp.Done {
-                break
-            }
-        }
-    }()
-    
-    return ch, nil
+func buildOllamaMessages(msgs []models.Message) []ollamaMsg {
+	out := make([]ollamaMsg, 0, len(msgs)+1)
+	out = append(out, ollamaMsg{Role: "system", Content: ollamaSystemPrompt})
+	for _, m := range msgs {
+		out = append(out, ollamaMsg{
+			Role:    string(m.Role),
+			Content: m.Content,
+		})
+	}
+	return out
+}
+
+func buildOllamaMessagesFromRequest(req models.TextRequest) []ollamaMsg {
+	msgs := make([]models.Message, 0, len(req.Messages)+1)
+	msgs = append(msgs, req.Messages...)
+
+	if strings.TrimSpace(req.Prompt) != "" {
+		msgs = append(msgs, models.Message{
+			Role:    "user",
+			Content: req.Prompt,
+		})
+	}
+
+	return buildOllamaMessages(msgs)
+}
+
+func doOllamaRequest(ctx context.Context, ollamaURL, model string, req models.TextRequest) (*http.Response, error) {
+	body, err := json.Marshal(OllamaRequest{
+		Model:    model,
+		Messages: buildOllamaMessagesFromRequest(req),
+		Stream:   true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal Ollama request: %w", err)
+	}
+
+	return withRetry(ctx, func() (*http.Response, error) {
+		reqHTTP, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/api/chat", bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("build Ollama request: %w", err)
+		}
+		reqHTTP.Header.Set("Content-Type", "application/json")
+		return http.DefaultClient.Do(reqHTTP)
+	})
+}
+
+func readOllamaToChannel(resp *http.Response, ch chan string) {
+	defer close(ch)
+	defer resp.Body.Close()
+	sender := &chunkSender{}
+	decoder := json.NewDecoder(resp.Body)
+	for {
+		var r OllamaResponse
+		if err := decoder.Decode(&r); err != nil {
+			if err != io.EOF {
+				log.Printf("Ollama decode error: %v", err)
+			}
+			break
+		}
+		sender.send(ch, r.Message.Content)
+		if r.Done {
+			break
+		}
+	}
+}
+
+func StreamOllama(ctx context.Context, req models.TextRequest) (<-chan string, error) {
+	model := os.Getenv("OLLAMA_MODEL")
+	if model == "" {
+		model = "gemma3"
+	}
+	ollamaURL := os.Getenv("OLLAMA_URL")
+	if ollamaURL == "" {
+		ollamaURL = "http://localhost:11434"
+	}
+
+	resp, err := doOllamaRequest(ctx, ollamaURL, model, req)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan string)
+	go readOllamaToChannel(resp, ch)
+	return ch, nil
 }

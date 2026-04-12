@@ -1,5 +1,5 @@
 [project]
-name = "rag-python-service"
+name = "python-rag-service"
 version = "0.1.0"
 description = "Python RAG microservice for llm-system-interface"
 readme = "README.md"

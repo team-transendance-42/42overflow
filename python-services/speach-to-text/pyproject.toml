@@ -1,0 +1,14 @@
+[project]
+name = "speach-to-text"
+version = "0.1.0"
+description = "Speech to text service"
+requires-python = ">=3.11"
+dependencies = [
+    "openai-whisper",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart"
+]
+
+[tool.uv]
+# Optional: uv-specific settings

@@ -9,7 +9,7 @@ Go exposes API routes your app calls:
 llm_server.go
 
 So the request path is:
-Frontend -> llm-server /api/rag/index or /api/rag/ask -> rag-python /rag/index or /rag/ask -> chromadb + ollama.
+Frontend -> llm-server /api/rag/index or /api/rag/ask -> python-rag /rag/index or /rag/ask -> chromadb + ollama.
 ======
 Start stack:
 docker compose up --build
@@ -20,8 +20,8 @@ POST /api/rag/ask
 
 If you change Python dependencies in pyproject.toml:
 Rebuild is required:
-docker compose build rag-python
-docker compose up -d rag-python
+docker compose build python-rag
+docker compose up -d python-rag
 
 If you only change Python code:
-Because main.py is copied at build time, rebuild/restart rag-python to apply changes.
+Because main.py is copied at build time, rebuild/restart python-rag to apply changes.

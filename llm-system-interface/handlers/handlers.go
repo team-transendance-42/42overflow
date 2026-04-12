@@ -3,7 +3,6 @@ package handlers
 import (
 	// "bufio" for waht?
 	"encoding/json"
-	"fmt"
 	"llm-system-interface/models"
 	"llm-system-interface/services"
 	"log"
@@ -72,23 +71,45 @@ func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func validateTextReq(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
+func decodeAndSanitize(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return false
 	}
-
-	log.Printf("GenerateText: received prompt len=%d", len(req.Prompt))
 	req.Prompt = strings.TrimSpace(req.Prompt)
-	if req.Prompt == "" {
-		http.Error(w, "prompt is required", http.StatusBadRequest)
-		return false
-	}
-	if len(req.Prompt) > 20000 {
-		http.Error(w, "prompt too large, max allowed len 20000", http.StatusRequestEntityTooLarge)
-		return false
+	return true
+}
+
+func normalizeMessages(w http.ResponseWriter, req *models.TextRequest) bool {
+	if len(req.Messages) == 0 {
+		if req.Prompt == "" {
+			http.Error(w, "prompt or messages required", http.StatusBadRequest)
+			return false
+		}
+		req.Messages = []models.Message{
+			{Role: models.RoleUser, Content: req.Prompt},
+		}
 	}
 	return true
+}
+
+func validateMessageSize(w http.ResponseWriter, req *models.TextRequest) bool {
+	total := 0
+	for _, m := range req.Messages {
+		total += len(m.Content)
+	}
+	if total > 20000 {
+		http.Error(w, "total message content too large, max 20000 chars", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	log.Printf("validateTextReq: %d messages, total_len=%d", len(req.Messages), total)
+	return true
+}
+
+func validateTextReq(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
+	return decodeAndSanitize(w, r, req) &&
+		normalizeMessages(w, req) &&
+		validateMessageSize(w, req)
 }
 
 /*
@@ -128,29 +149,15 @@ func GenerateText(w http.ResponseWriter, r *http.Request) {
 	if !validateTextReq(w, r, &req) {
 		return
 	}
+
 	ch, err := services.StreamLLM(r.Context(), req)
 	if err != nil {
 		log.Printf("GenerateText: StreamLLM error: %v", err)
-		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway) // writes to client
+		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
-	for chunk := range ch {
-		for _, line := range strings.Split(chunk, "\n") {
-			fmt.Fprintf(w, "data: %s\n", line)
-		}
-		fmt.Fprint(w, "\n")
-		flusher.Flush()
-	}
-
-	fmt.Fprintf(w, "event: end\ndata: \n\n")
-	flusher.Flush()
+	streamSSE(w, ch)
 }
 
 /**Images don't stream — they return a JSON response with a URL or base64 bytes.*/
