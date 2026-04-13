@@ -2,13 +2,13 @@
 	type UserListItem = {
 		id: string;
 		name: string | null;
-		email: string;
+		email?: string;
 		role: 'USER' | 'MODERATOR' | 'ADMIN';
 		image: string | null;
 		createdAt: string | Date;
 	};
 
-	let { data }: { data: { users: UserListItem[] } } = $props();
+	let { data }: { data: { users: UserListItem[]; canViewEmail: boolean } } = $props();
 
 	function formatDate(value: string | Date) {
 		return new Date(value).toLocaleDateString();
@@ -30,7 +30,10 @@
 						{/if}
 						<div>
 							<h2>{user.name ?? 'Unnamed user'}</h2>
-							<p>{user.email}</p>
+							<p class="email-row">
+								<span class="email-label">Email:</span>
+								<span class="email-value">{data.canViewEmail && user.email ? user.email : null}</span>
+							</p>
 						</div>
 					</div>
 					<div class="user-meta">
@@ -68,7 +71,7 @@
 
 	.user-main {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.75rem;
 	}
 
@@ -83,6 +86,19 @@
 	.user-main h2 {
 		margin: 0;
 		font-size: 1rem;
+	}
+
+	.email-row {
+		margin: 0.15rem 0 0;
+		font-size: 0.9rem;
+		display: flex;
+		gap: 0.3rem;
+	}
+	.email-label {
+		font-weight: 600;
+	}
+	.email-value {
+		min-width: 12ch; /* keeps layout stable for moderators */
 	}
 
 	.user-main p {

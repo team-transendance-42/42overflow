@@ -7,7 +7,7 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	let { children } = $props();
+	let { children, data }: { children: Snippet; data: LayoutData } = $props();
 	
 </script>
 
@@ -16,7 +16,7 @@
 <Header />
 
 <div class="content">
-	<Sidebar />
+	<Sidebar userRole={data.userRole} />
 
 	<main>
 		{@render children()}

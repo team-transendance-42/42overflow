@@ -2,7 +2,7 @@
   import Input from '$lib/components/Input.svelte';
   import Button from '$lib/components/Button.svelte';
   import { authClient } from '$lib/auth-client';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
 
   let email = '';
   let password = '';
@@ -24,7 +24,7 @@
       error = err.message ?? 'Invalid email or password';
       return;
     }
-
+	await invalidateAll();
     goto('/profile');
   }
 </script>
@@ -37,7 +37,7 @@
   {/if}
 
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
-  <Input label="Password" name="password" placeholder="Enter password" bind:value={password} />
+  <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
   <Button label={loading ? 'Logging in...' : 'Log In'} type="button" onClick={handleLogin} />
 

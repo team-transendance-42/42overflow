@@ -40,7 +40,7 @@
 
   <Input label="Name" name="name" placeholder="Your name" bind:value={name} />
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
-  <Input label="Password" name="password" placeholder="Enter password" type="password" autocomplete="new-password" bind:value={password} />
+  <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
   <Button label={loading ? 'Creating account...' : 'Sign Up'} type="button" onClick={handleSignup} />
 

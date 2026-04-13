@@ -1,5 +1,8 @@
-<script>
+<script lang="ts">
   export let width = "140px";
+  export let userRole: 'USER' | 'MODERATOR' | 'ADMIN' | null = null;
+
+  $: canSeeUsersLink = userRole === 'MODERATOR' || userRole === 'ADMIN';
 </script>
 
 
@@ -10,7 +13,9 @@ style="width: {width};">
     <a href="/questions">Questions</a>
     <a href="/post-question">Post Question</a>
     <a href="/ai-assist">AI Assist</a>
-	<a href="/users">Users</a>
+	{#if canSeeUsersLink}
+	  <a href="/users">Users</a>
+	{/if}
   </div>
 </aside>
 
