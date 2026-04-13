@@ -26,4 +26,4 @@ CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npm run de
 
 
 # only for development, not production: air is a tool that watches for file changes and restarts the server automatically
-RUN go install github.com/air-verse/air@latest
+# RUN go install github.com/air-verse/air@latest

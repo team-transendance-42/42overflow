@@ -109,6 +109,7 @@ services:
     command: ["uv", "run", "python", "main.py"]
     volumes:
       - ./python-services/speach-to-text:/app
+      - whisper-model-cache:/root/.cache/whisper # <--- Persists the model weights
     ports:
       - "8091:8091"
     healthcheck:
@@ -166,6 +167,7 @@ volumes:
   ollama-data:
   chroma-data:
   uploads-data:
+  whisper-model-cache:
 
 networks:
   app-net:

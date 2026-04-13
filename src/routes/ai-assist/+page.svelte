@@ -191,15 +191,17 @@
     let dictating = $state(false);
     let recognition: any = null;
     let interimTranscript = '';
-    let isQueued = $state(false);
+    // let isQueued = $state(false);
     let queueTimer: ReturnType<typeof setTimeout> | null = null;
+    let mediaRecorder = $state<MediaRecorder | null>(null);
+    let audioChunks: Blob[] = [];
 
     // to store history chat in db
-    const sessionId: string = localStorage.getItem('session_id') ?? (() => {
-        const id = crypto.randomUUID();
-        localStorage.setItem('session_id', id);
-        return id;
-    })();
+    // const sessionId: string = localStorage.getItem('session_id') ?? (() => {
+    //     const id = crypto.randomUUID();
+    //     localStorage.setItem('session_id', id);
+    //     return id;
+    // })();
 
     // TYPES
     type InlineToken =
@@ -260,41 +262,44 @@
         };
     }
 
-    function flushParagraph(state: ParserState) {
-        if (!state.paragraph.length) return;
-        state.blocks.push({
-            type: 'paragraph',
-            tokens: parseInlineTokens(state.paragraph.join(' ').replace(/\s+/g, ' ').trim())
-        });
-        state.paragraph = [];
-    }
-
-    function flushList(state: ParserState) {
-        if (!state.listItems.length || !state.listType) return;
-        state.blocks.push({
-            type: 'list',
-            ordered: state.listType === 'ol',
-            items: state.listItems.map((item) => parseInlineTokens(item))
-        });
-        state.listItems = [];
-        state.listType = null;
-    }
-
-    function flushCode(state: ParserState) {
-        state.blocks.push({
-            type: 'code',
-            lang: state.codeLang.replace(/[^a-z0-9_-]/gi, ''),
-            code: state.codeLines.join('\n')
-        });
-        state.codeLines = [];
-        state.codeLang = '';
+    /**
+     * Generic flushBlock function to flush a block by type.
+     * @param state ParserState
+     * @param type 'paragraph' | 'list' | 'code'
+     */
+    function flushBlock(state: ParserState, type: 'paragraph' | 'list' | 'code') {
+        if (type === 'paragraph') {
+            if (!state.paragraph.length) return;
+            state.blocks.push({
+                type: 'paragraph',
+                tokens: parseInlineTokens(state.paragraph.join(' ').replace(/\s+/g, ' ').trim())
+            });
+            state.paragraph = [];
+        } else if (type === 'list') {
+            if (!state.listItems.length || !state.listType) return;
+            state.blocks.push({
+                type: 'list',
+                ordered: state.listType === 'ol',
+                items: state.listItems.map((item) => parseInlineTokens(item))
+            });
+            state.listItems = [];
+            state.listType = null;
+        } else if (type === 'code') {
+            state.blocks.push({
+                type: 'code',
+                lang: state.codeLang.replace(/[^a-z0-9_-]/gi, ''),
+                code: state.codeLines.join('\n')
+            });
+            state.codeLines = [];
+            state.codeLang = '';
+        }
     }
 
     function handleCodeState(line: string, trimmed: string, state: ParserState): boolean {
         if (!state.inCodeBlock) return false;
         if (trimmed.startsWith('```')) {
             state.inCodeBlock = false;
-            flushCode(state);
+            flushBlock(state, 'code');
         } else {
             state.codeLines.push(line);
         }
@@ -303,23 +308,23 @@
 
     function handleRegularLine(trimmed: string, state: ParserState) {
         if (trimmed.startsWith('```')) {
-            flushParagraph(state);
-            flushList(state);
+            flushBlock(state, 'paragraph');
+            flushBlock(state, 'list');
             state.inCodeBlock = true;
             state.codeLang = trimmed.slice(3).trim();
             return;
         }
 
         if (!trimmed) {
-            flushParagraph(state);
-            flushList(state);
+            flushBlock(state, 'paragraph');
+            flushBlock(state, 'list');
             return;
         }
 
         const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
         if (headingMatch) {
-            flushParagraph(state);
-            flushList(state);
+            flushBlock(state, 'paragraph');
+            flushBlock(state, 'list');
             state.blocks.push({
                 type: 'heading',
                 level: headingMatch[1].length as 1 | 2 | 3,
@@ -330,8 +335,8 @@
 
         const unorderedMatch = trimmed.match(/^[-*•]\s+(.+)$/);
         if (unorderedMatch) {
-            flushParagraph(state);
-            if (state.listType === 'ol') flushList(state);
+            flushBlock(state, 'paragraph');
+            if (state.listType === 'ol') flushBlock(state, 'list');
             state.listType = 'ul';
             state.listItems.push(unorderedMatch[1]);
             return;
@@ -339,8 +344,8 @@
 
         const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
         if (orderedMatch) {
-            flushParagraph(state);
-            if (state.listType === 'ul') flushList(state);
+            flushBlock(state, 'paragraph');
+            if (state.listType === 'ul') flushBlock(state, 'list');
             state.listType = 'ol';
             state.listItems.push(orderedMatch[1]);
             return;
@@ -360,9 +365,9 @@
             handleRegularLine(trimmed, state);
         }
 
-        flushParagraph(state);
-        flushList(state);
-        if (state.inCodeBlock) flushCode(state);
+        flushBlock(state, 'paragraph');
+        flushBlock(state, 'list');
+        if (state.inCodeBlock) flushBlock(state, 'code');
         return state.blocks;
     }
 
@@ -378,8 +383,8 @@
             const { value, done } = await reader.read();
             if (done) break;
 
-            isQueued = false;
-            if (queueTimer) clearTimeout(queueTimer);
+            // isQueued = false;
+            // if (queueTimer) clearTimeout(queueTimer);
 
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split('\n\n');
@@ -441,7 +446,7 @@
         const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages, prompt, session_id: sessionId }), // keep prompt for backend fallback, sessionid for history tracking in db, and messages for context if supported by backend
+            body: JSON.stringify({ messages, prompt}),
             signal
         });
 
@@ -466,13 +471,6 @@
         }
     }
 
-    // tells the browser window to scroll to the very bottom of the page
-    $effect(() => {
-        if (answer) {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }
-    });
-
     // DERIVED
     let renderedAnswer = $derived(renderAnswer(answer));
 
@@ -488,14 +486,14 @@
         }
 
         loading = true;
-        isQueued = false;
+        // isQueued = false;
         error = '';
         answer = '';
         question = '';
 
-        queueTimer = setTimeout(() => {
-            if (loading && !answer) isQueued = true;
-        }, 3000);
+        // queueTimer = setTimeout(() => {
+        //     if (loading && !answer) isQueued = true;
+        // }, 3000);
     
         const controller = new AbortController();
         activeStreamController = controller;
@@ -508,7 +506,8 @@
 
             const completedAnswer = result.trim();
             if (completedAnswer) {
-                history = [...history, { question: prompt, blocks: renderAnswer(completedAnswer) }];
+                // history = [...history, { question: prompt, blocks: renderAnswer(completedAnswer) }];
+                history = [{ question: prompt, blocks: renderAnswer(completedAnswer) }, ...history]; // prepend to history to show most recent first
             }
         } catch (e) {
             if (e instanceof Error && e.name === 'AbortError') {
@@ -518,11 +517,59 @@
         } finally {
             if (activeStreamController === controller) {
                 activeStreamController = null;
-                isQueued = false;
+                // isQueued = false;
                 loading = false;
             }
         }
     }
+
+    async function toggleDictation() {
+    if (dictating) {
+        // Stop recording
+        mediaRecorder?.stop();
+        dictating = false;
+    } else {
+        // Start recording
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); //Asks for mic permission (locally).
+        mediaRecorder = new MediaRecorder(stream); //Captures raw audio chunks while you speak.
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        
+        mediaRecorder.onstop = async () => { //it bundles the audio into a .wav file.
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            await sendToWhisper(audioBlob);
+            // Stop the mic hardware completely
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        dictating = true;
+    }
+}
+
+async function sendToWhisper(blob: Blob) {
+    const formData = new FormData();
+    formData.append('file', blob, 'recording.wav');
+
+    try {
+        const response = await fetch('http://localhost:8091/convert_audio', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        // This puts the text into your input field/state
+        if (data.text) {
+            console.log("Whisper result:", data.text);
+            // take the string from Whisper and put it into the input box
+            question = data.text.trim();
+        }
+    } catch (err) {
+        error = "Could not reach Whisper backend.";
+        console.error(err);
+    }
+}
 </script>
 
 <div class="container">
@@ -568,7 +615,7 @@
             bind:value={question}
             placeholder="Ask a question..."
         />
-        <button type="button" onclick={startDictation} aria-pressed={dictating}>
+        <button type="button" onclick={toggleDictation} aria-pressed={dictating}>
             {dictating ? 'Stop Dictate' : 'Dictate'}
         </button>
         <button type="submit" disabled={loading || !question.trim()}>
@@ -581,11 +628,11 @@
     {#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
     {/if}
-    {#if isQueued}
+    <!-- {#if isQueued}
         <div style="color: #a8bc84; text-align:center; font-style: italic;">
             🐢 CPU is busy. You are in line...
         </div>
-    {/if}
+    {/if} -->
     {#if loading}
         <div style="text-align:center;">Loading...</div>
     {/if}
@@ -633,52 +680,53 @@
         </div>
     {/if}
     {#if history.length}
-        <section class="answer-card">
-            <h2>History</h2>
-            {#each history as entry, entryIndex (entryIndex)}
-                <article>
-                    <h3>Q {entryIndex + 1}: {entry.question}</h3>
-                    {#each entry.blocks as block, blockIndex (blockIndex)}
-                        {#if block.type === 'paragraph'}
-                            <p>
-                                {#each block.tokens as token, tokenIndex (tokenIndex)}
-                                    {@render renderToken(token)}
+    <section class="answer-card">
+        <h2>History</h2>
+        {#each history as entry, entryIndex (entryIndex)}
+            <article style="border-bottom: 1px solid var(--panel-border); margin-bottom: 1.5rem; padding-bottom: 1rem;">
+                <h3>Q {history.length - entryIndex}: {entry.question}</h3>
+                
+                {#each entry.blocks as block, blockIndex (blockIndex)}
+                    {#if block.type === 'paragraph'}
+                        <p>
+                            {#each block.tokens as token, tokenIndex (tokenIndex)}
+                                {@render renderToken(token)}
+                            {/each}
+                        </p>
+                    {:else if block.type === 'heading'}
+                        <svelte:element this={`h${block.level}`}>
+                            {#each block.tokens as token, tokenIndex (tokenIndex)}
+                                {@render renderToken(token)}
+                            {/each}
+                        </svelte:element>
+                    {:else if block.type === 'list'}
+                        {#if block.ordered}
+                            <ol>
+                                {#each block.items as item, itemIndex (itemIndex)}
+                                    <li>
+                                        {#each item as token, tokenIndex (tokenIndex)}
+                                            {@render renderToken(token)}
+                                        {/each}
+                                    </li>
                                 {/each}
-                            </p>
-                        {:else if block.type === 'heading'}
-                            <svelte:element this={`h${block.level}`}>
-                                {#each block.tokens as token, tokenIndex (tokenIndex)}
-                                    {@render renderToken(token)}
+                            </ol>
+                        {:else}
+                            <ul>
+                                {#each block.items as item, itemIndex (itemIndex)}
+                                    <li>
+                                        {#each item as token, tokenIndex (tokenIndex)}
+                                            {@render renderToken(token)}
+                                        {/each}
+                                    </li>
                                 {/each}
-                            </svelte:element>
-                        {:else if block.type === 'list'}
-                            {#if block.ordered}
-                                <ol>
-                                    {#each block.items as item, itemIndex (itemIndex)}
-                                        <li>
-                                            {#each item as token, tokenIndex (tokenIndex)}
-                                                {@render renderToken(token)}
-                                            {/each}
-                                        </li>
-                                    {/each}
-                                </ol>
-                            {:else}
-                                <ul>
-                                    {#each block.items as item, itemIndex (itemIndex)}
-                                        <li>
-                                            {#each item as token, tokenIndex (tokenIndex)}
-                                                {@render renderToken(token)}
-                                            {/each}
-                                        </li>
-                                    {/each}
-                                </ul>
-                            {/if}
-                        {:else if block.type === 'code'}
-                            <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
+                            </ul>
                         {/if}
-                    {/each}
-                </article>
-            {/each}
-        </section>
-    {/if}
+                    {:else if block.type === 'code'}
+                        <pre><code class={block.lang ? `language-${block.lang}` : undefined}>{block.code}</code></pre>
+                    {/if}
+                {/each}
+            </article>
+        {/each}
+    </section>
+{/if}
 </div>

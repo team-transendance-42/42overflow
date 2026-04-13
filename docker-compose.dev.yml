@@ -7,7 +7,7 @@ services:
   llm-server:
     volumes:
       - ./llm-system-interface:/app
-    command: air -c .air.toml
+    # command: air -c .air.toml
     ports:
       - "8081:8081"
 

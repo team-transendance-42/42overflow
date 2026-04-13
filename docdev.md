@@ -1,4 +1,8 @@
 For development, there is an extra docker-compose.dev.yml file that enables live reload for both Python and the app. This means code changes are reflected immediately in the local browser, without needing to rebuild the containers:
+==============================
+docker compose build --no-cache llm-server
+docker compose up -d llm-server
+==================================
 
 base stack only: (production)
 docker compose up --build

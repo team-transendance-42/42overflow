@@ -30,3 +30,16 @@ for deployment:
 sudo docker compose cp db/migrations/001_create_messages.sql postgres:/tmp/
 sudo docker compose exec postgres psql -U postgres -d transcendance_db -f /tmp/001_create_messages.sql
 docker compose cp copies from host → container, then -f works because the file exists inside the container.
+
+Q 1: Hi, where do you hear me?
+I process your text input via this interface. I do not hear audio.
+
+Q 2: I am 53 years old.
+Under stood. How can I help you today?
+
+Q 3: How old are you and how old am I?
+I am an AI without an age. You are 53.
+
+Q 4: How old am I?
+You are 5 3.
+=====================

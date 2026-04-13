@@ -161,15 +161,14 @@ func RateLimiter(next http.Handler) http.Handler {
 			entry.dailyCnt = 0
 		}
 
-		// --- daily quota check ---
 		// todo: re-enable in production — commented out for testing only
-		if entry.dailyCnt >= perStudentDailyMax {
-			w.Header().Set("X-RateLimit-Day-Remaining", "0")
-			w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
-			mu.Unlock()
-			http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
-			return
-		}
+		// if entry.dailyCnt >= perStudentDailyMax {
+		// 	w.Header().Set("X-RateLimit-Day-Remaining", "0")
+		// 	w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
+		// 	mu.Unlock()
+		// 	http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
+		// 	return
+		// }
 
 		// --- per-minute rate check --- todo: test do we see this text?
 		if !entry.limiter.Allow() {
