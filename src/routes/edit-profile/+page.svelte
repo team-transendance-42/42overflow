@@ -29,36 +29,49 @@
   previewUrl = '';
   if (fileInput) fileInput.value = ''; // reset the input
 }
+async function handleUpdate() {
+  error = '';
+  success = false;
+  loading = true;
 
-  async function handleUpdate() {
-    error = '';
-    success = false;
-    loading = true;
-
-    const { error: err } = await authClient.updateUser({
-      name: `${firstname} ${lastname}`.trim(),
-      image: previewUrl || '',
-    });
-
-    if (err) {
-	  loading = false;
-      error = err.message ?? 'Could not update profile';
-      return;
-    }
-
+  // step 1 — upload file + profile fields to server first
   const formData = new FormData();
   formData.append('intraprofile', intraprofile);
   formData.append('interests', interests);
   formData.append('quote', quote);
+  if (fileInput?.files?.[0]) {
+    formData.append('avatarimage', fileInput.files[0]);
+  }
 
-  await fetch('?/update', {
+  const res = await fetch('?/update', {
     method: 'POST',
     body: formData,
   });
 
+  // parse the real image URL back from the server
+  let savedImageUrl = previewUrl;
+  try {
+    const json = await res.json();
+    if (json?.data?.imageUrl) savedImageUrl = json.data.imageUrl;
+  } catch {}
+
+  // step 2 — save name + real server image URL via authClient
+  const { error: err } = await authClient.updateUser({
+    name: [firstname, lastname].filter(Boolean).join(' ').trim() || undefined,
+    image: savedImageUrl || '',
+  });
+
   loading = false;
+
+  if (err) {
+    error = err.message ?? 'Could not update profile';
+    return;
+  }
+
+  if (savedImageUrl) previewUrl = savedImageUrl;
   success = true;
 }
+
 </script>
 
 <form method="POST" action="?/update" use:enhance enctype="multipart/form-data">

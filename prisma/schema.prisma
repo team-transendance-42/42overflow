@@ -71,6 +71,7 @@ model Profile {
   interests String?
   quote		String?
   campusId  Int?
+  lastSeen  DateTime?
 
   anonymize_at DateTime?
   deleted_at   DateTime?

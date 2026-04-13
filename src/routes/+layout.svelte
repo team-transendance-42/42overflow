@@ -7,7 +7,16 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import { onMount } from 'svelte';
 	let { children } = $props();
+
+	onMount(() => {
+		const interval = setInterval(() => {
+			fetch('/api/ping', { method: 'POST' });
+		}, 2 * 60 * 1000); // every 2 minutes
+
+		return () => clearInterval(interval);
+	});
 	
 </script>
 
