@@ -191,52 +191,15 @@
     let dictating = $state(false);
     let recognition: any = null;
     let interimTranscript = '';
+    let isQueued = $state(false);
+    let queueTimer: ReturnType<typeof setTimeout> | null = null;
 
-    function startDictation() {
-        if (dictating) {
-            if (recognition) recognition.stop();
-            dictating = false;
-            return;
-        }
-
-        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-        if (!SpeechRecognition) {
-            error = 'Speech recognition not supported in this browser.';
-            return;
-        }
-
-        recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        recognition.interimResults = true;
-        recognition.continuous = false;
-
-        interimTranscript = '';
-        dictating = true;
-        error = '';
-
-        recognition.onresult = (event: any) => {
-            let final = '';
-            interimTranscript = '';
-            for (let i = 0; i < event.results.length; ++i) {
-                const res = event.results[i];
-                if (res.isFinal) final += res[0].transcript;
-                else interimTranscript += res[0].transcript;
-            }
-            question = (final + interimTranscript).trim();
-        };
-
-        recognition.onerror = (event: any) => {
-            error = 'Dictation error: ' + (event.error || 'Unknown');
-            dictating = false;
-        };
-
-        recognition.onend = () => {
-            dictating = false;
-            recognition = null;
-        };
-
-        recognition.start();
-    }
+    // to store history chat in db
+    const sessionId: string = localStorage.getItem('session_id') ?? (() => {
+        const id = crypto.randomUUID();
+        localStorage.setItem('session_id', id);
+        return id;
+    })();
 
     // TYPES
     type InlineToken =
@@ -415,6 +378,9 @@
             const { value, done } = await reader.read();
             if (done) break;
 
+            isQueued = false;
+            if (queueTimer) clearTimeout(queueTimer);
+
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split('\n\n');
             buffer = events.pop() || '';
@@ -475,7 +441,7 @@
         const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages, prompt }), // keep prompt for backend fallback
+            body: JSON.stringify({ messages, prompt, session_id: sessionId }), // keep prompt for backend fallback, sessionid for history tracking in db, and messages for context if supported by backend
             signal
         });
 
@@ -500,6 +466,13 @@
         }
     }
 
+    // tells the browser window to scroll to the very bottom of the page
+    $effect(() => {
+        if (answer) {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+    });
+
     // DERIVED
     let renderedAnswer = $derived(renderAnswer(answer));
 
@@ -515,9 +488,15 @@
         }
 
         loading = true;
+        isQueued = false;
         error = '';
         answer = '';
         question = '';
+
+        queueTimer = setTimeout(() => {
+            if (loading && !answer) isQueued = true;
+        }, 3000);
+    
         const controller = new AbortController();
         activeStreamController = controller;
 
@@ -539,6 +518,7 @@
         } finally {
             if (activeStreamController === controller) {
                 activeStreamController = null;
+                isQueued = false;
                 loading = false;
             }
         }
@@ -600,6 +580,11 @@
     </form>
     {#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
+    {/if}
+    {#if isQueued}
+        <div style="color: #a8bc84; text-align:center; font-style: italic;">
+            🐢 CPU is busy. You are in line...
+        </div>
     {/if}
     {#if loading}
         <div style="text-align:center;">Loading...</div>

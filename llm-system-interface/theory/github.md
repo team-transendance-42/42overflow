@@ -3,6 +3,8 @@ git branch -r // show remote branches
 git fetch origin --prune // synch with latest remote refs
 
 git checkout -b develop --track origin/develop // create local develop and pull from remote develop
+
+git fetch origin develop // update local develop with latest from remote
 ===============
 
 # 1) leave develop first (can't delete checked-out branch)
