@@ -7,11 +7,11 @@
 </script>
 
 <div class="avatar" style="width: {size}; height: {size};">
-  {#if src && !broken}
-    <img {src} {alt} on:error={() => broken = true} />
-  {:else}
-   <span>👤</span> <!-- placeholder icon -->
-  {/if}
+{#if src && !broken}
+  <img {src} {alt} on:error={() => broken = true} />
+{:else}
+  <img src="/default-avatar.png" alt="default avatar" />
+{/if}
 </div>
 
 <style>

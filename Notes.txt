@@ -144,3 +144,11 @@ OLD SETTINGS Code
     text-align: left;
   }
 </style>
+
+-----------------------------------------
+
+{#if src && !broken}
+    <img {src} {alt} on:error={() => broken = true} />
+  {:else}
+   <span>👤</span> <!-- placeholder icon -->
+  {/if}
