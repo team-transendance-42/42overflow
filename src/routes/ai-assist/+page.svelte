@@ -482,7 +482,6 @@
         // isQueued = false;
         error = '';
         answer = '';
-        question = '';
 
         // queueTimer = setTimeout(() => {
         //     if (loading && !answer) isQueued = true;
@@ -501,6 +500,7 @@
             if (completedAnswer) {
                 // history = [...history, { question: prompt, blocks: renderAnswer(completedAnswer) }];
                 history = [{ question: prompt, blocks: renderAnswer(completedAnswer) }, ...history]; // prepend to history to show most recent first
+                question = '';
             }
         } catch (e) {
             if (e instanceof Error && e.name === 'AbortError') {
