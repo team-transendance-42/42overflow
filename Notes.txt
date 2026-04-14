@@ -186,3 +186,18 @@ OLD SETTINGS Code
   loading = false;
   success = true;
 }
+
+-----------------------------------------------------------
+
+Monday April 13 2026
+
+Avatar not uploading immediately -- changed the default.. maybe that's why?
+
+added user profile - need to incorporate their own choice of userID, etc
+... to do localhost5173/profile/diwang for example
+
+so need to update that
+
+follows and followers sort of work!
+and there's a green light for last seen too!
+

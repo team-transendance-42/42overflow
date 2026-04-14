@@ -37,7 +37,7 @@
   {/if}
 
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
-  <Input label="Password" name="password" placeholder="Enter password" bind:value={password} />
+  <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
   <Button label={loading ? 'Logging in...' : 'Log In'} type="button" onClick={handleLogin} />
 

@@ -9,8 +9,9 @@ export const actions: Actions = {
     const password = data.get('password') as string;
     const name = data.get('name') as string;
 
-    if (!email || !password) {
-      return fail(400, { error: 'Email and password are required' });
+
+    if (!email || !password || !name ) {
+      return fail(400, { error: 'All fields are required' });
     }
 
     try {
