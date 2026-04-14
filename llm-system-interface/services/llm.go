@@ -44,7 +44,6 @@ func extractTextFromJSON(data string, text *string) bool {
 func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 	defer close(ch)
 	defer resp.Body.Close()
-	sender := &chunkSender{}
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -55,7 +54,7 @@ func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 		if !extractTextFromJSON(strings.TrimPrefix(line, "data: "), &text) {
 			continue
 		}
-		sender.send(ch, text)
+		ch <- text
 	}
 }
 

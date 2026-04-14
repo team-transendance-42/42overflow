@@ -80,7 +80,6 @@ func doOllamaRequest(ctx context.Context, ollamaURL, model string, req models.Te
 func readOllamaToChannel(resp *http.Response, ch chan string) {
 	defer close(ch)
 	defer resp.Body.Close()
-	sender := &chunkSender{}
 	decoder := json.NewDecoder(resp.Body)
 	for {
 		var r OllamaResponse
@@ -90,7 +89,9 @@ func readOllamaToChannel(resp *http.Response, ch chan string) {
 			}
 			break
 		}
-		sender.send(ch, r.Message.Content)
+		if r.Message.Content != "" {
+			ch <- r.Message.Content
+		}
 		if r.Done {
 			break
 		}

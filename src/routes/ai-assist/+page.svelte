@@ -458,7 +458,7 @@
         loading = false;
         // Save partial answer and question to history if not empty: todo: doesnt work
         if (question.trim() || answer.trim()) {
-            history = [...history, { question: question.trim(), blocks: renderAnswer(answer) }];
+            history = [{ question: question.trim(), blocks: renderAnswer(answer) }, ...history];
             question = '';
             answer = '';
         }
