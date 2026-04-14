@@ -10,7 +10,7 @@
   let lastname = data.user?.name?.split(' ')[1] ?? '';
   let email = data.user?.email ?? '';
   let interests = data.profile?.interests ?? '';
-  let quote = data.profile?.quote ?? '';
+  let username = data.profile?.username ?? '';
   let intraprofile = data.profile?.login ?? '';
   let campus = data.profile?.campus ?? '';
   let previewUrl = data.user?.image ?? '';
@@ -38,7 +38,7 @@ async function handleUpdate() {
   const formData = new FormData();
   formData.append('intraprofile', intraprofile);
   formData.append('interests', interests);
-  formData.append('quote', quote);
+  formData.append('username', username);
   if (fileInput?.files?.[0]) {
     formData.append('avatarimage', fileInput.files[0]);
   }
@@ -102,9 +102,9 @@ async function handleUpdate() {
     <Input label="First Name" name="firstname" placeholder="First" bind:value={firstname} />
     <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
   </div>
-
+  <Input label="User name" name="username" placeholder="User name" bind:value={username} />
   <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
-  <Input label="Favorite Quote" name="quote" placeholder="Quote" bind:value={quote} />
+
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
   <Input label="Campus" name="campus" placeholder="Campus" bind:value={campus} />
   <Input label="Intra Profile" name="intraprofile" placeholder="Intra profile" bind:value={intraprofile} />

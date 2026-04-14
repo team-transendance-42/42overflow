@@ -13,12 +13,12 @@
   </div>
 
   <h1>Name: {user?.name ?? 'No name set'}</h1>
-  <p class="email">Email: {user?.email}</p>
-
-  {#if profile?.quote}
-    <p class="quote">Favorite Quote: "{profile.quote}"</p>
+ 
+  {#if profile?.username}
+    <p class="username">User name: {profile.username}</p>
   {/if}
 
+ <p class="email">Email: {user?.email}</p>
   {#if profile?.interests}
     <div class="section">
       <p>Interests: {profile.interests}</p>

@@ -43,13 +43,13 @@ export const actions: Actions = {
       update: {
         login: data.get('intraprofile') as string || undefined,
         interests: data.get('interests') as string || undefined,
-        quote: data.get('quote') as string || undefined,
+        username: data.get('username') as string || undefined,
       },
       create: {
         userId: locals.user.id,
         login: data.get('intraprofile') as string || undefined,
         interests: data.get('interests') as string || undefined,
-        quote: data.get('quote') as string || undefined,
+        username: data.get('username') as string || undefined,
       },
     });
 
