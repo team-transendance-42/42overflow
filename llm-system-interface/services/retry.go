@@ -29,27 +29,26 @@ func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Re
 	delay := baseDelay
 	var lastErr error
 	for i := range maxRetries {
-		resp, err := fn()
-		if err == nil && !retryableStatus(resp.StatusCode) {
-			return resp, nil
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+				delay *= 2
+			}
 		}
+		resp, err := fn()
 		if err != nil {
 			lastErr = err
 			log.Printf("retry %d/%d: request error: %v", i+1, maxRetries, err)
-		} else {
-			lastErr = nil
-			resp.Body.Close()
-			log.Printf("retry %d/%d: HTTP %d", i+1, maxRetries, resp.StatusCode)
+			continue
 		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(delay):
-			delay *= 2
+		if !retryableStatus(resp.StatusCode) {
+			return resp, nil
 		}
+		lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
+		resp.Body.Close()
+		log.Printf("retry %d/%d: HTTP %d", i+1, maxRetries, resp.StatusCode)
 	}
-	if lastErr != nil {
-		return nil, lastErr
-	}
-	return nil, fmt.Errorf("max retries exceeded")
+	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
 }

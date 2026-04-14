@@ -196,13 +196,6 @@
     let mediaRecorder = $state<MediaRecorder | null>(null);
     let audioChunks: Blob[] = [];
 
-    // to store history chat in db
-    // const sessionId: string = localStorage.getItem('session_id') ?? (() => {
-    //     const id = crypto.randomUUID();
-    //     localStorage.setItem('session_id', id);
-    //     return id;
-    // })();
-
     // TYPES
     type InlineToken =
         | { type: 'text'; value: string }
@@ -536,11 +529,11 @@
 
         mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
         
-        mediaRecorder.onstop = async () => { //it bundles the audio into a .wav file.
+        mediaRecorder.onstop = async () => {
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             await sendToWhisper(audioBlob);
-            // Stop the mic hardware completely
             stream.getTracks().forEach(track => track.stop());
+            await askQuestion();
         };
 
         mediaRecorder.start();
