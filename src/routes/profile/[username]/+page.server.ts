@@ -5,13 +5,12 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, params }) => {
   if (!locals.user) throw redirect(303, '/login');
 
-  // get the logged-in user's profile
   const myProfile = await db.profile.findUnique({
     where: { userId: locals.user.id }
   });
 
   const profile = await db.profile.findUnique({
-    where: { userId: params.userId },
+    where: { username: params.username },
     include: { user: true }
   });
 
@@ -48,16 +47,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     followerCount,
     followingCount,
     isOnline,
-    isOwnProfile: locals.user.id === params.userId,
+    isOwnProfile: myProfile?.id === profile.id,
   };
-};  
-
+};
 
 export const actions = {
   follow: async ({ locals, params }) => {
     if (!locals.user) throw redirect(303, '/login');
 
-    // get both profiles
     const myProfile = await db.profile.findUnique({
       where: { userId: locals.user.id }
     });
@@ -65,7 +62,7 @@ export const actions = {
     if (!myProfile) throw error(400, 'Your profile not found');
 
     const targetProfile = await db.profile.findUnique({
-      where: { userId: params.userId }
+      where: { username: params.username }
     });
 
     if (!targetProfile) throw error(404, 'User not found');

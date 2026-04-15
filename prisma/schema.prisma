@@ -69,7 +69,7 @@ model Profile {
   login     String? @unique
   biography String?
   interests String?
-  username	String?
+  username	String? @unique
   campusId  Int?
   lastSeen  DateTime?
 

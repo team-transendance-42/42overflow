@@ -1,10 +1,11 @@
 <script lang="ts">
   import Avatar from '$lib/components/Avatar.svelte';
   import { enhance } from '$app/forms';
+  import { invalidateAll } from '$app/navigation';
 
   export let data;
 
-  const { profile, user, isFollowing, followerCount, followingCount, isOnline, isOwnProfile } = data;
+  $: ({ profile, user, isFollowing, followerCount, followingCount, isOnline, isOwnProfile } = data);
 </script>
 
 <div class="profile-page">
@@ -25,7 +26,16 @@
   </div>
 
   {#if !isOwnProfile}
-    <form method="POST" action="?/follow" use:enhance>
+    <form
+      method="POST"
+      action="?/follow"
+      use:enhance={() => {
+        return async ({ update }) => {
+          await update();
+          await invalidateAll();
+        };
+      }}
+    >
       <button type="submit" class="follow-btn {isFollowing ? 'following' : ''}">
         {isFollowing ? 'Unfollow' : 'Follow'}
       </button>
@@ -72,7 +82,6 @@
   h1 { margin: 0; }
   .online-text { font-size: 0.8rem; color: var(--color-text-secondary); margin: 0; }
   .counts { display: flex; gap: 1rem; font-size: 0.875rem; color: var(--color-text-secondary); }
-  .email { color: var(--color-text-secondary); font-size: 0.875rem; margin: 0 0 1rem; }
   .quote { font-style: italic; color: var(--color-text-secondary); margin: 1rem 0; }
   .section { margin: 0.75rem 0; }
   .label { font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -88,7 +97,8 @@
   }
   .follow-btn.following {
     background: transparent;
-    color: var(--color-text-primary);
+    color: var(--color-neutral-200);
+    border: 0.5px solid var(--color-neutral-900);
   }
   .edit-btn {
     display: inline-block;
