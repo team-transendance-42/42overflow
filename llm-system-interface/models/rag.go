@@ -1,5 +1,5 @@
 package models
-
+// TODO: not yet implemented
 type RagIndexRequest struct {
 	Collection string   `json:"collection,omitempty"`
 	Documents  []string `json:"documents"`

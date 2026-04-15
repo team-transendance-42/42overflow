@@ -76,6 +76,11 @@ func decodeAndSanitize(w http.ResponseWriter, r *http.Request, req *models.TextR
 	return true
 }
 
+// normalizeMessages is a compatibility layer.
+// Frontend can send just { "prompt": "hello" } or full { "messages": [{...}] }.
+// Both Gemini and Ollama expect req.Messages to be populated — never just a raw prompt.
+// If messages is empty, wraps the prompt into a single user message so both models
+// receive one consistent format regardless of what the frontend sent.
 func normalizeMessages(w http.ResponseWriter, req *models.TextRequest) bool {
 	if len(req.Messages) == 0 {
 		if req.Prompt == "" {
@@ -137,23 +142,19 @@ Second flush: for the final “end” event, to guarantee delivery.
 */
 func GenerateText(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GenerateText(): method=%s path=%s", r.Method, r.URL.Path)
-	if !setHeaders(w, r) {
-		return
-	}
+	if !setHeaders(w, r) { return }
 
 	var req models.TextRequest
-	if !validateTextReq(w, r, &req) {
-		return
-	}
+	if !validateTextReq(w, r, &req) { return }
 
-	ch, err := services.StreamLLM(r.Context(), req)
+	ch, err := services.StreamLLM(r.Context(), req) // receiving from gemini
 	if err != nil {
 		log.Printf("GenerateText: StreamLLM error: %v", err)
 		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
-	streamSSE(w, ch)
+	streamSSE(w, ch) // talks to browser, sending each chunk as an SSE message
 }
 
 /**Images don't stream — they return a JSON response with a URL or base64 bytes.*/
