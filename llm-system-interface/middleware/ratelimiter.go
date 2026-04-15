@@ -23,11 +23,11 @@ Imagine a bucket that holds up to 5 tokens.
 One request needs 1 token.
 Tokens are added continuously at 10/60 tokens per second (about 1 token every 6 seconds).
 If a request arrives and bucket has at least 1 token:
-request is allowed, 1 token is removed
+request is allowed, 1 token is removed.
 If no token is available:request is denied 429
 globalLimiter is one shared object for the whole process.
 Every request hits this check first.
-Then per-client limiter runs after tha
+Then per-client limiter runs
 */
 var (
 	mu            sync.Mutex
@@ -35,17 +35,16 @@ var (
 	globalLimiter = rate.NewLimiter(rate.Limit(10.0/60.0), 5) // tocken bucket algorithm:Average: 10 requests/minute across all clients; Burst: up to 5 immediate requests before throttling starts
 )
 
-// todo: clean: waht we really use
 const (
-	perStudentRateLimit = rate.Limit(5.0 / 60.0) // todo: revert to 2 requests/minute per student?
-	perStudentBurst     = 2                       // short burst allowance
-	perStudentDailyMax  = 20                      // 20 requests/day per student
+	perStudentRateLimit = rate.Limit(5.0 / 60.0) // todo: revert to 2 requests/minute per student
+	perStudentBurst     = 2
+	perStudentDailyMax  = 20
 	limiterTTL          = 30 * time.Minute // remove inactive limiter entries after this idle time
-	cleanupInterval     = 5 * time.Minute  // background cleanup cadence
+	cleanupInterval     = 5 * time.Minute  //  how often the janitor wakes up
 	maxLimiters         = 10_000 // safety cap: prevents unbounded map growth from bot/fake IDs -> used
 )
 
-func secondsUntilUTCMidnight(now time.Time) int {
+func secondsB4UTCMidnight(now time.Time) int {
 	midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
 	return int(time.Until(midnight).Seconds())
 }
@@ -78,8 +77,10 @@ func getLimiter(key string) (*limiterEntry, bool) {
 }
 
 /**
-todo: Add JWT auth middleware that verifies the Bearer token and writes the user ID into context.
+todo: JWTAuth — runs before the rate limiter, verifies the token, and writes the user ID into context.aa(add JWT auth middleware that verifies the Bearer token and writes the user ID into context.
 Change limiter key selection to use context user ID first, IP second.
+extractClientKey — decides which bucket to rate-limit against (user ID or IP). It's a helper inside the rate limiter.
+todo: **With JWT:** replace all of this with `"user:" + userID` from context — unfakeable.
 */
 func extractClientKey(r *http.Request) string {
 	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
@@ -116,7 +117,7 @@ func StartCleanup() {
 			now := time.Now().UTC()
 
 			for key, entry := range limiters {
-				if now.Sub(entry.lastSeen) > limiterTTL {
+				if now.Sub(entry.lastSeen) > limiterTTL { // subtracts one time from another, returning a time.Duration
 					delete(limiters, key)
 				}
 			}
@@ -128,7 +129,7 @@ func StartCleanup() {
 
 func RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodOptions {
+		if r.Method == http.MethodOptions { // if method is OPTIONS, skip rate limiting and just return 200 OK for CORS preflight requests
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -164,7 +165,7 @@ func RateLimiter(next http.Handler) http.Handler {
 		// todo: re-enable in production — commented out for testing only
 		// if entry.dailyCnt >= perStudentDailyMax {
 		// 	w.Header().Set("X-RateLimit-Day-Remaining", "0")
-		// 	w.Header().Set("Retry-After", strconv.Itoa(secondsUntilUTCMidnight(now)))
+		// 	w.Header().Set("Retry-After", strconv.Itoa(secondsB4UTCMidnight(now)))
 		// 	mu.Unlock()
 		// 	http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
 		// 	return

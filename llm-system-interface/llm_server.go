@@ -16,17 +16,16 @@ import (
 )
 
 func main() {
-	err := godotenv.Load() // Load the .env file
+	err := godotenv.Load()
 	if err != nil {
 		log.Println("No .env file loaded, using container/runtime environment variables")
 	}
-	apiKey := os.Getenv("GEMINI_API_KEY") // todo: rmv, this is for testing
-	if apiKey == "" {
-		log.Println("GEMINI_API_KEY not found in environment after loading .env")
+	if os.Getenv("GEMINI_API_KEY") == "" {
+		log.Fatal("GEMINI_API_KEY is required")
 	}
 	log.Println("Successfully loaded API Key.")
 
-	router := mux.NewRouter()
+	router := mux.NewRouter() // contains list of routes, middleware chain, config flags(strict slash, etc)
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -38,8 +37,8 @@ func main() {
 
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
 	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/rag/index", handlers.RagIndex).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/rag/ask", handlers.RagAsk).Methods("POST", "OPTIONS")
+	// router.HandleFunc("/api/rag/index", handlers.RagIndex).Methods("POST", "OPTIONS") todo: implement RAG indexing endpoint, which accepts text and metadata, and stores it in a vector database like Pinecone or Weaviate. This is separate from the /ask endpoint, which only retrieves info.
+	// router.HandleFunc("/api/rag/ask", handlers.RagAsk).Methods("POST", "OPTIONS")
 	//router.HandleFunc("/api/generate-image", handlers.GenerateImage).Methods("POST", "OPTIONS") // placeholder for future image generation endpoint: todo: implement handlers.GenerateImage
 
 	log.Println("Server running on port 8081")

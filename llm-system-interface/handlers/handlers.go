@@ -8,45 +8,41 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
 /**
-for chunk := range ch {
-for range loop specifically designed for channels. It will continue to pull data from the channel ch until the channel is closed
----
-fmt.Fprintf(w, "data: %s\n\n", chunk)
+CORS (Cross-Origin Resource Sharing) is a security feature in browsers that restricts web pages from making requests to a different domain than the one that served the web page. When a web page tries to make a cross-origin request, the browser sends an HTTP request with an Origin header indicating the source of the request. The server can respond with specific CORS headers to allow or deny the request.
 
-Syntax: fmt.Fprintf writes a formatted string to an io.Writer. In this case, the http.ResponseWriter (w) acts as that writer.
-Theory: SSE is a text-based protocol. To be valid, the browser expects a specific format: the word data:, followed by the message, followed by two newline characters (\n\n).
-Under the Hood: * w usually points to a buffer. Without the next line, the operating system or Go's standard library might hold onto this data to send it in one large "clump" later to improve network efficiency.
-The \n\n is critical; it tells the client's EventSource API that one complete message has finished.
----
-flusher.Flush()
-
-Syntax: This calls the Flush method on an object that implements the http.Flusher interface.
-Theory: Standard HTTP is "request-response"—the server sends the whole body at once. SSE is "streaming." If you don't flush, the user might wait seconds or minutes to see any data because the server is waiting for its internal buffer (usually 4KB or 8KB) to fill up.
-Under the Hood: * This sends a signal to the underlying TCP socket to "push everything we have in the buffer right now."
-It bypasses the standard buffering logic of the Go web server.
-This allows for the "typing" effect or real-time ticker updates, as the browser receives the bytes immediately after they are written.
 */
 
+// buildAllowedOrigins reads ALLOWED_ORIGINS env var (comma-separated) and always includes localhost.
+// Production: set ALLOWED_ORIGINS=https://42overflow.com,https://www.42overflow.com
+func buildAllowedOrigins() map[string]bool {
+	allowed := map[string]bool{
+		"http://localhost":      true,
+		"http://localhost:5173": true, // default SvelteKit dev port
+		"http://127.0.0.1":     true,
+	}
+	if env := os.Getenv("ALLOWED_ORIGINS"); env != "" {
+		for _, o := range strings.Split(env, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				allowed[o] = true
+			}
+		}
+	}
+	return allowed
+}
+
+var allowedOrigins = buildAllowedOrigins() //stores that map in memory for the lifetime of the server. saves rebuilding it on every request
+
 func allowedOrigin(origin string) string {
-	if origin == "" {
-		return ""
-	}
-
+	if origin == "" { return ""	}
 	parsed, err := url.Parse(origin)
-	if err != nil {
-		return ""
-	}
-
-	host := parsed.Hostname()
-	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
-		return ""
-	}
-
-	return origin
+	if err != nil || parsed.Host == "" { return ""}
+	if allowedOrigins[origin] { return origin}
+	return ""
 }
 
 func setHeaders(w http.ResponseWriter, r *http.Request) bool {
@@ -57,7 +53,7 @@ func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache") // required by sse spec to prevent buffering
 	w.Header().Set("Connection", "keep-alive")
 
 	if r.Method == http.MethodOptions {

@@ -19,6 +19,6 @@ func ErrorRecovery(next http.Handler) http.Handler {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError) //Sends an HTTP 500 response back to the client.
 			}
 		}()
-		next.ServeHTTP(w, r) //
+		next.ServeHTTP(w, r) //next is an interface — specifically http.Handler from the standard library net/http package. next can be anything that has ServeHTTP — a router, another middleware, a plain handler function
 	})
 }	

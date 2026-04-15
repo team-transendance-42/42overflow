@@ -112,6 +112,11 @@ func buildGeminiContentsFromRequest(req models.TextRequest) []map[string]any {
 
 const geminiSystemPrompt = "reply with less words, dont repeat info"
 
+/**
+Channel — typed pipe between goroutines: without shared memory + mutexes
+ch := make(chan int)       // unbuffered: sender blocks until receiver reads
+ch := make(chan int, 5)    // buffered: sender can push 5 items before blocking
+*/
 func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
