@@ -518,7 +518,8 @@
 
     async function toggleDictation() {
     if (dictating) {
-        // Stop recording
+        // If LLM is still processing, stop it and save partial answer to history first
+        if (loading) stopStreaming();
         mediaRecorder?.stop();
         dictating = false;
     } else {

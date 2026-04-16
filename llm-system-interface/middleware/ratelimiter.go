@@ -49,6 +49,12 @@ func secondsB4UTCMidnight(now time.Time) int {
 	return int(time.Until(midnight).Seconds())
 }
 
+/*
+looks up or creates a per-client rate limiter entry by key (IP address)
+Lock — acquires the mutex since limiters map is shared across goroutines.
+Lookup — if an entry for this key already exists, updates lastSeen and returns it.
+Cap check — if the map has hit maxLimiters (10,000), returns false to signal "map full" — bot protection against fake IDs exhausting memory.
+*/
 func getLimiter(key string) (*limiterEntry, bool) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -81,6 +87,7 @@ todo: JWTAuth — runs before the rate limiter, verifies the token, and writes t
 Change limiter key selection to use context user ID first, IP second.
 extractClientKey — decides which bucket to rate-limit against (user ID or IP). It's a helper inside the rate limiter.
 todo: **With JWT:** replace all of this with `"user:" + userID` from context — unfakeable.
+Context is an object that carries a cancellation signal and deadline. Every HTTP request has one. If the browser disconnects, ctx is cancelled, and you can detect that to stop work early. It's passed as the first argument by convention in Go whenever a function does I/O.
 */
 func extractClientKey(r *http.Request) string {
 	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
@@ -107,6 +114,7 @@ func extractClientKey(r *http.Request) string {
 /**
 lowercase name = private to that package
 uppercase name = exported
+deletes idle entries for longer than limiterTTL
 */
 func StartCleanup() {
 	go func() {
@@ -117,7 +125,7 @@ func StartCleanup() {
 			now := time.Now().UTC()
 
 			for key, entry := range limiters {
-				if now.Sub(entry.lastSeen) > limiterTTL { // subtracts one time from another, returning a time.Duration
+				if now.Sub(entry.lastSeen) > limiterTTL { // subtr
 					delete(limiters, key)
 				}
 			}
@@ -127,6 +135,10 @@ func StartCleanup() {
 	}()
 }
 
+// RateLimiter is an HTTP middleware that enforces two tiers of rate limiting:
+//   - Global: shared token bucket across all clients (10 req/min, burst 5) to protect upstream API quota.
+//   - Per-client: individual token bucket keyed by IP (5 req/min, burst 2) with a daily cap of 20 requests.
+// Sets X-RateLimit-* response headers and returns 429 on limit breach. CORS preflight (OPTIONS) is bypassed.
 func RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions { // if method is OPTIONS, skip rate limiting and just return 200 OK for CORS preflight requests

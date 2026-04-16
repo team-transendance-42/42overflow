@@ -1,18 +1,13 @@
 package models
 
-type Role string
-
-const (
-	RoleUser      Role = "user"
-	RoleAssistant Role = "assistant"
-	RoleSystem    Role = "system"
-)
+const RoleUser      = "user"
 
 type Message struct {
-	Role    Role   `json:"role"`
+	Role    string   `json:"role"`
 	Content string `json:"content"`
 }
 
+/*both gemini and ollama services accept TextRequest */
 type TextRequest struct {
 	Prompt   string    `json:"prompt"`             // current message (backward compatible)
 	Messages []Message `json:"messages,omitempty"` // full history (optional)
@@ -20,7 +15,8 @@ type TextRequest struct {
 	Stream   bool      `json:"stream,omitempty"`
 }
 
-type ImageRequest struct {
-	Prompt string `json:"prompt"`
-	Size   string `json:"size,omitempty"`
-}
+// todo: not implemented yet
+//type ImageRequest struct {
+//	Prompt string `json:"prompt"`
+//	Size   string `json:"size,omitempty"`
+//}

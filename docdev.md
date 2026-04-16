@@ -71,3 +71,5 @@ docker network prune -f
 docker system prune -a -f --volumes
 
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build llm-server
+
+go install golang.org/x/tools/gopls@latest

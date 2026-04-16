@@ -14,22 +14,14 @@ import (
 
 /**
 CORS (Cross-Origin Resource Sharing) is a security feature in browsers that restricts web pages from making requests to a different domain than the one that served the web page. When a web page tries to make a cross-origin request, the browser sends an HTTP request with an Origin header indicating the source of the request. The server can respond with specific CORS headers to allow or deny the request.
-
+CORS is a browser security mechanism; it doesn't protect against non-browser clients (curl, Postman, etc.)
 */
-
-// buildAllowedOrigins reads ALLOWED_ORIGINS env var (comma-separated) and always includes localhost.
-// Production: set ALLOWED_ORIGINS=https://42overflow.com,https://www.42overflow.com
+// buildAllowedOrigins reads ALLOWED_ORIGINS env var (comma-separated).
 func buildAllowedOrigins() map[string]bool {
-	allowed := map[string]bool{
-		"http://localhost":      true,
-		"http://localhost:5173": true, // default SvelteKit dev port
-		"http://127.0.0.1":     true,
-	}
-	if env := os.Getenv("ALLOWED_ORIGINS"); env != "" {
-		for _, o := range strings.Split(env, ",") {
-			if o = strings.TrimSpace(o); o != "" {
-				allowed[o] = true
-			}
+	allowed := map[string]bool{}
+	for _, o := range strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			allowed[o] = true
 		}
 	}
 	return allowed
@@ -45,13 +37,14 @@ func allowedOrigin(origin string) string {
 	return ""
 }
 
+/*  tells the browser which request headers are permitted in cross-origin requests. */
 func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	if origin := allowedOrigin(r.Header.Get("Origin")); origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
 	}
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") //Authorization — reserved for when you add JWT auth; without it listed here, auth'd requests would be blocked by the browser before they even reach your server
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache") // required by sse spec to prevent buffering
 	w.Header().Set("Connection", "keep-alive")
@@ -76,11 +69,12 @@ func decodeAndSanitize(w http.ResponseWriter, r *http.Request, req *models.TextR
 	return true
 }
 
-// normalizeMessages is a compatibility layer.
-// Frontend can send just { "prompt": "hello" } or full { "messages": [{...}] }.
-// Both Gemini and Ollama expect req.Messages to be populated — never just a raw prompt.
-// If messages is empty, wraps the prompt into a single user message so both models
-// receive one consistent format regardless of what the frontend sent.
+/* a compatibility layer
+Frontend can send just { "prompt": "hello" } or full { "messages": [{...}] }.
+Both Gemini and Ollama expect req.Messages to be populated — never just a raw prompt.
+If messages is empty, wraps the prompt into a single user message so both models
+receive one consistent format regardless of what the frontend sent.
+*/
 func normalizeMessages(w http.ResponseWriter, req *models.TextRequest) bool {
 	if len(req.Messages) == 0 {
 		if req.Prompt == "" {
@@ -157,13 +151,13 @@ func GenerateText(w http.ResponseWriter, r *http.Request) {
 	streamSSE(w, ch) // talks to browser, sending each chunk as an SSE message
 }
 
-/**Images don't stream — they return a JSON response with a URL or base64 bytes.*/
-func GenerateImage(w http.ResponseWriter, r *http.Request) {
-	var req models.ImageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
+/**todo: not implemented; Images don't stream — they return a JSON response with a URL or base64 bytes.*/
+//func GenerateImage(w http.ResponseWriter, r *http.Request) {
+//	var req models.ImageRequest
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		http.Error(w, "Invalid request", http.StatusBadRequest)
+//		return
+//	}
 
 	// imageURL, err := services.GenerateImage(r.Context(), req)
 	// if err != nil {
@@ -173,4 +167,4 @@ func GenerateImage(w http.ResponseWriter, r *http.Request) {
 
 	// w.Header().Set("Content-Type", "application/json")
 	// json.NewEncoder(w).Encode(map[string]string{"url": imageURL})
-}
+//}

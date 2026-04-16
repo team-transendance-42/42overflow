@@ -12,7 +12,7 @@ import (
 var ollamaQueue = make(chan struct{}, 1)
 
 /**
-implememts a buffered channel as a semaphore to manage concurrent access to a local LLM. Since the environment is CPU-bound, this prevented resource exhaustion and ensured system stability under multi-user load
+implememts a buffered channel as a semaphore to manage concurrent access to a local LLM. Since the environment is CPU-bound(my laptop), this prevents resource exhaustion and ensured system stability under multi-user load; otherwise: Possible server crashes or instability if the system runs out of CPU or memory.
 */
 func GenerateOllamaText(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GenerateOllamaText(): method=%s path=%s", r.Method, r.URL.Path)
@@ -20,7 +20,6 @@ func GenerateOllamaText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 1. GET IN LINE
-	// This blocks here if another student is currently using Ollama.
 	ollamaQueue <- struct{}{}
 	defer func() { 
         <-ollamaQueue 

@@ -35,6 +35,7 @@ func main() {
 	router.Use(middleware.ErrorRecovery) //ErrorRecovery lets execution flow to RateLimiter only if no panic occurs.
 	router.Use(middleware.RateLimiter)
 
+	// url: what client calls
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
 	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST", "OPTIONS")
 	// router.HandleFunc("/api/rag/index", handlers.RagIndex).Methods("POST", "OPTIONS") todo: implement RAG indexing endpoint, which accepts text and metadata, and stores it in a vector database like Pinecone or Weaviate. This is separate from the /ask endpoint, which only retrieves info.
