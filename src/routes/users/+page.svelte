@@ -8,7 +8,11 @@
 		createdAt: string | Date;
 	};
 
-	let { data }: { data: { users: UserListItem[]; canViewEmail: boolean } } = $props();
+	let {
+		data
+	}: {
+		data: { users: UserListItem[]; canViewEmail: boolean; canManageRoles: boolean };
+	} = $props();
 
 	function formatDate(value: string | Date) {
 		return new Date(value).toLocaleDateString();
@@ -32,13 +36,18 @@
 							<h2>{user.name ?? 'Unnamed user'}</h2>
 							<p class="email-row">
 								<span class="email-label">Email:</span>
-								<span class="email-value">{data.canViewEmail && user.email ? user.email : null}</span>
+								<span class="email-value"
+									>{data.canViewEmail && user.email ? user.email : null}</span
+								>
 							</p>
 						</div>
 					</div>
 					<div class="user-meta">
 						<span class="role">{user.role}</span>
 						<span>Joined {formatDate(user.createdAt)}</span>
+						{#if data.canManageRoles}
+							<a class="edit-link" href={`/users/${user.id}`}>edit</a>
+						{/if}
 					</div>
 				</article>
 			{/each}
@@ -120,6 +129,16 @@
 		/* border: 1px solid var(--color-neutral-500); */
 		/* border-radius: var(--radius-sm); */
 		font-weight: 700;
+	}
+
+	.edit-link {
+		font-size: 0.85rem;
+		color: var(--color-text-primary);
+		text-decoration: none;
+	}
+
+	.edit-link:hover {
+		text-decoration: underline;
 	}
 
 	@media (max-width: 720px) {
