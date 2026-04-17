@@ -117,8 +117,8 @@
 	.role {
 		display: inline-block;
 		padding: 0.1rem 0.5rem;
-		border: 1px solid var(--color-neutral-500);
-		border-radius: var(--radius-sm);
+		/* border: 1px solid var(--color-neutral-500); */
+		/* border-radius: var(--radius-sm); */
 		font-weight: 700;
 	}
 
