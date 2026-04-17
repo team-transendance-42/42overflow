@@ -22,16 +22,15 @@ async function loadQuestions() {
 <h1>QUESTIONS</h1>
 
 {#each questions as q}
+  <Postbox>
+    <h2><strong>Project Name:</strong> {q.title}</h2>
+    <p class="content><strong>Question: </strong> {q.content}</p>
+    {#if q.profile?.user?.name}
+      <p class="author">Posted by: {q.profile.user.name}</p>
+    {/if}
+  </Postbox>
+{/each}
 
-    <Postbox>
-	 <h2>Project name: {q.projectname}</h2>
-      <h2>Topic: {q.topic}</h2>
-      <p>Summary: {q.body}</p>
-    </Postbox>
-  {/each}
-
-
-<p> This will have a list of questions/posts from students etc </p>
 
 </div>
 
@@ -63,7 +62,15 @@ async function loadQuestions() {
   .questions-page {
     width: 100%;
     max-width: 3400px;
-    margin: 0 auto;   /* THIS centers it */
+    margin: 0 auto;   
   
   }
+
+.content {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 </style>
