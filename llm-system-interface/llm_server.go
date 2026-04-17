@@ -10,7 +10,6 @@ import (
 	"llm-system-interface/middleware"
 	"log"
 	"net/http"
-	"os"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -20,10 +19,6 @@ func main() {
 	if err != nil {
 		log.Println("No .env file loaded, using container/runtime environment variables")
 	}
-	if os.Getenv("GEMINI_API_KEY") == "" {
-		log.Fatal("GEMINI_API_KEY is required")
-	}
-	log.Println("Successfully loaded API Key.")
 
 	router := mux.NewRouter() // contains list of routes, middleware chain, config flags(strict slash, etc)
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

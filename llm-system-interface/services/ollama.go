@@ -39,19 +39,31 @@ type OllamaResponse struct {
 	Done    bool           `json:"done"`
 }
 
+func truncate(s string, n int) string {
+	if (len(s) > n) {
+		return s[:n]
+	}
+	return s
+}
+
+/**
+In Go, the maximum length of a string you can send through a channel (like ch <- r.Message.Content) is limited by available memory, not by the channel itself. The channel transmits the string as a value, and Go strings can be up to 2GB (on 32-bit systems) or much larger (on 64-bit systems), but in practice, you are limited by system memory and performance.
+*/
 func buildOllamaMessages(req models.TextRequest) []models.Message {
     const systemPrompt = "reply with less words, dont repeat info"
     const maxHistory = 10
+	const maxContentLen = 2000 // chars per msg
 
     msgs := make([]models.Message, 0, len(req.Messages)+1)
-    msgs = append(msgs, req.Messages...)
+    for _, m := range req.Messages {
+        msgs = append(msgs, models.Message{Role: m.Role, Content: truncate(m.Content, maxContentLen)})
+    }
     if strings.TrimSpace(req.Prompt) != "" {
-        msgs = append(msgs, models.Message{Role: "user", Content: req.Prompt})
+        msgs = append(msgs, models.Message{Role: "user", Content: truncate(req.Prompt, maxContentLen)})
     }
     if len(msgs) > maxHistory {
         msgs = msgs[len(msgs)-maxHistory:]
     }
-
     return append([]models.Message{{Role: "system", Content: systemPrompt}}, msgs...)
 }
 

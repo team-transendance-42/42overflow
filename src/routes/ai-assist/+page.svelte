@@ -3,12 +3,18 @@
         --olive-text: #F4FFE8;
         --panel-bg: #1b231b;
         --panel-border: rgba(244, 255, 232, 0.12);
-        --soft-shadow: 0 0 12px #F4FFE8, 0 0 8px #F4FFE8;
+        --soft-shadow: 0 0 12px var(--olive-text), 0 0 8px var(--olive-text);
         --focus-border: rgba(168, 188, 132, 0.9);
         --focus-glow: rgba(168, 188, 132, 0.22);
+        --button-bg: #152015;
+        --button-color: var(--olive-text);
+        --button-border: rgba(244, 255, 232, 0.18);
+        --button-radius: 14px;
+        --button-disabled-opacity: 0.55;
         color: white;
         display: flex;
         flex-direction: column;
+        box-sizing: border-box;
     }
 
     h2,
@@ -69,15 +75,27 @@
         box-shadow: 0 0 0 3px var(--focus-glow);
     }
 
-    .form-input-parent button {
+    .form-input-parent button,
+    .toggle-button {
         flex: 0 0 auto;
-        border: 1px solid rgba(244, 255, 232, 0.18);
-        border-radius: 14px;
-        background: #152015;
-        color: #f4ffe8;
-        padding: 1.25rem 1.5rem;
+        border: 1px solid var(--button-border);
+        border-radius: var(--button-radius);
+        background: var(--button-bg);
+        color: var(--button-color);
         cursor: pointer;
         white-space: nowrap;
+        transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .form-input-parent button {
+        padding: 1.25rem 1.5rem;
+    }
+
+    .toggle-button {
+        padding: .75rem 1.5rem;
+        margin-top: 1rem;
+        font-size: 0.9em;
+        color: #a8bc84;
     }
 
 	.parent-llms {
@@ -100,13 +118,14 @@
     }
 
     .toggle-button.active {
-        color: #f4ffe8;
+        color: var(--olive-text);
         border-color: rgba(168, 188, 132, 0.6);
     }
 
-    .form-input-parent button:disabled {
+    .form-input-parent button:disabled,
+    .toggle-button:disabled {
         cursor: not-allowed;
-        opacity: 0.55;
+        opacity: var(--button-disabled-opacity);
     }
 
     .answer-card :global(h1),
@@ -185,22 +204,18 @@
     let answer = $state('');
     let loading = $state(false);
     let error = $state('');
-    let activeStreamController = $state<AbortController | null>(null);
+    let activeStreamController = $state<AbortController | null>(null); //Each AbortController is created per-request and linked to exactly one fetch via its .signal
     let llmMode = $state<'gemini' | 'ollama'>('gemini');
     let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]);
     let dictating = $state(false);
-    let recognition: any = null;
-    let interimTranscript = '';
-    // let isQueued = $state(false);
-    let queueTimer: ReturnType<typeof setTimeout> | null = null;
     let mediaRecorder = $state<MediaRecorder | null>(null);
-    let audioChunks: Blob[] = [];
+    let audioChunks: Blob[] = []; // Array of audio chunks for dictation
 
     // TYPES
     type InlineToken =
         | { type: 'text'; value: string }
         | { type: 'strong'; value: string }
-        | { type: 'em'; value: string }
+        | { type: 'em'; value: string } // emphasize, like bold
         | { type: 'code'; value: string }
         | { type: 'link'; value: string; href: string };
 
@@ -214,12 +229,26 @@
         return { type: 'text', value: value.replaceAll('**', '').replaceAll('`', '') };
     }
 
+
+    /**
+     * Parses inline markdown-like tokens from a string.
+    *  1. `([^`]+)`         → Group 1: Inline code (text between backticks)
+     *  2. **([^*]+)**       → Group 2: Bold (text between double asterisks)
+     *  3. __([^_]+)__       → Group 3: Bold (text between double underscores)
+     *  4. *([^*]+)*        → Group 4: Emphasis/italic (text between single asterisks)
+     *  5. _([^_]+)_        → Group 5: Emphasis/italic (text between single underscores)
+     *  6. [(.+?)]((.+?))   → Group 6: Link text, Group 7: Link URL (markdown links)
+     *
+     * Only one group will be filled per match, depending on which pattern matched.
+     * The function uses these groups to create the correct InlineToken type for each match.
+     */
     function parseInlineTokens(text: string): InlineToken[] {
         const tokens: InlineToken[] = [];
+        // Pattern matches: code, bold, italic, and links (markdown style)
         const pattern = /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_|\[(.+?)\]\((.+?)\)/g;
         let lastIndex = 0;
 
-        for (const match of text.matchAll(pattern)) {
+        for (const match of text.matchAll(pattern)) { // arr of captured groups
             const index = match.index ?? 0;
             if (index > lastIndex) tokens.push(createTextToken(text.slice(lastIndex, index)));
             if (match[1]) tokens.push({ type: 'code', value: match[1] });
@@ -256,16 +285,15 @@
     }
 
     /**
-     * Generic flushBlock function to flush a block by type.
-     * @param state ParserState
-     * @param type 'paragraph' | 'list' | 'code'
+	 * takes the text, formats and stores in ParserState.AsnwerBlock[]
+     *finalizes and stores the current block (paragraph, list, or code) and resets the relevant buffers in the parser state
      */
     function flushBlock(state: ParserState, type: 'paragraph' | 'list' | 'code') {
         if (type === 'paragraph') {
             if (!state.paragraph.length) return;
             state.blocks.push({
                 type: 'paragraph',
-                tokens: parseInlineTokens(state.paragraph.join(' ').replace(/\s+/g, ' ').trim())
+                tokens: parseInlineTokens(state.paragraph.join(' ').replace(/\s+/g, ' ').trim()) //\s any whitespace char, +=1 or more
             });
             state.paragraph = [];
         } else if (type === 'list') {
@@ -290,18 +318,18 @@
 
     function handleCodeState(line: string, trimmed: string, state: ParserState): boolean {
         if (!state.inCodeBlock) return false;
-        if (trimmed.startsWith('```')) {
+        if (trimmed.startsWith('```')) { // ``` marks end ond fo a code block
             state.inCodeBlock = false;
             flushBlock(state, 'code');
         } else {
-            state.codeLines.push(line);
+            state.codeLines.push(line); // keep collecting code lines
         }
         return true;
     }
 
     function handleRegularLine(trimmed: string, state: ParserState) {
         if (trimmed.startsWith('```')) {
-            flushBlock(state, 'paragraph');
+            flushBlock(state, 'paragraph'); // if we start a code block, flush p and li
             flushBlock(state, 'list');
             state.inCodeBlock = true;
             state.codeLang = trimmed.slice(3).trim();
@@ -338,7 +366,7 @@
         const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
         if (orderedMatch) {
             flushBlock(state, 'paragraph');
-            if (state.listType === 'ul') flushBlock(state, 'list');
+            if (state.listType === 'ul') flushBlock(state, 'list'); // end and save ol block
             state.listType = 'ol';
             state.listItems.push(orderedMatch[1]);
             return;
@@ -347,12 +375,16 @@
         state.paragraph.push(trimmed);
     }
 
+	/**
+	 * text.replaceAll('\r\n', '\n'):
+ 		Converts Windows-style line endings (\r\n) to Unix-style (\n), so all newlines are consistent
+	 */
     function renderAnswer(text: string): AnswerBlock[] {
         const lines = text.replaceAll('\r\n', '\n').trim().split('\n');
         const state = createParserState();
 
         for (const rawLine of lines) {
-            const line = rawLine.trimEnd();
+            const line = rawLine.trimEnd(); //need line (with only trailing whitespace removed) for cases where leading spaces matter (like code blocks: indentation (leading spaces) is important and should be preserved)
             const trimmed = line.trim();
             if (handleCodeState(line, trimmed, state)) continue;
             handleRegularLine(trimmed, state);
@@ -364,11 +396,15 @@
         return state.blocks;
     }
 
+	/**
+	 * Returns: the complete accumulated text of the entire streamed response, once streaming is done. During streaming it updates answer live (chunk by chunk)
+	 * Response: built-in Fetch API Response object(HTTP response)
+	 */
     async function parseSSEStream(response: Response): Promise<string> {
         if (!response.body) throw new Error('No response body');
 
         const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+        const decoder = new TextDecoder(); //Built-in object for decoding binary data (Uint8Array) into strings. { stream: true } allows incremental decoding (for streaming)
         let buffer = '';
         let fullText = '';
 
@@ -376,12 +412,9 @@
             const { value, done } = await reader.read();
             if (done) break;
 
-            // isQueued = false;
-            // if (queueTimer) clearTimeout(queueTimer);
-
-            buffer += decoder.decode(value, { stream: true });
-            const events = buffer.split('\n\n');
-            buffer = events.pop() || '';
+            buffer += decoder.decode(value, { stream: true }); // Decodes the current chunk (value) into a string, 
+            const events = buffer.split('\n\n'); // SSE event separator
+            buffer = events.pop() || ''; // keep all events to buffer, rmv last one fr
 
             for (const event of events) {
                 const lines = event.split('\n');
@@ -389,22 +422,20 @@
 
                 for (const line of lines) {
                     if (line.startsWith('data:')) {
-                        dataParts.push(line.slice(5).replace(/^ /, ''));
+                        dataParts.push(line.slice(5).replace(/^ /, ''));// rmv single leading space
                     }
                 }
 
                 if (dataParts.length) {
                     let newText = dataParts.join('\n');
                     fullText += newText;
-                    answer = fullText;
+                    answer = fullText; // reactive state var, bound to the displayed output
                 }
             }
         }
 
         return fullText;
     }
-
-    const MAX_HISTORY = 10;
 
     /**
      * Skip code blocks in history — token-expensive and low context value.
@@ -421,19 +452,25 @@
         return '';
     }
 
-    async function callLLM(
-            endpoint: string,
-            prompt: string,
-            fallbackError: string,
-            signal?: AbortSignal,
-            historySnapshot: typeof history = []
-        ): Promise<string> {
+	/**
+	 * builds the msgs history
+	POSTs to the endpoint — sends the messages array + raw prompt as JSON, with an optional AbortSignal for cancellation
+	Throws on HTTP error — reads the response body for an error message, falls back to fallbackError
+	Streams the response — passes the response to parseSSEStream, which reads SSE chunks and updates answer live as text arrives
+	Returns the full text — resolves with the complete response string once streaming is done
+
+	typeof history says: "use the same type as the variable history":
+	let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]); [] is default val=empty
+	$state(...) — marks history as reactive state. Any time history changes, every place in the template that reads it re-renders automatically
+	 */
+    async function callLLM( endpoint: string, prompt: string, fallbackError: string,
+            signal?: AbortSignal, historySnapshot: typeof history = [] ): Promise<string> {
         const messages = [
             ...historySnapshot.flatMap(entry => [
                 { role: 'user', content: entry.question },
-                { role: 'assistant', content: entry.blocks.map(blockToText).join(' ') }
+                { role: 'assistant', content: entry.blocks.map(blockToText).join(' ') } // history
             ]),
-            { role: 'user', content: prompt }
+            { role: 'user', content: prompt } // last q
         ];
 
         const res = await fetch(endpoint, {
@@ -456,7 +493,7 @@
         activeStreamController.abort();
         activeStreamController = null;
         loading = false;
-        // Save partial answer and question to history if not empty: todo: doesnt work
+        // Save partial answer and question to history
         if (question.trim() || answer.trim()) {
             history = [{ question: question.trim(), blocks: renderAnswer(answer) }, ...history];
             question = '';
@@ -464,12 +501,11 @@
         }
     }
 
-    // DERIVED
     let renderedAnswer = $derived(renderAnswer(answer));
 
     async function askQuestion(event?: SubmitEvent) {
         event?.preventDefault();
-
+		const MAX_HISTORY = 10;
         const prompt = question.trim();
         if (!prompt) return;
 
@@ -479,26 +515,20 @@
         }
 
         loading = true;
-        // isQueued = false;
         error = '';
         answer = '';
 
-        // queueTimer = setTimeout(() => {
-        //     if (loading && !answer) isQueued = true;
-        // }, 3000);
-    
         const controller = new AbortController();
         activeStreamController = controller;
 
         try {
             const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
             const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
-            const historySnapshot = history.slice(-MAX_HISTORY);
+            const historySnapshot = history.slice(-MAX_HISTORY); // give last max history of the slice
             const result = await callLLM(endpoint, prompt, fallbackError, controller.signal, historySnapshot);
 
             const completedAnswer = result.trim();
             if (completedAnswer) {
-                // history = [...history, { question: prompt, blocks: renderAnswer(completedAnswer) }];
                 history = [{ question: prompt, blocks: renderAnswer(completedAnswer) }, ...history]; // prepend to history to show most recent first
                 question = '';
             }
@@ -609,8 +639,12 @@ async function sendToWhisper(blob: Blob) {
             bind:value={question}
             placeholder="Ask a question..."
         />
-        <button type="button" onclick={toggleDictation} aria-pressed={dictating}>
-            {dictating ? 'Stop Dictate' : 'Dictate'}
+        <button type="button" onclick={toggleDictation} aria-pressed={dictating} disabled={loading}>
+            {#if loading}
+                <span>Dictating...</span>
+            {:else}
+                {dictating ? 'Stop Dictate' : 'Dictate'}
+            {/if}
         </button>
         <button type="submit" disabled={loading || !question.trim()}>
             Ask
