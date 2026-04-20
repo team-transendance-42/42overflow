@@ -2,7 +2,7 @@
   import Input from '$lib/components/Input.svelte';
   import Button from '$lib/components/Button.svelte';
   import { authClient } from '$lib/auth-client';
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
 
   let email = '';
   let password = '';
@@ -24,7 +24,7 @@
       error = err.message ?? 'Invalid email or password';
       return;
     }
-
+	await invalidateAll();
     goto('/profile');
   }
 </script>
