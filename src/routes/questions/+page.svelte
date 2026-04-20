@@ -24,9 +24,18 @@ async function loadQuestions() {
 {#each questions as q}
   <Postbox>
     <h2><strong>Project Name:</strong> {q.title}</h2>
-    <p class="content><strong>Question: </strong> {q.content}</p>
+    <p class="content"><strong>Question: </strong> {q.content}</p>
+
     {#if q.profile?.user?.name}
-      <p class="author">Posted by: {q.profile.user.name}</p>
+      <p class="author">Posted by: 
+
+	  	<a 
+			class="author-link"
+			href="/profile/{q.profile.username}"
+		>
+	  		{q.profile.user.name}
+	  	</a>
+	 </p>
     {/if}
   </Postbox>
 {/each}
@@ -71,6 +80,15 @@ async function loadQuestions() {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.author-link {
+  font-style: italic;
+  color: #083957;
+  text-decoration: none;
+}
+.author-link:hover {
+  text-decoration: underline;
 }
 
 </style>
