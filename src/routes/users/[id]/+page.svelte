@@ -50,6 +50,14 @@
 	function formatDate(value: string | Date) {
 		return new Date(value).toLocaleDateString();
 	}
+
+	function confirmDelete(event: SubmitEvent) {
+		const ok = window.confirm('Are you sure you want to delete this user? This action cannot be undone.');
+		if (!ok) {
+			// Prevent form submission
+			event.preventDefault();
+		}
+	}
 </script>
 
 <div class="edit-user-page">
@@ -125,8 +133,13 @@
 			</label>
 
 			<button type="submit" class="full-width">Save profile details</button>
+			
 		</form>
 	</section>
+		
+	<form method="POST" action="?/deleteUser" onsubmit={confirmDelete}>
+		<button type="submit" class="full-width" style="background-color: red;">Delete account</button>
+	</form>
 
 	<section class="card">
 		<h2>User posts (read-only)</h2>

@@ -242,5 +242,31 @@ export const actions: Actions = {
 		});
 
 		return { success: true, message: 'Profile details updated' };
+	},
+
+	deleteUser: async ({ locals, params }) => {
+		await requireAdmin(locals.user?.id);
+
+		const targetUser = await prisma.user.findUnique({
+			where: { id: params.id },
+			select: { role: true }
+		});
+
+		if (!targetUser) {
+			throw error(404, 'User not found');
+		}
+
+		if (targetUser.role === 'ADMIN') {
+			const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+			if (adminCount <= 1) {
+				return fail(400, { message: 'Cannot delete the last admin' });
+			}
+		}
+
+		await prisma.user.delete({
+			where: { id: params.id }
+		});
+
+		return { success: true, message: 'User deleted' };
 	}
 };
