@@ -1,21 +1,22 @@
 For development, there is an extra docker-compose.dev.yml file that enables live reload for both Python and the app. This means code changes are reflected immediately in the local browser, without needing to rebuild the containers:
-==============================
-docker compose build --no-cache llm-server
-docker compose up -d llm-server
-==================================
-
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 base stack only: (production)
 docker compose up --build
 
+Use --build only when you changed:
+Dockerfile/base image
+package.json or lockfile
+Anything copied during image build that is not from the live mount
+================================
 dev stack with reload:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-
-If the progress output is too noisy, use detached mode and quiet build/pull flags:
-
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --quiet-build --quiet-pull
-
-Then follow only the services you care about:
-
+==============================
+for go we do need to recompile, didnt install an extra tool: 
+docker compose -d --build --no-cache llm-server
+or:
+docker compose up -d llm-server
+==================================
+for debugg:
 docker compose logs -f app llm-server python-rag
 ================================
 restart only app service:
@@ -24,23 +25,13 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml restart app
 if changed dependencies or dockerfiles, also restart llm-server and python-rag:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build app
 ================================
-
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
-================================
-
-Use --build only when you changed:
-
-Dockerfile/base image
-package.json or lockfile
-Anything copied during image build that is not from the live mount
-================================
 sudo systemctl start docker
 ===
 sudo dockerd &
 
 It manually starts the Docker daemon process in the background (& = background).
 
-The daemon is the service that actually runs containers — the docker CLI you have installed is just a client that talks to it. Without the daemon running, the CLI can't do anything.
+The daemon is the service that actually runs containers — the docker CLI  installed is just a client that talks to it. Without the daemon running, the CLI can't do anything.
 
 ====
 docker ps -a
@@ -70,13 +61,6 @@ docker network prune -f
 Remove everything (be careful!):
 docker system prune -af
 ====================================
-no python recompile if u run:
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-===================================================================
-
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build llm-server
-
-go install golang.org/x/tools/gopls@latest
 
 //shows disk usage broken down by images, containers, volumes, and build cache.
 docker system df // disk free
@@ -86,4 +70,7 @@ docker pull ollama/ollama:0.20.5
 
 docker compose logs python-stt
 docker compose up -d --build caddy app
+
+for deleted files:
+git add -A
 

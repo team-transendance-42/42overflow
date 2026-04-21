@@ -1,5 +1,5 @@
-Store the last 3 question/answer pairs for each user/session (in memory, or in a simple map if you don't need persistence).
-When a new question comes in, prepend the last 3 Q&A pairs as a summary/context to the prompt you send to the LLM.
+Store the last 10 question/answer pairs for each user/session (in memory, or in a simple map if you don't need persistence).
+When a new question comes in, prepend the last 10 Q&A pairs as a summary/context to the prompt you send to the LLM.
 If you want to further limit usage, you can summarize older history into a single line (e.g., “Earlier, user asked about X and Y”).
 ================================
 
