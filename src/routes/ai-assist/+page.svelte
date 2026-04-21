@@ -42,7 +42,7 @@
         overflow-x: auto;
     }
 
-	.answer-card, form-input, .form-input-parent button, .toggle-button, .answer-card :global(pre) {
+	.answer-card, .form-input, .form-input-parent button, .toggle-button, .answer-card :global(pre) {
 		border-radius: var(--button-radius);
 	}
 
