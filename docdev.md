@@ -69,6 +69,10 @@ docker network prune -f
 ===================================
 Remove everything (be careful!):
 docker system prune -af
+====================================
+no python recompile if u run:
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+===================================================================
 
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build llm-server
 
@@ -79,3 +83,7 @@ docker system df // disk free
 
 docker pull ollama/ollama:0.20.5
 // it fails again, the tag 0.20.5 may be broken on the registry. In that case, check your docker-compose.yml and try switching to ollama/ollama:latest or a nearby stable tag.
+
+docker compose logs python-stt
+docker compose up -d --build caddy app
+

@@ -53,8 +53,6 @@ compute_type="int8" — 8-bit quantization: smaller, faster, slight quality loss
 Model stays in RAM after first load — no reload cost per request.
 
 Per request:
-
-
 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
     tmp.write(content)  # save blob to disk
 Whisper needs a file path, not raw bytes — so the audio must be saved to disk first.

@@ -44,6 +44,7 @@
 
 	.answer-card, .form-input, .form-input-parent button, .toggle-button, .answer-card :global(pre) {
 		border-radius: var(--button-radius);
+		color: var(--olive-text);
 	}
 
     .form-input-parent {
@@ -82,7 +83,7 @@
         flex: 0 0 auto;
         border: 1px solid var(--button-border);
         background: var(--button-bg);
-        color: var(--button-color);
+        /*color: var(--button-color);*/
         padding: 1.25rem 1.5rem;
         cursor: pointer;
         white-space: nowrap;
@@ -99,7 +100,7 @@
         flex: 0 0 auto;
         border: 1px solid var(--panel-border);
         background: var(--button-bg);
-        color: var(--light-olive);
+        /*color: var(--light-olive);*/
         padding: 0.75rem 1.5rem;
         margin-top: 1rem;
         cursor: pointer;
@@ -585,7 +586,7 @@ async function sendToWhisper(blob: Blob) {
 	Location: lives only in browser RAM, no file system path;The Whisper backend receives it as a multipart form upload and reads the bytes directly — it may or may not save it temporarily on its end. */
 
     try {
-        const response = await fetch('http://localhost:8091/convert_audio', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
+        const response = await fetch('/stt/convert_audio', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
             method: 'POST',
             body: formData
         });
