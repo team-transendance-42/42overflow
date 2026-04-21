@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# run: ./llm-system-interface/test_api.sh
+
 # Configuration
 API_URL="http://localhost:8081/ai-assist"
 GREEN='\033[0;32m'
