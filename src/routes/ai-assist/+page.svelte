@@ -1,17 +1,18 @@
 <style>
     .container {
         --olive-text: #F4FFE8;
+        --light-olive: #a8bc84;
         --panel-bg: #1b231b;
         --panel-border: rgba(244, 255, 232, 0.12);
-        --soft-shadow: 0 0 12px var(--olive-text), 0 0 8px var(--olive-text);
-        --focus-border: rgba(168, 188, 132, 0.9);
+        --soft-shadow: 0 0 10px var(--olive-text);
         --focus-glow: rgba(168, 188, 132, 0.22);
         --button-bg: #152015;
         --button-color: var(--olive-text);
         --button-border: rgba(244, 255, 232, 0.18);
+        --dark-olive: rgba(168, 188, 132, 0.6);
         --button-radius: 14px;
         --button-disabled-opacity: 0.55;
-        color: white;
+        color: var(--olive-text);
         display: flex;
         flex-direction: column;
         box-sizing: border-box;
@@ -28,19 +29,22 @@
         margin: 1rem 0;
     }
 
-	.answer-card {
+    .answer-card {
         width: 100%;
-        display: inline-block;
+        display: block;
         margin: 20px auto;
         max-width: 780px;
         background: var(--panel-bg);
         border: 1px solid var(--panel-border);
-        border-radius: 14px;
-        padding: 1.25rem 1.25rem;
+        padding: 1.25rem;
         text-align: left;
         line-height: 1.6;
         overflow-x: auto;
     }
+
+	.answer-card, form-input, .form-input-parent button, .toggle-button, .answer-card :global(pre) {
+		border-radius: var(--button-radius);
+	}
 
     .form-input-parent {
         width: 100%;
@@ -60,8 +64,7 @@
         display: block;
         background: var(--panel-bg);
         border: 1px solid var(--panel-border);
-        border-radius: 14px;
-        padding: 1.25rem 1.25rem;
+        padding: 1.25rem;
         color: var(--olive-text);
         line-height: 1.6;
         box-sizing: border-box;
@@ -75,51 +78,39 @@
         box-shadow: 0 0 0 3px var(--focus-glow);
     }
 
-    .form-input-parent button,
-    .toggle-button {
+    .form-input-parent button {
         flex: 0 0 auto;
         border: 1px solid var(--button-border);
-        border-radius: var(--button-radius);
         background: var(--button-bg);
         color: var(--button-color);
+        padding: 1.25rem 1.5rem;
         cursor: pointer;
         white-space: nowrap;
         transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
-    .form-input-parent button {
-        padding: 1.25rem 1.5rem;
+    .parent-llms {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
     }
-
-    .toggle-button {
-        padding: .75rem 1.5rem;
-        margin-top: 1rem;
-        font-size: 0.9em;
-        color: #a8bc84;
-    }
-
-	.parent-llms {
-		display: flex;
-		gap: 1rem;
-		justify-content: center;
-	}
 
     .toggle-button {
         flex: 0 0 auto;
-        border: 1px solid rgba(244, 255, 232, 0.18);
-        border-radius: 14px;
-        color: #a8bc84;
-        padding: .75rem 1.5rem;
-		margin-top: 1rem;
+        border: 1px solid var(--panel-border);
+        background: var(--button-bg);
+        color: var(--light-olive);
+        padding: 0.75rem 1.5rem;
+        margin-top: 1rem;
         cursor: pointer;
         white-space: nowrap;
         font-size: 0.9em;
-        transition: background-color 0.2s ease;
+        transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
     .toggle-button.active {
-        color: var(--olive-text);
-        border-color: rgba(168, 188, 132, 0.6);
+        color: white;
+        border-color: white;
     }
 
     .form-input-parent button:disabled,
@@ -133,7 +124,7 @@
     .answer-card :global(h3) {
         margin: 1rem 0 0.5rem;
         line-height: 1.2;
-        color: #f4ffe8;
+        color: var(--olive-text);
     }
 
     .answer-card :global(ul),
@@ -149,9 +140,8 @@
     .answer-card :global(pre) {
         margin: 1rem 0;
         padding: 1rem;
-        border-radius: 12px;
-        background: #0d120d;
-        color: #e6f4dc;
+        background: var(--button-bg);
+        color: var(--olive-text);
         overflow-x: auto;
         white-space: pre;
     }
@@ -169,32 +159,23 @@
     .answer-card :global(:not(pre) > code) {
         padding: 0.15rem 0.35rem;
         border-radius: 0.35rem;
-        background: rgba(244, 255, 232, 0.12);
+        background: var(--dark-olive);
     }
 
     .answer-card :global(blockquote) {
         margin: 0.75rem 0;
         padding-left: 1rem;
-        border-left: 3px solid rgba(244, 255, 232, 0.25);
-        color: #d8e4d2;
+        border-left: 3px solid var(--dark-olive);
     }
 
     .answer-card :global(a) {
-        color: #98f5c5;
+        color: var(--light-olive);
     }
 
     .answer-card :global(hr) {
         border: 0;
-        border-top: 1px solid rgba(244, 255, 232, 0.16);
+        border-top: 1px solid var(--panel-border);
         margin: 1rem 0;
-    }
-
-    .answer-card :global(strong) {
-        color: #ffffff;
-    }
-
-    .answer-card :global(em) {
-        color: #dbe9d2;
     }
 </style>
 
@@ -241,6 +222,7 @@
      *
      * Only one group will be filled per match, depending on which pattern matched.
      * The function uses these groups to create the correct InlineToken type for each match.
+	 * the LLM responses come back as raw markdown text 
      */
     function parseInlineTokens(text: string): InlineToken[] {
         const tokens: InlineToken[] = [];
@@ -272,7 +254,7 @@
         inCodeBlock: boolean;
     };
 
-    function createParserState(): ParserState {
+    function initParserState(): ParserState {
         return {
             blocks: [],
             paragraph: [],
@@ -316,6 +298,10 @@
         }
     }
 
+	/**
+	 * Called for every line. If inside a code block: collects lines until closing ```, then flushes.
+	 * Returns true if the line was consumed (we're in a code block), false to let handleRegularLine process it.
+	 */
     function handleCodeState(line: string, trimmed: string, state: ParserState): boolean {
         if (!state.inCodeBlock) return false;
         if (trimmed.startsWith('```')) { // ``` marks end ond fo a code block
@@ -327,6 +313,9 @@
         return true;
     }
 
+	/**
+	 * Processes one non-code line and decides what kind of markdown block it belongs to
+	 */
     function handleRegularLine(trimmed: string, state: ParserState) {
         if (trimmed.startsWith('```')) {
             flushBlock(state, 'paragraph'); // if we start a code block, flush p and li
@@ -376,12 +365,12 @@
     }
 
 	/**
-	 * text.replaceAll('\r\n', '\n'):
- 		Converts Windows-style line endings (\r\n) to Unix-style (\n), so all newlines are consistent
+	 * text.replaceAll('\r\n', '\n'): Converts Windows-style line endings (\r\n) to Unix-style (\n), so all newlines are consistent
+	 * converts a completed markdown string into structured AnswerBlock[] for the template to render. Called once per finished response (and on partial answer for live preview via $derived)
 	 */
     function renderAnswer(text: string): AnswerBlock[] {
         const lines = text.replaceAll('\r\n', '\n').trim().split('\n');
-        const state = createParserState();
+        const state = initParserState();
 
         for (const rawLine of lines) {
             const line = rawLine.trimEnd(); //need line (with only trailing whitespace removed) for cases where leading spaces matter (like code blocks: indentation (leading spaces) is important and should be preserved)
@@ -397,8 +386,7 @@
     }
 
 	/**
-	 * Returns: the complete accumulated text of the entire streamed response, once streaming is done. During streaming it updates answer live (chunk by chunk)
-	 * Response: built-in Fetch API Response object(HTTP response)
+	 * reads the raw HTTP stream chunk by chunk, reassembles SSE events, extracts data: lines, and updates answer live as text arrives. Returns the full accumulated string when streaming ends
 	 */
     async function parseSSEStream(response: Response): Promise<string> {
         if (!response.body) throw new Error('No response body');
@@ -413,8 +401,8 @@
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true }); // Decodes the current chunk (value) into a string, 
-            const events = buffer.split('\n\n'); // SSE event separator
-            buffer = events.pop() || ''; // keep all events to buffer, rmv last one fr
+            const events = buffer.split('\n\n'); // SSE event separator: has all except the last
+            buffer = events.pop() || ''; // keeps only the last event
 
             for (const event of events) {
                 const lines = event.split('\n');
@@ -453,17 +441,13 @@
     }
 
 	/**
-	 * builds the msgs history
-	POSTs to the endpoint — sends the messages array + raw prompt as JSON, with an optional AbortSignal for cancellation
-	Throws on HTTP error — reads the response body for an error message, falls back to fallbackError
-	Streams the response — passes the response to parseSSEStream, which reads SSE chunks and updates answer live as text arrives
-	Returns the full text — resolves with the complete response string once streaming is done
-
-	typeof history says: "use the same type as the variable history":
-	let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]); [] is default val=empty
-	$state(...) — marks history as reactive state. Any time history changes, every place in the template that reads it re-renders automatically
+	 * Builds a messages array — flattens chat history into user/assistant pairs, then appends the new prompt at the end
+	 * POSTs it to the given endpoint as JSON
+	 * Throws an error if the response is not OK
+	 * Returns parseSSEStream(res) — reads the streamed response chunk by chunk (Server-Sent Events)
+	* $state(...) — marks history as reactive state. Any time history changes, every place in the template that reads it re-renders automatically
 	 */
-    async function callLLM( endpoint: string, prompt: string, fallbackError: string,
+    async function streamChat( endpoint: string, prompt: string, fallbackError: string,
             signal?: AbortSignal, historySnapshot: typeof history = [] ): Promise<string> {
         const messages = [
             ...historySnapshot.flatMap(entry => [
@@ -473,7 +457,7 @@
             { role: 'user', content: prompt } // last q
         ];
 
-        const res = await fetch(endpoint, {
+        const res = await fetch(endpoint, { // endpoint is the url
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ messages, prompt}),
@@ -488,6 +472,12 @@
         return parseSSEStream(res);
     }
 
+	/**
+	 * AbortController is a browser built-in for cancelling async operations.
+	 * const controller = new AbortController();
+	   controller.signal — a read-only AbortSignal object
+       controller.abort() — fires the cancel
+	 */
     function stopStreaming() {
         if (!loading || !activeStreamController) return;
         activeStreamController.abort();
@@ -502,14 +492,25 @@
     }
 
     let renderedAnswer = $derived(renderAnswer(answer));
+	const MAX_HISTORY = 10;
 
+	/**
+	 *  interface SubmitEvent
+        defines the object used to represent an HTML form's HTMLFormElement.submit_event event
+	  * Trims and validates the input
+	  *	Aborts any in-progress stream if the user submits again
+	  *	Picks the API endpoint based on llmMode (Gemini or Ollama)
+	  *	Calls streamChat() with the prompt and last N history messages
+	  *	On success, prepends the Q&A to history and clears the input
+	  *	On abort, silently exits; on other errors, sets the error message
+	 */
     async function askQuestion(event?: SubmitEvent) {
-        event?.preventDefault();
-		const MAX_HISTORY = 10;
+        event?.preventDefault(); // cancels page reload; The ?. means it's safe to call even if no event was passed (e.g., called programmatically).
+
         const prompt = question.trim();
         if (!prompt) return;
 
-        if (loading && activeStreamController) {
+        if (loading && activeStreamController) { //If the user submits while a previous request is still streaming, it cancels that stream via AbortController.abort() and clears the reference
             activeStreamController.abort();
             activeStreamController = null;
         }
@@ -518,14 +519,14 @@
         error = '';
         answer = '';
 
-        const controller = new AbortController();
+        const controller = new AbortController(); // each req gets a new controller
         activeStreamController = controller;
 
         try {
             const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
             const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
             const historySnapshot = history.slice(-MAX_HISTORY); // give last max history of the slice
-            const result = await callLLM(endpoint, prompt, fallbackError, controller.signal, historySnapshot);
+            const result = await streamChat(endpoint, prompt, fallbackError, controller.signal, historySnapshot); // actuall API call
 
             const completedAnswer = result.trim();
             if (completedAnswer) {
@@ -538,31 +539,35 @@
             }
             error = e instanceof Error ? e.message : 'Unknown error';
         } finally {
-            if (activeStreamController === controller) {
+            if (activeStreamController === controller) { //Guards against a race condition where the user fires a second question before the first finishes.
                 activeStreamController = null;
-                // isQueued = false;
                 loading = false;
             }
         }
     }
 
-    async function toggleDictation() {
+    async function toggleDictation() { // can use await inside
     if (dictating) {
         // If LLM is still processing, stop it and save partial answer to history first
         if (loading) stopStreaming();
-        mediaRecorder?.stop();
+        mediaRecorder?.stop(); //?. — safely calls .stop() only if mediaRecorder is not null
         dictating = false;
     } else {
-        // Start recording
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); //Asks for mic permission (locally).
-        mediaRecorder = new MediaRecorder(stream); //Captures raw audio chunks while you speak.
+        let stream: MediaStream; // type annotation, no val assigned
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true }); // Browser API — asks user for mic permission, returns an audio stream. await pauses until the user grants/denies.
+        } catch {
+            error = 'Microphone access denied.';
+            return;
+        }
+        mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
 
         mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-        
+	        
         mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            await sendToWhisper(audioBlob);
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); //Blob = Binary Large Object — a browser built-in for raw binary data; type: 'audio/wav' tells the browser what MIME type this binary data is.
+            await sendToWhisper(audioBlob); //puts the blob into a FormData and sends it via fetch
             stream.getTracks().forEach(track => track.stop());
             await askQuestion();
         };
@@ -574,10 +579,13 @@
 
 async function sendToWhisper(blob: Blob) {
     const formData = new FormData();
-    formData.append('file', blob, 'recording.wav');
+    formData.append('file', blob, 'recording.wav'); /*recording.wav is not a real file — it's just a filename hint sent inside the HTTP request so the Whisper backend knows what to call it;Created: only in memory, when formData.append(...) runs
+	From: the audioBlob (the merged chunks from recording)
+	Deleted: automatically by the garbage collector after the fetch request completes — it never touches disk
+	Location: lives only in browser RAM, no file system path;The Whisper backend receives it as a multipart form upload and reads the bytes directly — it may or may not save it temporarily on its end. */
 
     try {
-        const response = await fetch('http://localhost:8091/convert_audio', {
+        const response = await fetch('http://localhost:8091/convert_audio', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
             method: 'POST',
             body: formData
         });
@@ -639,12 +647,8 @@ async function sendToWhisper(blob: Blob) {
             bind:value={question}
             placeholder="Ask a question..."
         />
-        <button type="button" onclick={toggleDictation} aria-pressed={dictating} disabled={loading}>
-            {#if loading}
-                <span>Dictating...</span>
-            {:else}
-                {dictating ? 'Stop Dictate' : 'Dictate'}
-            {/if}
+        <button type="button" onclick={toggleDictation} aria-pressed={dictating} disabled={loading && !dictating}>
+            {dictating ? 'Stop Dictate' : 'Dictate'}
         </button>
         <button type="submit" disabled={loading || !question.trim()}>
             Ask
@@ -656,11 +660,6 @@ async function sendToWhisper(blob: Blob) {
     {#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
     {/if}
-    <!-- {#if isQueued}
-        <div style="color: #a8bc84; text-align:center; font-style: italic;">
-            🐢 CPU is busy. You are in line...
-        </div>
-    {/if} -->
     {#if loading}
         <div style="text-align:center;">Loading...</div>
     {/if}

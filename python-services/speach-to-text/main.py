@@ -9,17 +9,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# --- THEORY: CORS (Cross-Origin Resource Sharing) ---
+# --- CORS (Cross-Origin Resource Sharing) ---
 # Browsers block "cross-origin" requests by default for security. 
 # Since frontend (port 5173) is different from this backend (port 8090),
 # the browser will block the 'fetch' call unless this middleware explicitly 
 # tells the browser "I trust this origin."
+# TODO: replace with production URL before deploying
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows all origins. For production, use ["http://localhost:5173"]
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["*"], # Allows POST, GET, etc.
-    allow_headers=["*"], # Allows all custom headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- THEORY: Whisper Model Loading ---

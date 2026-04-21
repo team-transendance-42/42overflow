@@ -67,9 +67,15 @@ docker image prune -a -f
 docker volume prune -f
 docker network prune -f
 ===================================
-(Optional) Remove everything (be careful!):
-docker system prune -a -f --volumes
+Remove everything (be careful!):
+docker system prune -af
 
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build llm-server
 
 go install golang.org/x/tools/gopls@latest
+
+//shows disk usage broken down by images, containers, volumes, and build cache.
+docker system df // disk free
+
+docker pull ollama/ollama:0.20.5
+// it fails again, the tag 0.20.5 may be broken on the registry. In that case, check your docker-compose.yml and try switching to ollama/ollama:latest or a nearby stable tag.
