@@ -19,6 +19,7 @@
   {/if}
 
  <p class="email">Email: {user?.email}</p>
+
   {#if profile?.interests}
     <div class="section">
       <p>Interests: {profile.interests}</p>
@@ -30,6 +31,18 @@
       <span class="label">Intra</span>
       <p>{profile.login}</p>
     </div>
+  {/if}
+
+    {#if profile?.followers?.length > 0}
+    <div class="section">
+      <span class="label">Following:</span>
+      {#each profile.followers as f}
+	  <div>
+        <a href="/profile/{f.following.username}" class="following-link">
+          {f.following.user.name}
+        </a>
+		</div>
+      {/each}
   {/if}
 
 </div>
@@ -50,5 +63,9 @@
     border-radius: var(--border-radius-md);
     text-decoration: none;
     color: var(--color-text-primary);
+  }
+
+    .following-link:hover {
+    text-decoration: underline;
   }
 </style>
