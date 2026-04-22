@@ -48,18 +48,7 @@ async function handleUpdate() {
     body: formData,
   });
 
-  // parse the real image URL back from the server
-  let savedImageUrl = previewUrl;
-  try {
-    const json = await res.json();
-    if (json?.data?.imageUrl) savedImageUrl = json.data.imageUrl;
-  } catch {}
 
-  // step 2 — save name + real server image URL via authClient
-  const { error: err } = await authClient.updateUser({
-    name: [firstname, lastname].filter(Boolean).join(' ').trim() || undefined,
-    image: savedImageUrl || '',
-  });
 
   loading = false;
 
