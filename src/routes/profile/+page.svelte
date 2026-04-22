@@ -43,6 +43,7 @@
         </a>
 		</div>
       {/each}
+	</div>
   {/if}
 
 </div>

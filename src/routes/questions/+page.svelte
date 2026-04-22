@@ -7,7 +7,8 @@ let questions = [];
   let limit = 10;
   let total = 0;
 
-async function loadQuestions() {
+async function loadQuestions() 
+{
     const res = await fetch(`/api/questions?page=${page}&limit=${limit}`);
     const json = await res.json();
 
@@ -16,10 +17,12 @@ async function loadQuestions() {
   };
 
   onMount(loadQuestions);
+
 </script>
 
 <div class="questions-page">
-<h1>QUESTIONS</h1>
+<h1><strong> NEWEST QUESTIONS</strong></h1>
+
 
 {#each questions as q}
   <Postbox>
@@ -28,7 +31,6 @@ async function loadQuestions() {
 
     {#if q.profile?.user?.name}
       <p class="author">Posted by: 
-
 	  	<a 
 			class="author-link"
 			href="/profile/{q.profile.username}"
@@ -39,8 +41,6 @@ async function loadQuestions() {
     {/if}
   </Postbox>
 {/each}
-
-
 </div>
 
 <div class="pagination">
@@ -66,14 +66,19 @@ async function loadQuestions() {
 </div>
 
 
-
 <style>
   .questions-page {
     width: 100%;
     max-width: 3400px;
-    margin: 0 auto;   
+    margin: 100 auto; 
   
   }
+
+  .questions-page h1 {
+  margin-bottom: 4px;
+  margin-left: 8px;
+}
+
 
 .content {
   display: -webkit-box;
