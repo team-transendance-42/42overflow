@@ -34,11 +34,12 @@ async function handleUpdate() {
   success = false;
   loading = true;
 
-  // step 1 — upload file + profile fields to server first
   const formData = new FormData();
   formData.append('intraprofile', intraprofile);
   formData.append('interests', interests);
   formData.append('username', username);
+  formData.append('firstname', firstname);
+  formData.append('lastname', lastname);
   if (fileInput?.files?.[0]) {
     formData.append('avatarimage', fileInput.files[0]);
   }
@@ -48,16 +49,19 @@ async function handleUpdate() {
     body: formData,
   });
 
-
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    if (json?.data?.imageUrl) previewUrl = json.data.imageUrl;
+  } catch {}
 
   loading = false;
 
-  if (err) {
-    error = err.message ?? 'Could not update profile';
+  if (!res.ok) {
+    error = 'Could not update profile';
     return;
   }
 
-  if (savedImageUrl) previewUrl = savedImageUrl;
   success = true;
 }
 

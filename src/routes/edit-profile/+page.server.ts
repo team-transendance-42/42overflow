@@ -53,6 +53,17 @@ export const actions: Actions = {
       },
     });
 
+	const firstname = data.get('firstname') as string;
+	const lastname = data.get('lastname') as string;
+	const fullName = [firstname, lastname].filter(Boolean).join(' ').trim();
+
+	if (fullName) {
+  		await db.user.update({
+    		where: { id: locals.user.id },
+    		data: { name: fullName }
+  	});
+	}
+
     if (imageUrl) {
   		await db.user.update({
     		where: { id: locals.user.id },

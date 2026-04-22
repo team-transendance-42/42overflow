@@ -157,6 +157,11 @@ OLD SETTINGS Code
 
   --------------
 
+
+
+-----------------------------------------------------------
+
+
     async function handleUpdate() {
     error = '';
     success = false;
@@ -187,6 +192,35 @@ OLD SETTINGS Code
   success = true;
 }
 
------------------------------------------------------------
+
+async function handleUpdate() {
+  error = '';
+  success = false;
+  loading = true;
+
+  // step 1 — upload file + profile fields to server first
+  const formData = new FormData();
+  formData.append('intraprofile', intraprofile);
+  formData.append('interests', interests);
+  formData.append('username', username);
+  if (fileInput?.files?.[0]) {
+    formData.append('avatarimage', fileInput.files[0]);
+  }
+
+  const res = await fetch('?/update', {
+    method: 'POST',
+    body: formData,
+  });
 
 
+
+  loading = false;
+
+  if (err) {
+    error = err.message ?? 'Could not update profile';
+    return;
+  }
+
+  if (savedImageUrl) previewUrl = savedImageUrl;
+  success = true;
+}
