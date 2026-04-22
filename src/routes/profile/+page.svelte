@@ -5,39 +5,41 @@
 
   const user = data.user;
   const profile = data.profile;
+
 </script>
 
 <div class="profile-page">
   <div class="avatar-section">
-    <Avatar src={user?.image ?? ''} size="100px" />
+    <Avatar src={user?.image ?? ''} size="80px" />
   </div>
 
-  <h1>Name: {user?.name ?? 'No name set'}</h1>
+  <h1><strong>Name: </strong> {user?.name ?? 'No name set'}</h1>
  
   {#if profile?.username}
-    <p class="username">User name: {profile.username}</p>
+    <p class="username"><strong>Username: </strong> {profile.username}</p>
   {/if}
 
- <p class="email">Email: {user?.email}</p>
+ <p class="email"><strong>Email:</strong> {user?.email}</p>
 
   {#if profile?.interests}
     <div class="section">
-      <p>Interests: {profile.interests}</p>
+      <p><strong>Interests</strong>: {profile.interests}</p>
     </div>
   {/if}
 
   {#if profile?.login}
-    <div class="section">
+    <div class="nonefornow">
       <span class="label">Intra</span>
       <p>{profile.login}</p>
     </div>
   {/if}
 
     {#if profile?.followers?.length > 0}
-    <div class="section">
-      <span class="label">Following:</span>
+    <div class="interests">
+      <span class="label"><strong>Following:</strong></span>
       {#each profile.followers as f}
-	  <div>
+	    <div class="following-row">
+	    <Avatar src={f.following.user.image ?? ''} size="36px" />
         <a href="/profile/{f.following.username}" class="following-link">
           {f.following.user.name}
         </a>
@@ -46,27 +48,44 @@
 	</div>
   {/if}
 
+
 </div>
 
 <style>
-  .profile-page { width: 100%; max-width: 490px; padding: 0; text-align: left; }
-  .avatar-section { margin: 1rem 0; }
-  h1 { margin: 0.5rem 0 0.25rem; }
-  .email { color: var(--color-text-secondary); font-size: 0.875rem; margin: 0 0 1rem; }
-  .quote { font-style: italic; color: var(--color-text-secondary); margin: 1rem 0; }
-  .section { margin: 0.75rem 0; }
-  .label { font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-  .edit-btn {
-    display: inline-block;
-    margin-top: 1.5rem;
-    font-size: 0.875rem;
-    border: 0.5px solid var(--color-border-secondary);
-    border-radius: var(--border-radius-md);
-    text-decoration: none;
-    color: var(--color-text-primary);
-  }
 
-    .following-link:hover {
-    text-decoration: underline;
-  }
+  .profile-page { 
+	width: 100%; 
+	max-width: 490px; 
+	padding: 0; 
+	text-align: 
+	left; }
+
+  .avatar-section { 
+	margin: 1rem 0; }
+
+  .interests { 
+	margin: 0.75rem 0; }
+
+  .label { 
+	font-size: 0.75rem; 
+	color: var(--color-text-secondary); 
+	text-transform: uppercase; 
+	letter-spacing: 0.05em; }
+  
+
+  .following-row {	
+	display: flex;
+  	align-items: center;
+  	gap: 0.5rem;
+	margin: 0.4rem 0;
+ }
+
+  .following-link:hover {
+    text-decoration: underline;}
+
+  .following-link {
+  	color: #a5c11a;
+ }
+
+  
 </style>
