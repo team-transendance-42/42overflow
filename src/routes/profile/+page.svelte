@@ -13,6 +13,7 @@
     <Avatar src={user?.image ?? ''} size="80px" />
   </div>
 
+
   <h1><strong>Name: </strong> {user?.name ?? 'No name set'}</h1>
  
   {#if profile?.username}
@@ -61,7 +62,10 @@
 	left; }
 
   .avatar-section { 
-	margin: 1rem 0; }
+	margin: 1rem 0;  }
+
+  .avatar-section.outlined { 
+	border: 2px solid black; }
 
   .interests { 
 	margin: 0.75rem 0; }

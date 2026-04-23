@@ -2,6 +2,7 @@
   export let src: string = '';
   export let size: string = '50px';
   export let alt: string = 'Avatar';
+  export let outlined: boolean = false;
 
   let broken = false;
 </script>
@@ -23,6 +24,7 @@
     justify-content: center;
     background-color: var(--color-neutral-300);
     flex-shrink: 0;
+
   }
   .avatar img {
     width: 100%;
