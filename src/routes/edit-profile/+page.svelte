@@ -6,13 +6,11 @@
 
   export let data;
 
-  let firstname = data.user?.name?.split(' ')[0] ?? '';
-  let lastname = data.user?.name?.split(' ')[1] ?? '';
+  let firstname = data.user?.first_name ?? '';
+  let lastname = data.user?.last_name ?? '';
   let email = data.user?.email ?? '';
-  let interests = data.profile?.interests ?? '';
-  let username = data.profile?.username ?? '';
-  let intraprofile = data.profile?.login ?? '';
-  let campus = data.profile?.campus ?? '';
+  let interests = data.user?.interests ?? '';
+  let username = data.user?.name ?? '';
   let previewUrl = data.user?.image ?? '';
   let error = '';
   let success = false;
@@ -35,7 +33,6 @@ async function handleUpdate() {
   loading = true;
 
   const formData = new FormData();
-  formData.append('intraprofile', intraprofile);
   formData.append('interests', interests);
   formData.append('username', username);
   formData.append('firstname', firstname);
@@ -96,11 +93,10 @@ async function handleUpdate() {
     <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
   </div>
   <Input label="User name" name="username" placeholder="User name" bind:value={username} />
+  <!-- Non-editable TODO -->
   <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
 
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
-  <Input label="Campus" name="campus" placeholder="Campus" bind:value={campus} />
-  <Input label="Intra Profile" name="intraprofile" placeholder="Intra profile" bind:value={intraprofile} />
 
   <Button label={loading ? 'Saving...' : 'Update'} type="button" onClick={handleUpdate} />
 </div>

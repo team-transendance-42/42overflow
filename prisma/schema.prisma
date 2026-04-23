@@ -19,15 +19,30 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   emailVerified Boolean   @default(false)
-  name          String?
+
+  name          String?	  @unique	// Username
+  first_name	String?
+  last_name		String?
+
   image         String?
+  biography 	String?
+  interests 	String?
+
+  last_seen		DateTime?
+
+  anonymize_at	DateTime?
+  deleted_at	DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   role          Role      @default(USER)
 
+  followers  Follow[] @relation("Follower")
+  following  Follow[] @relation("Following")
+  posts      Post[]
+  comments   Comment[]
+
   sessions Session[]
   accounts Account[]
-  profile  Profile?
 }
 
 model Session {
@@ -38,7 +53,7 @@ model Session {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   ipAddress String?
-  userAgent String? 
+  userAgent String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -70,41 +85,13 @@ model Verification {
 
 // ─── your app models ──────────────────────────────────────────────────────────
 
-model Profile {
-  id        String  @id @default(cuid())
-  userId    String  @unique
-  login     String? @unique
-  biography String?
-  interests String?
-  username	String? @unique
-  campusId  Int?
-  lastSeen  DateTime?
-
-  anonymize_at DateTime?
-  deleted_at   DateTime?
-
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campus Campus? @relation(fields: [campusId], references: [id])
-
-  followers  Follow[] @relation("Follower")
-  following  Follow[] @relation("Following")
-  posts      Post[]
-  comments   Comment[]
-}
-
-model Campus {
-  id       Int       @id
-  name     String
-  profiles Profile[]
-}
-
 model Follow {
   id          Int    @id @default(autoincrement())
   followerId  String
   followingId String
 
-  follower  Profile @relation("Follower", fields: [followerId], references: [id])
-  following Profile @relation("Following", fields: [followingId], references: [id])
+  follower  User @relation("Follower", fields: [followerId], references: [id])
+  following User @relation("Following", fields: [followingId], references: [id])
 
   @@unique([followerId, followingId])
   @@index([followerId])
@@ -116,13 +103,13 @@ model Post {
   title   String
   content String
 
-  profileId String
+  userId String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
-  profile  Profile   @relation(fields: [profileId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
   comments Comment[]
 }
 
@@ -133,14 +120,14 @@ model Comment {
 
   parentId  Int?
   postId    Int
-  profileId String
+  userId	String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
   post     Post      @relation(fields: [postId], references: [id])
-  profile  Profile   @relation(fields: [profileId], references: [id])
+  user     User   	 @relation(fields: [userId], references: [id])
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }

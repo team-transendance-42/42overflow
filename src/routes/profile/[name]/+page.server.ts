@@ -5,13 +5,12 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, params }) => {
   if (!locals.user) throw redirect(303, '/login');
 
-  const myProfile = await db.profile.findUnique({
-    where: { userId: locals.user.id }
+  const myProfile = await db.user.findUnique({
+    where: { id: locals.user.id }
   });
 
-  const profile = await db.profile.findUnique({
-    where: { username: params.username },
-    include: { user: true }
+  const profile = await db.user.findUnique({
+    where: { name: params.name },
   });
 
   if (!profile) throw error(404, 'User not found');
@@ -40,8 +39,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   return {
     profile,
     user: {
-      name: profile.user.name,
-      image: profile.user.image,
+      name: profile.name,
+      image: profile.image,
     },
     isFollowing: !!isFollowing,
     followerCount,
@@ -55,14 +54,14 @@ export const actions = {
   follow: async ({ locals, params }) => {
     if (!locals.user) throw redirect(303, '/login');
 
-    const myProfile = await db.profile.findUnique({
-      where: { userId: locals.user.id }
+    const myProfile = await db.user.findUnique({
+      where: { id: locals.user.id }
     });
 
     if (!myProfile) throw error(400, 'Your profile not found');
 
-    const targetProfile = await db.profile.findUnique({
-      where: { username: params.username }
+    const targetProfile = await db.user.findUnique({
+      where: { name: params.name }
     });
 
     if (!targetProfile) throw error(404, 'User not found');

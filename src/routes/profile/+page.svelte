@@ -40,9 +40,9 @@
       <span class="label"><strong>Following:</strong></span>
       {#each profile.followers as f}
 	    <div class="following-row">
-	    <Avatar src={f.following.user.image ?? ''} size="36px" />
-        <a href="/profile/{f.following.username}" class="following-link">
-          {f.following.user.name}
+	    <Avatar src={f.following.image ?? ''} size="36px" />
+        <a href="/profile/{f.following.name}" class="following-link">
+          {f.following.name}
         </a>
 		</div>
       {/each}

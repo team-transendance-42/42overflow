@@ -7,15 +7,15 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.user) throw redirect(303, '/login');
-  
-  // also load profile-specific fields
-  const profile = await db.profile.findUnique({
-    where: { userId: locals.user.id }
-  });
 
-  return { 
+  // also load user-specific fields
+//   const profile = await db.user.findUnique({
+//     where: { id: locals.user.id }
+//   });
+
+  return {
     user: locals.user,
-    profile 
+    // profile
   };
 };
 
@@ -38,40 +38,44 @@ export const actions: Actions = {
       imageUrl = `/uploads/${filename}`;
     }
 
-    await db.profile.upsert({
-      where: { userId: locals.user.id },
-      update: {
+    await db.user.update({
+      where: { id: locals.user.id },
+      data: {
         login: data.get('intraprofile') as string || undefined,
         interests: data.get('interests') as string || undefined,
-        username: data.get('username') as string || undefined,
-      },
-      create: {
-        userId: locals.user.id,
-        login: data.get('intraprofile') as string || undefined,
-        interests: data.get('interests') as string || undefined,
-        username: data.get('username') as string || undefined,
+        name: data.get('username') as string || undefined,
       },
     });
 
-	const firstname = data.get('firstname') as string;
-	const lastname = data.get('lastname') as string;
-	const fullName = [firstname, lastname].filter(Boolean).join(' ').trim();
+	const firstname = data.get('firstname');
+	const lastname = data.get('lastname');
 
-	if (fullName) {
-  		await db.user.update({
-    		where: { id: locals.user.id },
-    		data: { name: fullName }
-  	});
+	const updateData: {
+		first_name?: string;
+		last_name?: string;
+		image?: string;
+	} = {};
+
+	// Create an update object only with the fields that are provided
+	if (typeof firstname === 'string' && firstname !== undefined) {
+		updateData.first_name = firstname;
+	}
+	if (typeof lastname === 'string' && lastname !== undefined) {
+		updateData.last_name = lastname;
+	}
+	if (imageUrl) {
+		updateData.image = imageUrl;
 	}
 
-    if (imageUrl) {
-  		await db.user.update({
-    		where: { id: locals.user.id },
-    		data: { image: imageUrl }
-  		});
+	// Only perform the update if there are fields to update
+	if (Object.keys(updateData).length > 0) {
+		await db.user.update({
+			where: { id: locals.user.id },
+			data: updateData
+		});
 	}
 
 	return { success: true, imageUrl };
- 	 }
-	};
+	}
+};
 

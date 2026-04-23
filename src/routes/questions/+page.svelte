@@ -29,13 +29,13 @@ async function loadQuestions()
     <h2><strong>Project Name:</strong> {q.title}</h2>
     <p class="content"><strong>Question: </strong> {q.content}</p>
 
-    {#if q.profile?.user?.name}
+    {#if q.user?.name}
       <p class="author">Posted by: 
 	  	<a 
 			class="author-link"
-			href="/profile/{q.profile.username}"
+			href="/profile/{q.user.name}"
 		>
-	  		{q.profile.user.name}
+	  		{q.user.name}
 	  	</a>
 	 </p>
     {/if}

@@ -13,9 +13,7 @@ export const GET: RequestHandler = async ({ url }) => {
       orderBy: { created_at: 'desc' },
       where: { deleted_at: null },
       include: {
-        profile: {
-          include: { user: true }
-        }
+        user: { select: { name: true } }
       }
     }),
     db.post.count({ where: { deleted_at: null } })
@@ -27,8 +25,8 @@ export const GET: RequestHandler = async ({ url }) => {
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) throw error(401, 'Unauthorized');
 
-  const myProfile = await db.profile.findUnique({
-    where: { userId: locals.user.id }
+  const myProfile = await db.user.findUnique({
+    where: { id: locals.user.id }
   });
 
   if (!myProfile) throw error(400, 'Profile not found');
@@ -39,7 +37,7 @@ const post = await db.post.create({
   data: {
     title: projectname,
     content: `${topic}\n\n${body}`,
-    profileId: myProfile.id
+    userId: myProfile.id
   }
 });
 

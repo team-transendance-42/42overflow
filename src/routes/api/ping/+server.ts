@@ -4,9 +4,9 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async ({ locals }) => {
   if (locals.user) {
-    await db.profile.updateMany({
-      where: { userId: locals.user.id },
-      data: { lastSeen: new Date() },
+    await db.user.updateMany({
+      where: { id: locals.user.id },
+      data: { last_seen: new Date() },
     });
   }
   return json({ ok: true });

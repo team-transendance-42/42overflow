@@ -48,13 +48,6 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			role: true,
 			createdAt: true,
 			updatedAt: true,
-			profile: {
-				select: {
-					login: true,
-					biography: true,
-					campusId: true
-				}
-			}
 		}
 	});
 
@@ -62,17 +55,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, 'User not found');
 	}
 
-	const campuses = await prisma.campus.findMany({
-		select: { id: true, name: true },
-		orderBy: { name: 'asc' }
-	});
-
 	const posts = await prisma.post.findMany({
-		where: {
-			profile: {
-				userId: user.id
-			}
-		},
+		where: { userId: user.id },
 		select: {
 			id: true,
 			title: true,
@@ -86,7 +70,6 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	return {
 		user,
-		campuses,
 		posts,
 		firstName,
 		lastName
@@ -194,10 +177,10 @@ export const actions: Actions = {
 
 		const normalizedLogin = login.trim();
 		if (normalizedLogin) {
-			const loginInUse = await prisma.profile.findFirst({
+			const loginInUse = await prisma.user.findFirst({
 				where: {
-					login: normalizedLogin,
-					NOT: { userId: params.id }
+					name: normalizedLogin,
+					NOT: { id: params.id }
 				},
 				select: { id: true }
 			});
@@ -226,16 +209,16 @@ export const actions: Actions = {
 			campusId = parsed;
 		}
 
-		await prisma.profile.upsert({
-			where: { userId: params.id },
+		await prisma.user.upsert({
+			where: { id: params.id },
 			update: {
-				login: normalizedLogin || null,
+				name: normalizedLogin || null,
 				biography: biography.trim() || null,
 				campusId
 			},
 			create: {
-				userId: params.id,
-				login: normalizedLogin || null,
+				id: params.id,
+				name: normalizedLogin || null,
 				biography: biography.trim() || null,
 				campusId
 			}
