@@ -1,17 +1,13 @@
 """
 =============================================================================
-EXERCISES — Vectors, Direction, Cosine Similarity
-=============================================================================
-Work through each exercise in order. Each one builds on the previous.
-Run the file to check your answers: python3 exercises_vectors.py
+EXERCISES — Vectors(dynamic arr), Direction, Cosine Similarity
 =============================================================================
 """
 import math
 
-
 # =============================================================================
-# HELPERS — already implemented, read them first
-# =============================================================================
+# HELPERS
+#=============================================================================
 
 def magnitude(v: list[float]) -> float:
     return math.sqrt(sum(x**2 for x in v))

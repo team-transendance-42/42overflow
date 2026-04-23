@@ -14,7 +14,7 @@ Error handling uses try and except
 ==========
 Python function is closer to a Go function or Java method, but lighter.
 Python list is like a dynamic array.
-Python dict is like a hash map.
+Python dict is like a hash map: key-value pairs using a hash function to convert the key into an index in an array, allowing near-instant lookup regardless of size
 Python module is like a source file / package unit.
 Python package is a directory of modules.
 ===

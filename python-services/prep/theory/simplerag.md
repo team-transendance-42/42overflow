@@ -1,4 +1,4 @@
-he minimum stack: 
+the minimum stack: 
 	a vector store (ChromaDB)
 	a model server (Ollama)
 	the app layer that talks to them

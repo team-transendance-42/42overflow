@@ -16,14 +16,11 @@ import math
 import json
 import urllib.request  # stdlib only — no extra install needed for HTTP
 
-
 # =============================================================================
 # SECTION 1 — What is a Vector?
 # =============================================================================
-#
-# A vector is just a list of numbers with a fixed length (its "dimension").
-# Every number is called a "component" or "dimension".
-
+# dynamic arr: Every number is called a "component" or "dimension".
+# python3 python-services/prep/learning_code/embeddings_tutorial.py
 def section_1_what_is_a_vector():
     print("\n" + "="*60)
     print("SECTION 1 — What is a Vector?")
@@ -74,19 +71,19 @@ def section_2_why_not_words():
     print("="*60)
 
     def bag_of_words(text: str) -> dict:
-        """Counts each word. Ignores order and meaning."""
-        counts = {}
+        """Counts each word. Ignores order and meaning.""" # Python stores it as the function's __doc__ attribute; """...""" — actual string, stored in memory; It's not a file — it's an attribute on the function object in memory. Tools like help() read it
+        counts = {} # dict(like js map)
         for word in text.lower().split():
-            counts[word] = counts.get(word, 0) + 1
+            counts[word] = counts.get(word, 0) + 1 # get curr count of the word, if none, put 0 and + 1
         return counts
 
     def bag_similarity(text_a: str, text_b: str) -> float:
         """Jaccard similarity of two bags of words."""
-        a = set(bag_of_words(text_a).keys())
+        a = set(bag_of_words(text_a).keys()) # dynamic arr, no dubs
         b = set(bag_of_words(text_b).keys())
-        if not a and not b:
+        if not a and not b: # if a is empty  AND  b is empty
             return 1.0
-        return len(a & b) / len(a | b)  # intersection / union
+        return len(a & b) / len(a | b)  # & intersection(keeps only what's in BOTH) / union(returns new container with both sets(no dubs0/arrs)
 
     pairs = [
         ("the cat sat on the mat", "the feline rested on the rug"),
@@ -699,8 +696,8 @@ def section_10_mini_rag():
 # =============================================================================
 
 def main():
-    section_1_what_is_a_vector()
-#     section_2_why_not_words()
+#    section_1_what_is_a_vector()
+     section_2_why_not_words()
 #     section_3_cosine_similarity()
 #     section_4_how_embedding_model_works()
 #     section_5_real_embeddings()      # needs Ollama
@@ -712,8 +709,8 @@ def main():
 
 if __name__ == "__main__":
 #     # Run sections that need no external dependencies (1-4, 7-9):
-    section_1_what_is_a_vector()
-#     section_2_why_not_words()
+    #section_1_what_is_a_vector()
+    section_2_why_not_words()
 #     section_3_cosine_similarity()
 #     section_4_how_embedding_model_works()
 #     section_7_ann_intuition()
