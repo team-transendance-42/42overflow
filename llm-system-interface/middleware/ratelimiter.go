@@ -12,13 +12,14 @@ import (
 )
 
 type limiterEntry struct {
-	limiter  	*rate.Limiter
-	dayUTC   	string
-	dailyCnt	int
-	lastSeen 	time.Time
+	limiter  *rate.Limiter
+	dayUTC   string
+	dailyCnt int
+	lastSeen time.Time
 }
 
-/** limiter:
+/*
+* limiter:
 Imagine a bucket that holds up to 5 tokens.
 One request needs 1 token.
 Tokens are added continuously at 10/60 tokens per second (about 1 token every 6 seconds).
@@ -41,7 +42,7 @@ const (
 	perStudentDailyMax  = 20
 	limiterTTL          = 30 * time.Minute // remove inactive limiter entries after this idle time
 	cleanupInterval     = 5 * time.Minute  //  how often the janitor wakes up
-	maxLimiters         = 10_000 // safety cap: prevents unbounded map growth from bot/fake IDs -> used
+	maxLimiters         = 10_000           // safety cap: prevents unbounded map growth from bot/fake IDs -> used
 )
 
 func secondsB4UTCMidnight(now time.Time) int {
@@ -82,7 +83,8 @@ func getLimiter(key string) (*limiterEntry, bool) {
 	return entry, true
 }
 
-/**
+/*
+*
 todo: JWTAuth — runs before the rate limiter, verifies the token, and writes the user ID into context.aa(add JWT auth middleware that verifies the Bearer token and writes the user ID into context.
 Change limiter key selection to use context user ID first, IP second.
 extractClientKey — decides which bucket to rate-limit against (user ID or IP). It's a helper inside the rate limiter.
@@ -111,7 +113,8 @@ func extractClientKey(r *http.Request) string {
 	return "ip:" + host
 }
 
-/**
+/*
+*
 lowercase name = private to that package
 uppercase name = exported
 deletes idle entries for longer than limiterTTL
@@ -138,9 +141,10 @@ func StartCleanup() {
 // RateLimiter is an HTTP middleware that enforces two tiers of rate limiting:
 //   - Global: shared token bucket across all clients (10 req/min, burst 5) to protect upstream API quota.
 //   - Per-client: individual token bucket keyed by IP (5 req/min, burst 2) with a daily cap of 20 requests.
+//
 // Sets X-RateLimit-* response headers and returns 429 on limit breach. CORS preflight (OPTIONS) is bypassed.
 func RateLimiter(next http.Handler) http.Handler {
-	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions { // if method is OPTIONS, skip rate limiting and just return 200 OK for CORS preflight requests
 			next.ServeHTTP(w, r)
 			return
@@ -174,14 +178,13 @@ func RateLimiter(next http.Handler) http.Handler {
 			entry.dailyCnt = 0
 		}
 
-		// todo: re-enable in production — commented out for testing only
-		// if entry.dailyCnt >= perStudentDailyMax {
-		// 	w.Header().Set("X-RateLimit-Day-Remaining", "0")
-		// 	w.Header().Set("Retry-After", strconv.Itoa(secondsB4UTCMidnight(now)))
-		// 	mu.Unlock()
-		// 	http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
-		// 	return
-		// }
+		if entry.dailyCnt >= perStudentDailyMax {
+			w.Header().Set("X-RateLimit-Day-Remaining", "0")
+			w.Header().Set("Retry-After", strconv.Itoa(secondsB4UTCMidnight(now)))
+			mu.Unlock()
+			http.Error(w, "Daily quota exceeded (20/day)", http.StatusTooManyRequests)
+			return
+		}
 
 		// --- per-minute rate check --- todo: test do we see this text?
 		if !entry.limiter.Allow() {
@@ -196,9 +199,9 @@ func RateLimiter(next http.Handler) http.Handler {
 		entry.dailyCnt++
 		remaining := perStudentDailyMax - entry.dailyCnt
 		w.Header().Set("X-RateLimit-Day-Remaining", strconv.Itoa(remaining))
-		
+
 		mu.Unlock()
 		// call next handler
-		next.ServeHTTP(w,r)
+		next.ServeHTTP(w, r)
 	})
 }

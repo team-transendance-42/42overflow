@@ -710,7 +710,7 @@ async function sendToWhisper(blob: Blob) {
     {#if history.length}
     <section class="answer-card">
         <h2>History</h2>
-        {#each history as entry, entryIndex (entryIndex)}
+        {#each history.slice(0, MAX_HISTORY) as entry, entryIndex (entryIndex)}
             <article style="border-bottom: 1px solid var(--panel-border); margin-bottom: 1.5rem; padding-bottom: 1rem;">
                 <h3>Q {history.length - entryIndex}: {entry.question}</h3>
                 
