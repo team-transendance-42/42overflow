@@ -13,6 +13,26 @@ import (
 
 const defaultRagCollection = "my_rag_collection"
 
+func ragBackend() string {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("RAG_BACKEND")))
+	if v == "" {
+		return "go"
+	}
+	return v
+}
+
+func pyRagURL() string {
+	v := os.Getenv("PY_RAG_URL")
+	if strings.TrimSpace(v) == "" {
+		return "http://python-rag:8090"
+	}
+	return strings.TrimRight(v, "/")
+}
+
+func usePythonRag() bool {
+	return ragBackend() == "python"
+}
+
 func chromaURL() string {
 	v := os.Getenv("CHROMA_URL")
 	if strings.TrimSpace(v) == "" {
@@ -137,6 +157,23 @@ func IndexDocuments(ctx context.Context, collection string, documents []string) 
 		return 0, fmt.Errorf("documents are required")
 	}
 
+	if usePythonRag() {
+		var resp struct {
+			Indexed int `json:"indexed"`
+		}
+		payload := map[string]any{
+			"collection": collection,
+			"documents":  filtered,
+		}
+		if err := doJSON(ctx, http.MethodPost, pyRagURL()+"/rag/index", payload, &resp); err != nil {
+			return 0, fmt.Errorf("python rag index: %w", err)
+		}
+		if resp.Indexed > 0 {
+			return resp.Indexed, nil
+		}
+		return len(filtered), nil
+	}
+
 	if err := ensureCollection(ctx, collection); err != nil {
 		return 0, fmt.Errorf("ensure collection: %w", err)
 	}
@@ -222,6 +259,25 @@ func AskRag(ctx context.Context, collection, question string, topK int) (string,
 	question = strings.TrimSpace(question)
 	if question == "" {
 		return "", nil, fmt.Errorf("question is required")
+	}
+
+	if usePythonRag() {
+		var resp struct {
+			Answer   string   `json:"answer"`
+			Contexts []string `json:"contexts"`
+		}
+		payload := map[string]any{
+			"collection": collection,
+			"question":   question,
+			"top_k":      topK,
+		}
+		if err := doJSON(ctx, http.MethodPost, pyRagURL()+"/rag/ask", payload, &resp); err != nil {
+			return "", nil, fmt.Errorf("python rag ask: %w", err)
+		}
+		if strings.TrimSpace(resp.Answer) == "" {
+			return "", resp.Contexts, fmt.Errorf("empty model answer")
+		}
+		return resp.Answer, resp.Contexts, nil
 	}
 
 	contexts, err := queryContexts(ctx, collection, question, topK)

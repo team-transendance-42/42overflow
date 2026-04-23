@@ -1,12 +1,22 @@
 package models
 
-type TextRequest struct {
-	Prompt string `json:"prompt"`
-	Model  string `json:"model,omitempty"`  // optional backend-side override if you need it later
-	Stream bool   `json:"stream,omitempty"` // kept for compatibility with older callers
+const RoleUser      = "user"
+
+type Message struct {
+	Role    string   `json:"role"`
+	Content string `json:"content"`
 }
 
-type ImageRequest struct {
-	Prompt string `json:"prompt"`
-	Size   string `json:"size,omitempty"` // Optional: specify image size (e.g., "256x256", "512x512")
+/*both gemini and ollama services accept TextRequest */
+type TextRequest struct {
+	Prompt   string    `json:"prompt"`             // current message (backward compatible)
+	Messages []Message `json:"messages,omitempty"` // full history (optional)
+	Model    string    `json:"model,omitempty"`
+	Stream   bool      `json:"stream,omitempty"`
 }
+
+// todo: not implemented yet
+//type ImageRequest struct {
+//	Prompt string `json:"prompt"`
+//	Size   string `json:"size,omitempty"`
+//}

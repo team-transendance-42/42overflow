@@ -1,5 +1,6 @@
 package handlers
 
+// todo: not implemented
 import (
 	"encoding/json"
 	"llm-system-interface/models"

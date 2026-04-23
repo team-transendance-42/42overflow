@@ -1,103 +1,132 @@
 package services
 
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-    "net/http"
-    "os"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"llm-system-interface/models"
+	"log"
+	"net/http"
+	"os"
+	"strings"
 )
+/*
+Ollama
+======================================
+messages:   	{role, content}
+system prompt: 	role:system
+role name:     "assistant"
+extra fields: stream
 
-// Ollama request/response structs
-type OllamaMessage struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
-}
-
+=====================================
+Gemini
+=====================================
+messages:     	{role, parts:[{text}]}
+system prompt:  system_instruction, top-level field
+role name:      "model"
+extra fields:   system_instruction, multimodal parts
+*/
 type OllamaRequest struct {
-    Model    string          `json:"model"`
-    Messages []OllamaMessage `json:"messages"`
-    Stream   bool            `json:"stream"`
+	Model    string           `json:"model"`
+	Messages []models.Message `json:"messages"`
+	Stream   bool             `json:"stream"`
 }
 
 type OllamaResponse struct {
-    Message OllamaMessage `json:"message"`
-    Done    bool          `json:"done"`
+	Message models.Message `json:"message"`
+	Done    bool           `json:"done"`
 }
 
-/* StreamOllama sends a prompt to Ollama and returns chunks via channel */
-func StreamOllama(ctx context.Context, prompt string) (<-chan string, error) {
-    ch := make(chan string)
-	const conciseInstruction = "Be my tutor: use less words,dry";
+func truncate(s string, n int) string {
+	if (len(s) > n) {
+		return s[:n]
+	}
+	return s
+}
 
-    model := os.Getenv("OLLAMA_MODEL")
-    if model == "" {
-        model = "codellama"
+/**
+In Go, the maximum length of a string you can send through a channel (like ch <- r.Message.Content) is limited by available memory, not by the channel itself. The channel transmits the string as a value, and Go strings can be up to 2GB (on 32-bit systems) or much larger (on 64-bit systems), but in practice, you are limited by system memory and performance.
+*/
+func buildOllamaMessages(req models.TextRequest) []models.Message {
+    const systemPrompt = "reply with less words, dont repeat info"
+    const maxHistory = 10
+	const maxContentLen = 2000 // chars per msg
+
+    msgs := make([]models.Message, 0, len(req.Messages)+1)
+    for _, m := range req.Messages {
+        msgs = append(msgs, models.Message{Role: m.Role, Content: truncate(m.Content, maxContentLen)})
     }
-    
-    ollamaURL := os.Getenv("OLLAMA_URL")
-    if ollamaURL == "" {
-        ollamaURL = "http://localhost:11434"
+    if strings.TrimSpace(req.Prompt) != "" {
+        msgs = append(msgs, models.Message{Role: "user", Content: truncate(req.Prompt, maxContentLen)})
     }
-    
-    reqBody := OllamaRequest{
-        Model: model,
-        Messages: []OllamaMessage{
-            {Role: "user", Content: conciseInstruction + "." + prompt},
-        },
-        Stream: true,
+    if len(msgs) > maxHistory {
+        msgs = msgs[len(msgs)-maxHistory:]
     }
-    
-    body, err := json.Marshal(reqBody)
-    if err != nil {
-        return nil, err
-    }
-    
-    // Make HTTP request to Ollama with configurable URL
-    req, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/api/chat", bytes.NewReader(body))
-    if err != nil {
-        return nil, err
-    }
-    req.Header.Set("Content-Type", "application/json")
-    
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("Ollama request failed: %w", err)
-    }
-    
-    if resp.StatusCode != http.StatusOK {
-        defer resp.Body.Close()
-        respBody, _ := io.ReadAll(resp.Body)
-        return nil, fmt.Errorf("Ollama HTTP %d: %s", resp.StatusCode, string(respBody))
-    }
-    
-    // Stream response in background
-    go func() {
-        defer close(ch)
-        defer resp.Body.Close()
-        
-        decoder := json.NewDecoder(resp.Body)
-        for {
-            var ollamaResp OllamaResponse
-            if err := decoder.Decode(&ollamaResp); err != nil {
-                if err != io.EOF {
-                    log.Printf("Ollama decode error: %v", err)
-                }
-                break
-            }
-            
-            if ollamaResp.Message.Content != "" {
-                ch <- ollamaResp.Message.Content
-            }
-            
-            if ollamaResp.Done {
-                break
-            }
-        }
-    }()
-    
-    return ch, nil
+    return append([]models.Message{{Role: "system", Content: systemPrompt}}, msgs...)
+}
+
+/*
+ollamaURL+"/api/chat": Ollama always exposes /api/chat — it's their fixed endpoint
+*/
+func doOllamaRequest(ctx context.Context, ollamaURL, model string, req models.TextRequest) (*http.Response, error) {
+	body, err := json.Marshal(OllamaRequest{ //serializes the OllamaRequest struct into a JSON byte slice
+		Model:    model,
+		Messages: buildOllamaMessages(req),
+		Stream:   true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal Ollama request: %w", err) //%w = wrap verb for errors
+	}
+
+	return withRetry(ctx, func() (*http.Response, error) {
+		reqHTTP, err := http.NewRequestWithContext(ctx, "POST", ollamaURL+"/api/chat", bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("build Ollama request: %w", err)
+		}
+		reqHTTP.Header.Set("Content-Type", "application/json")
+		return http.DefaultClient.Do(reqHTTP)
+	})
+}
+
+/*
+defer: no matter what happens (early return, error, normal exit) the body always gets closed and no resources are leaked
+*/
+func readOllamaToChannel(resp *http.Response, ch chan string) {
+	defer close(ch)
+	defer resp.Body.Close() // close the ioReader
+	decoder := json.NewDecoder(resp.Body)
+	for {
+		var r OllamaResponse
+		if err := decoder.Decode(&r); err != nil {
+			if err != io.EOF {
+				log.Printf("Ollama decode error: %v", err) // %v = format verb(prints the value in its natural representation)
+			}
+			break
+		}
+		if r.Message.Content != "" {
+			ch <- r.Message.Content //Every ch <- r.Message.Content blocks until someone reads from the other end; unbuffered chan
+		}
+		if r.Done {
+			break
+		}
+	}
+}
+
+func StreamOllama(ctx context.Context, req models.TextRequest) (<-chan string, error) {
+	model := os.Getenv("OLLAMA_MODEL")
+	ollamaURL := os.Getenv("OLLAMA_URL")
+	if model == "" || ollamaURL == "" {
+		return nil, fmt.Errorf("OLLAMA_URL and OLLAMA_MODEL must be set")
+	}
+
+	resp, err := doOllamaRequest(ctx, ollamaURL, model, req)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan string)
+	go readOllamaToChannel(resp, ch)
+	return ch, nil
 }

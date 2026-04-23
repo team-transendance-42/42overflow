@@ -3,62 +3,50 @@ package handlers
 import (
 	// "bufio" for waht?
 	"encoding/json"
-	"fmt"
 	"llm-system-interface/models"
 	"llm-system-interface/services"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
 /**
-for chunk := range ch {
-for range loop specifically designed for channels. It will continue to pull data from the channel ch until the channel is closed
----
-fmt.Fprintf(w, "data: %s\n\n", chunk)
-
-Syntax: fmt.Fprintf writes a formatted string to an io.Writer. In this case, the http.ResponseWriter (w) acts as that writer.
-Theory: SSE is a text-based protocol. To be valid, the browser expects a specific format: the word data:, followed by the message, followed by two newline characters (\n\n).
-Under the Hood: * w usually points to a buffer. Without the next line, the operating system or Go's standard library might hold onto this data to send it in one large "clump" later to improve network efficiency.
-The \n\n is critical; it tells the client's EventSource API that one complete message has finished.
----
-flusher.Flush()
-
-Syntax: This calls the Flush method on an object that implements the http.Flusher interface.
-Theory: Standard HTTP is "request-response"—the server sends the whole body at once. SSE is "streaming." If you don't flush, the user might wait seconds or minutes to see any data because the server is waiting for its internal buffer (usually 4KB or 8KB) to fill up.
-Under the Hood: * This sends a signal to the underlying TCP socket to "push everything we have in the buffer right now."
-It bypasses the standard buffering logic of the Go web server.
-This allows for the "typing" effect or real-time ticker updates, as the browser receives the bytes immediately after they are written.
+CORS (Cross-Origin Resource Sharing) is a security feature in browsers that restricts web pages from making requests to a different domain than the one that served the web page. When a web page tries to make a cross-origin request, the browser sends an HTTP request with an Origin header indicating the source of the request. The server can respond with specific CORS headers to allow or deny the request.
+CORS is a browser security mechanism; it doesn't protect against non-browser clients (curl, Postman, etc.)
 */
-
-func allowedOrigin(origin string) string {
-	if origin == "" {
-		return ""
+// buildAllowedOrigins reads ALLOWED_ORIGINS env var (comma-separated).
+func buildAllowedOrigins() map[string]bool {
+	allowed := map[string]bool{}
+	for _, o := range strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			allowed[o] = true
+		}
 	}
-
-	parsed, err := url.Parse(origin)
-	if err != nil {
-		return ""
-	}
-
-	host := parsed.Hostname()
-	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
-		return ""
-	}
-
-	return origin
+	return allowed
 }
 
+var allowedOrigins = buildAllowedOrigins() //stores that map in memory for the lifetime of the server. saves rebuilding it on every request
+
+func allowedOrigin(origin string) string {
+	if origin == "" { return ""	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" { return ""}
+	if allowedOrigins[origin] { return origin}
+	return ""
+}
+
+/*  tells the browser which request headers are permitted in cross-origin requests. */
 func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	if origin := allowedOrigin(r.Header.Get("Origin")); origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
 	}
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") //Authorization — reserved for when you add JWT auth; without it listed here, auth'd requests would be blocked by the browser before they even reach your server
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache") // required by sse spec to prevent buffering
 	w.Header().Set("Connection", "keep-alive")
 
 	if r.Method == http.MethodOptions {
@@ -72,23 +60,51 @@ func setHeaders(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func validateTextReq(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
+func decodeAndSanitize(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return false
 	}
-
-	log.Printf("GenerateText: received prompt len=%d", len(req.Prompt))
 	req.Prompt = strings.TrimSpace(req.Prompt)
-	if req.Prompt == "" {
-		http.Error(w, "prompt is required", http.StatusBadRequest)
-		return false
-	}
-	if len(req.Prompt) > 20000 {
-		http.Error(w, "prompt too large, max allowed len 20000", http.StatusRequestEntityTooLarge)
-		return false
+	return true
+}
+
+/* a compatibility layer
+Frontend can send just { "prompt": "hello" } or full { "messages": [{...}] }.
+Both Gemini and Ollama expect req.Messages to be populated — never just a raw prompt.
+If messages is empty, wraps the prompt into a single user message so both models
+receive one consistent format regardless of what the frontend sent.
+*/
+func normalizeMessages(w http.ResponseWriter, req *models.TextRequest) bool {
+	if len(req.Messages) == 0 {
+		if req.Prompt == "" {
+			http.Error(w, "prompt or messages required", http.StatusBadRequest)
+			return false
+		}
+		req.Messages = []models.Message{
+			{Role: models.RoleUser, Content: req.Prompt},
+		}
 	}
 	return true
+}
+
+func validateMessageSize(w http.ResponseWriter, req *models.TextRequest) bool {
+	total := 0
+	for _, m := range req.Messages {
+		total += len(m.Content)
+	}
+	if total > 20000 {
+		http.Error(w, "total message content too large, max 20000 chars", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	log.Printf("validateTextReq: %d messages, total_len=%d", len(req.Messages), total)
+	return true
+}
+
+func validateTextReq(w http.ResponseWriter, r *http.Request, req *models.TextRequest) bool {
+	return decodeAndSanitize(w, r, req) &&
+		normalizeMessages(w, req) &&
+		validateMessageSize(w, req)
 }
 
 /*
@@ -120,46 +136,28 @@ Second flush: for the final “end” event, to guarantee delivery.
 */
 func GenerateText(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GenerateText(): method=%s path=%s", r.Method, r.URL.Path)
-	if !setHeaders(w, r) {
-		return
-	}
+	if !setHeaders(w, r) { return }
 
 	var req models.TextRequest
-	if !validateTextReq(w, r, &req) {
-		return
-	}
-	ch, err := services.StreamLLM(r.Context(), req)
+	if !validateTextReq(w, r, &req) { return }
+
+	ch, err := services.StreamLLM(r.Context(), req) // receiving from gemini
 	if err != nil {
 		log.Printf("GenerateText: StreamLLM error: %v", err)
-		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway) // writes to client
+		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
-	for chunk := range ch {
-		for _, line := range strings.Split(chunk, "\n") {
-			fmt.Fprintf(w, "data: %s\n", line)
-		}
-		fmt.Fprint(w, "\n")
-		flusher.Flush()
-	}
-
-	fmt.Fprintf(w, "event: end\ndata: \n\n")
-	flusher.Flush()
+	streamSSE(w, ch) // talks to browser, sending each chunk as an SSE message
 }
 
-/**Images don't stream — they return a JSON response with a URL or base64 bytes.*/
-func GenerateImage(w http.ResponseWriter, r *http.Request) {
-	var req models.ImageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
+/**todo: not implemented; Images don't stream — they return a JSON response with a URL or base64 bytes.*/
+//func GenerateImage(w http.ResponseWriter, r *http.Request) {
+//	var req models.ImageRequest
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		http.Error(w, "Invalid request", http.StatusBadRequest)
+//		return
+//	}
 
 	// imageURL, err := services.GenerateImage(r.Context(), req)
 	// if err != nil {
@@ -169,4 +167,4 @@ func GenerateImage(w http.ResponseWriter, r *http.Request) {
 
 	// w.Header().Set("Content-Type", "application/json")
 	// json.NewEncoder(w).Encode(map[string]string{"url": imageURL})
-}
+//}
