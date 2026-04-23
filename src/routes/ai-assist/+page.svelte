@@ -453,7 +453,7 @@
         const messages = [
             ...historySnapshot.flatMap(entry => [
                 { role: 'user', content: entry.question },
-                { role: 'assistant', content: entry.blocks.map(blockToText).join(' ') } // history
+                { role: 'assistant', content: entry.blocks.map(blockToText).join(' ') }
             ]),
             { role: 'user', content: prompt } // last q
         ];
@@ -526,7 +526,7 @@
         try {
             const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
             const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
-            const historySnapshot = history.slice(-MAX_HISTORY); // give last max history of the slice
+            const historySnapshot = history.slice(0, MAX_HISTORY).reverse(); // give last max history of the slice
             const result = await streamChat(endpoint, prompt, fallbackError, controller.signal, historySnapshot); // actuall API call
 
             const completedAnswer = result.trim();
