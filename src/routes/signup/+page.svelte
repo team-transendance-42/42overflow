@@ -12,6 +12,11 @@
 
   async function handleSignup() {
     error = '';
+
+	if (!email.trim() || !password.trim() || !name.trim()) {
+    error = 'All fields are required';
+    return;
+  }
     loading = true;
 
     const { data, error: err } = await authClient.signUp.email({
