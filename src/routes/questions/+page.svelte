@@ -1,46 +1,34 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Postbox from '$lib/components/Postbox.svelte';
+  import type { ComponentProps } from 'svelte';
+  import PostCard from '$lib/components/PostCard.svelte';
 
-let questions = [];
-  let page = 1;
-  let limit = 10;
-  let total = 0;
+	type Post = ComponentProps<typeof PostCard>['post'];
 
-async function loadQuestions() 
-{
-    const res = await fetch(`/api/questions?page=${page}&limit=${limit}`);
-    const json = await res.json();
+	let questions: Post[] = [];
+	let page = 1;
+	let limit = 10;
+	let total = 0;
 
-	questions = json.data;  
-    total = json.total;
-  };
+	async function loadQuestions() {
+		const res = await fetch(`/api/questions?page=${page}&limit=${limit}`);
+		const json = await res.json();
 
-  onMount(loadQuestions);
+		questions = (json.data ?? []) as Post[];
+		total = json.total;
+	};
 
+	onMount(loadQuestions);
 </script>
 
 <div class="questions-page">
-<h1><strong> NEWEST QUESTIONS</strong></h1>
+	<h1><strong>
+		NEWEST QUESTIONS
+	</strong></h1>
 
-
-{#each questions as q}
-  <Postbox>
-    <h2><strong>Project Name:</strong> {q.title}</h2>
-    <p class="content"><strong>Question: </strong> {q.content}</p>
-
-    {#if q.user?.name}
-      <p class="author">Posted by: 
-	  	<a 
-			class="author-link"
-			href="/profile/{q.user.name}"
-		>
-	  		{q.user.name}
-	  	</a>
-	 </p>
-    {/if}
-  </Postbox>
-{/each}
+	{#each questions as post}
+		<PostCard {post} />
+	{/each}
 </div>
 
 <div class="pagination">
