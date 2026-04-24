@@ -72,11 +72,7 @@
 
   <div class="tag-input">
     <input placeholder="Add tag..." bind:value={tagInput} />
-    <select bind:value={category}>
-      <option value="memory">Memory</option>
-      <option value="webserv">Webserv</option>
-      <option value="custom">Custom</option>
-    </select>
+ 
     <button type="button" on:click={addTag}>Add</button>
   </div>
 

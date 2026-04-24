@@ -14,8 +14,9 @@
 
    <div class="right">
 
-		
+		{#if !user}
     	<a href="/login">Log-In | </a>
+		{/if}
 		<a href="/profile">Profile  </a>
 		<a href="/settings" class="settings-link">
 		<Settingsicon size="15px" />  </a>

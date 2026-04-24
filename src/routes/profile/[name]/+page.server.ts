@@ -32,8 +32,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     where: { followerId: profile.id }
   });
 
-  const isOnline = profile.lastSeen
-    ? new Date().getTime() - new Date(profile.lastSeen).getTime() < 5 * 60 * 1000
+  const isOnline = profile.last_seen
+    ? new Date().getTime() - new Date(profile.last_seen).getTime() < 5 * 60 * 1000
     : false;
 
   return {
