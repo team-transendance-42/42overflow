@@ -238,11 +238,20 @@ export const actions: Actions = {
 			}
 		}
 
+		await prisma.follow.deleteMany({
+			where: {
+				OR: [
+					{ followerId: params.id },
+					{ followingId: params.id }
+				]
+			}
+		});
+
 		await prisma.user.update({
 			where: { id: params.id },
 			data: { deleted_at: new Date(),
-				name: "deleted",
-				email: "deleted",
+				name: "deleted_user#" + params.id,
+				email: "deleted_user#" + params.id,
 				image: null,
 				role: 'USER',
 				biography: null,
