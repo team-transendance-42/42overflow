@@ -2,6 +2,7 @@
 
 <script>
 	import Settingsicon from '$lib/components/Settingsicon.svelte';
+	export let user = null;
 </script>
 
 <header>
@@ -9,11 +10,16 @@
    		<a href="/" >@42overflow</a>
 	</div>
 
+	
+
    <div class="right">
+
+		
     	<a href="/login">Log-In | </a>
 		<a href="/profile">Profile  </a>
 		<a href="/settings" class="settings-link">
 		<Settingsicon size="15px" />  </a>
+		<p> Welcome{user ? `, ${user.name}` : ''} </p>
 
 		
 	</div>
@@ -41,19 +47,13 @@ header .right {
   font-weight: normal;
 }
 
-.profile-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem; /* small gap between text and icon */
-  text-decoration: none;
-  color: inherit;
-}
+
 
   .settings-link {
     display: inline-flex;
     align-items: center;
     color: inherit;
-	vertical-align: middle;  /* add this */
+	vertical-align: middle; 
   	margin-bottom: 2px; 
 	font-weight: bold;
 	
