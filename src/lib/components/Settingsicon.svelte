@@ -1,5 +1,5 @@
 <script lang="ts">
-  export let size: string = '30px'; // icon size
+  export let size: string = '30px'; 
 </script>
 
 
