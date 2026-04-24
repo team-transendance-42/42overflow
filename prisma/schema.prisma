@@ -16,33 +16,36 @@ enum Role {
 // ─── better-auth required tables ─────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  id            String  @id @default(cuid())
+  email         String
+  emailVerified Boolean @default(false)
 
-  name          String?	  @unique	// Username
-  first_name	String?
-  last_name		String?
+  name       String // Username
+  first_name String?
+  last_name  String?
 
-  image         String?
-  biography 	String?
-  interests 	String?
+  image     String?
+  biography String?
+  interests String?
 
-  last_seen		DateTime?
+  last_seen DateTime?
 
-  anonymize_at	DateTime?
-  deleted_at	DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  role          Role      @default(USER)
+  anonymize_at DateTime?
+  deleted_at   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  role         Role      @default(USER)
 
-  followers  Follow[] @relation("Follower")
-  following  Follow[] @relation("Following")
-  posts      Post[]
-  comments   Comment[]
+  followers Follow[]  @relation("Follower")
+  following Follow[]  @relation("Following")
+  posts     Post[]
+  comments  Comment[]
 
   sessions Session[]
   accounts Account[]
+
+  @@unique([name, deleted_at])
+  @@unique([email, deleted_at])
 }
 
 model Session {
@@ -59,17 +62,17 @@ model Session {
 }
 
 model Account {
-  id            String    @id @default(cuid())
-  userId        String
-  accountId     String
-  providerId    String
-  accessToken   String?
-  refreshToken  String?
-  idToken       String?
-  expiresAt     DateTime?
-  password      String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  accountId    String
+  providerId   String
+  accessToken  String?
+  refreshToken String?
+  idToken      String?
+  expiresAt    DateTime?
+  password     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -109,7 +112,7 @@ model Post {
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
-  user  User   @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
   comments Comment[]
 }
 
@@ -118,16 +121,16 @@ model Comment {
   content String
   likes   Int    @default(0)
 
-  parentId  Int?
-  postId    Int
-  userId	String
+  parentId Int?
+  postId   Int
+  userId   String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
   post     Post      @relation(fields: [postId], references: [id])
-  user     User   	 @relation(fields: [userId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }

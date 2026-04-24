@@ -1,24 +1,19 @@
 <script lang="ts">
-	type Campus = {
-		id: number;
-		name: string;
-	};
 
 	type UserRole = 'USER' | 'MODERATOR' | 'ADMIN';
 
 	type UserDetails = {
 		id: string;
-		name: string | null;
+		name: string;
+		first_name: string | null;
+		last_name: string | null;
 		email: string;
 		image: string | null;
 		role: UserRole;
 		createdAt: string | Date;
 		updatedAt: string | Date;
-		profile: {
-			login: string | null;
-			biography: string | null;
-			campusId: number | null;
-		} | null;
+		biography: string | null;
+		interests: string | null;
 	};
 
 	type UserPost = {
@@ -39,10 +34,7 @@
 	}: {
 		data: {
 			user: UserDetails;
-			campuses: Campus[];
 			posts: UserPost[];
-			firstName: string;
-			lastName: string;
 		};
 		form: FormState | null;
 	} = $props();
@@ -70,18 +62,23 @@
 
 	<section class="card">
 		<h2>Core details</h2>
-		<form method="POST" action="?/updateUserCore" class="form-grid">
+		<form method="POST" action="?/updateUserCore" class="form-grid">			
 			<label>
 				First name
-				<input name="firstName" value={data.firstName} />
+				<input name="firstName" value={data.user.first_name ?? ''} />
 			</label>
 
 			<label>
 				Last name
-				<input name="lastName" value={data.lastName} />
+				<input name="lastName" value={data.user.last_name ?? ''} />
 			</label>
 
-			<label class="full-width">
+			<label>
+				Username
+				<input name="username" value={data.user.name} required />
+			</label>
+
+			<label>
 				Email
 				<input name="email" type="email" value={data.user.email} required />
 			</label>
@@ -89,6 +86,16 @@
 			<label class="full-width">
 				Image URL
 				<input name="image" value={data.user.image ?? ''} />
+			</label>
+
+			<label class="full-width">
+				Biography
+				<textarea name="biography" rows="5">{data.user.biography ?? ''}</textarea>
+			</label>
+
+			<label class="full-width">
+				Interests
+				<input name="interests" value={data.user.interests ?? ''} />
 			</label>
 
 			<label>
@@ -106,34 +113,6 @@
 			</div>
 
 			<button type="submit" class="full-width">Save core details</button>
-		</form>
-	</section>
-
-	<section class="card">
-		<h2>Profile details</h2>
-		<form method="POST" action="?/updateProfile" class="form-grid">
-			<label>
-				Intra profile
-				<input name="login" value={data.user.profile?.login ?? ''} />
-			</label>
-
-			<label>
-				Campus
-				<select name="campusId" value={data.user.profile?.campusId?.toString() ?? ''}>
-					<option value="">None</option>
-					{#each data.campuses as campus}
-						<option value={campus.id}>{campus.name}</option>
-					{/each}
-				</select>
-			</label>
-
-			<label class="full-width">
-				Biography
-				<textarea name="biography" rows="5">{data.user.profile?.biography ?? ''}</textarea>
-			</label>
-
-			<button type="submit" class="full-width">Save profile details</button>
-			
 		</form>
 	</section>
 		
