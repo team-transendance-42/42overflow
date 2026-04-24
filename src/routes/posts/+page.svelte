@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import type { ComponentProps } from 'svelte';
-  import PostCard from '$lib/components/PostCard.svelte';
+	import { onMount } from 'svelte';
+	import type { ComponentProps } from 'svelte';
+	import PostCard from '$lib/components/PostCard.svelte';
 
 	type Post = ComponentProps<typeof PostCard>['post'];
 
@@ -11,7 +11,7 @@
 	let total = 0;
 
 	async function loadQuestions() {
-		const res = await fetch(`/api/questions?page=${page}&limit=${limit}`);
+		const res = await fetch(`/api/posts?page=${page}&limit=${limit}`);
 		const json = await res.json();
 
 		questions = (json.data ?? []) as Post[];
@@ -21,7 +21,8 @@
 	onMount(loadQuestions);
 </script>
 
-<div class="questions-page">
+<!-- Posts -->
+<div>
 	<h1><strong>
 		NEWEST QUESTIONS
 	</strong></h1>
@@ -31,7 +32,8 @@
 	{/each}
 </div>
 
-<div class="pagination">
+<!-- Pagination -->
+<div>
 	<button on:click={() => {
 		if (page > 1) {
 			page--;

@@ -1,5 +1,4 @@
 <script lang=ts>
-	import Postbox from '$lib/components/Postbox.svelte';
     import { goto } from '$app/navigation';
 
 	let rawProps = $props() as { post: any };
@@ -23,7 +22,7 @@
     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { openPostPage(); } }}
     onclick={openPostPage}
 >
-	<Postbox>
+	<div class=postbox>
 		<h2><strong>Project Name:</strong> {post.title}</h2>
 		<p class="content"><strong>Question: </strong> {post.content}</p>
 
@@ -33,11 +32,9 @@
 			onclick={openProfile}
 			aria-label="View {post.user.name}'s profile'"
 		>
-			{#if post.user?.name}
-				<p class="author">
-					Posted by: {post.user.name}
-				</p>
-			{/if}
+			<p class="author">
+				Posted by: {post.user.name}
+			</p>
 		</button>
-  	</Postbox>
+  	</div>
 </div>

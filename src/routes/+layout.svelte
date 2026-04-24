@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '../app.css';
 	import '$lib/styles/tokens.css';
 	import { page } from '$app/state';
 	import { locales, localizeHref } from '$lib/paraglide/runtime';
@@ -17,8 +18,6 @@
 
 		return () => clearInterval(interval);
 	});
-	
-	
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
@@ -51,7 +50,6 @@
   background-color: var(--color-neutral-500);
   color: var(--color-neutral-900);
   font-family: var(--font-family-base);
-   
   }
 
   .content {
