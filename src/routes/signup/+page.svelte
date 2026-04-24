@@ -38,7 +38,7 @@
     <p class="error">{error}</p>
   {/if}
 
-  <Input label="Name" name="name" placeholder="Your name" bind:value={name} />
+  <Input label="Username" name="name" placeholder="Enter Username" bind:value={name} />
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
   <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 

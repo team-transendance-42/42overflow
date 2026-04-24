@@ -2,7 +2,6 @@
   import Avatar from '$lib/components/Avatar.svelte';
 
   export let data;
-
   const user = data.user;
   const profile = data.profile;
 
@@ -14,7 +13,9 @@
   </div>
 
 
-  <h1><strong>Name: </strong> {user?.name ?? 'No name set'}</h1>
+  <h1><strong>Name: </strong> {user?.first_name ?? 'No name set'} {user?.last_name ?? 'No name set'} </h1>
+
+  <h1><strong>Username: </strong> {user?.name ?? 'No name set'}</h1>
  
   {#if profile?.username}
     <p class="username"><strong>Username: </strong> {profile.username}</p>
@@ -28,12 +29,6 @@
     </div>
   {/if}
 
-  {#if profile?.login}
-    <div class="nonefornow">
-      <span class="label">Intra</span>
-      <p>{profile.login}</p>
-    </div>
-  {/if}
 
     {#if profile?.followers?.length > 0}
     <div class="interests">
