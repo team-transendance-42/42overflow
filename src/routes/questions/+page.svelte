@@ -32,56 +32,23 @@
 </div>
 
 <div class="pagination">
-  <button on:click={() => {
-    if (page > 1) {
-      page--;
-      loadQuestions();
-    }
-  }}>
-    Prev 
-  </button>
+	<button on:click={() => {
+		if (page > 1) {
+			page--;
+			loadQuestions();
+		}
+	}}>
+	Prev
+	</button>
 
-  <span> - Page {page} -</span>
+	<span> - Page {page} -</span>
 
-  <button on:click={() => {
-    if (page * limit < total) {
-      page++;
-      loadQuestions();
-    }
-  }}>
-    Next
-  </button>
+	<button on:click={() => {
+		if (page * limit < total) {
+			page++;
+			loadQuestions();
+		}
+	}}>
+	Next
+	</button>
 </div>
-
-
-<style>
-  .questions-page {
-    width: 100%;
-    max-width: 3400px;
-    margin: 100 auto; 
-  
-  }
-
-  .questions-page h1 {
-  margin-bottom: 4px;
-  margin-left: 8px;
-}
-
-
-.content {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.author-link {
-  font-style: italic;
-  color: #083957;
-  text-decoration: none;
-}
-.author-link:hover {
-  text-decoration: underline;
-}
-
-</style>

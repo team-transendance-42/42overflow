@@ -1,3 +1,4 @@
+/* Buttons */
 .invisible-button {
     background: transparent;
     border: 0;
@@ -13,4 +14,16 @@
     height: 100%;
     display: block;
     position: relative;
+}
+
+/* Posts */
+.questions-page {
+	width: 100%;
+	max-width: 3400px;
+	margin: 100 auto;
+}
+
+.questions-page h1 {
+	margin-bottom: 4px;
+	margin-left: 8px;
 }
