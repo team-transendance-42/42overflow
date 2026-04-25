@@ -3,6 +3,7 @@
     import { goto } from '$app/navigation';
 	import CommentCard from '$lib/components/CommentCard.svelte';
 	import CreateComment from '$lib/components/CreateComment.svelte';
+	import CreateComment2 from '$lib/components/CreateComment2.svelte';
 
 	type Comment = ComponentProps<typeof CommentCard>['comment'];
 
@@ -34,10 +35,10 @@
 			</button>
 		</div>
 
-		<CreateComment />
+		<CreateComment2 />
 
-		{#each comments as c}
-			<CommentCard {c} />
+		{#each comments as comment}
+			<CommentCard {comment} />
 		{/each}
 	{/if}
 </div>
