@@ -1,11 +1,18 @@
 <script lang="ts">
-	import type { ComponentProps } from 'svelte';
-    import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import CommentCard from '$lib/components/CommentCard.svelte';
 	import CreateComment from '$lib/components/CreateComment.svelte';
 
 	// Define types for post and comments
-	type Comment = ComponentProps<typeof CommentCard>['comment'];
+	type Comment = {
+		id: number;
+		content: string;
+		image?: string | null;
+		likes: number;
+		created_at: Date | string;
+		user: { name: string; id: string; };
+		children?: Comment[];
+	};
 	type Post = {
 		id: number;
 		title: string;
@@ -13,10 +20,13 @@
 		user: { name: string; };
 		comments?: Comment[];
 	};
-	type PageData = { post: Post | null; };
 
-	// Get data from props
-	let { data }: { data: PageData } = $props();
+	// Get data from props with inline type
+	interface PageData {
+		post: Post | null;
+	}
+
+	let { data } = $props() as any as { data: PageData };
 	let post = $derived(data.post);
 	let comments = $derived<Comment[] | null>(data.post?.comments ?? []);
 

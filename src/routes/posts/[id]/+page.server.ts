@@ -1,6 +1,31 @@
 import type { PageServerLoad } from './$types.js';
 import { db } from '$lib/server/db.js';
 
+// Recursively fetch all children of a comment
+async function fetchCommentWithChildren(commentId: number) {
+	const comment = await db.comment.findUnique({
+		where: { id: commentId },
+		include: { user: true }
+	});
+
+	if (!comment) return null;
+
+	// Fetch and recursively process all children
+	const childComments = await db.comment.findMany({
+		where: { parentId: commentId },
+		include: { user: true },
+		orderBy: { created_at: 'asc' }
+	});
+
+	const childrenWithNestedReplies = await Promise.all(
+		childComments.map(child => fetchCommentWithChildren(child.id))
+	);
+
+	return {
+		...comment,
+		children: childrenWithNestedReplies.filter(Boolean)
+	};
+}
 
 export const load: PageServerLoad = async ({ params }) => {
     try {
@@ -16,7 +41,6 @@ export const load: PageServerLoad = async ({ params }) => {
 			where: { id: postIdNum },
 			include: {
 				comments: {
-					orderBy: { created_at: 'desc' },
 					include: { user: true }
 				},
 				user: true
@@ -27,7 +51,23 @@ export const load: PageServerLoad = async ({ params }) => {
             throw (new Error('Post not found'));
         }
 
-        return ({ post: postwithcomments });
+		// Filter root comments (parentId = null) and recursively fetch their children
+		const rootComments = postwithcomments.comments.filter(c => c.parentId === null);
+		const commentsWithChildren = await Promise.all(
+			rootComments.map(comment => fetchCommentWithChildren(comment.id))
+		);
+
+		// Sort root comments by created_at descending
+		commentsWithChildren.sort((b, a) =>
+			new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+		);
+
+		return ({
+			post: {
+				...postwithcomments,
+				comments: commentsWithChildren
+			}
+		});
     } catch (error) {
         console.error('Error fetching product data:', error);
         return ({ post: null });

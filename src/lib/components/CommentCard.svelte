@@ -1,9 +1,14 @@
 <script lang=ts>
     import { goto } from '$app/navigation';
-	import CreateComment from '$lib/components/CreateComment.svelte';
+    import CommentCard from './CommentCard.svelte';
+	import CreateComment from './CreateComment.svelte';
 
-	let rawProps = $props() as { comment: any };
-    let comment = $derived(rawProps.comment);
+	interface Props {
+		comment: any;
+		depth?: number;
+	}
+
+	let { comment, depth = 0 }: Props = $props();
 
 	// Derive postId and parentId for creating replies to this comment
 	let postId = $derived(comment.postId);
@@ -14,9 +19,8 @@
     }
 </script>
 
-<div>
+<div style="margin-left: {depth * 20}px;">
 	<div class=postbox>
-		<p>{#if comment.parentId} Parent: {comment.parentId} {/if} {#if !comment.parentId} N/A {/if}</p>
 		<!-- View Profile Button -->
 		<button
 			class="bg-sky-500 hover:bg-sky-700"
@@ -33,7 +37,7 @@
 
 		<!-- Comment Image (Optional) -->
 		{#if comment.image}
-			<enhanced:img
+			<img
                 src={comment.image || `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`}
                 onerror={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`; }}
 				alt="Comment attachment"
@@ -43,5 +47,13 @@
 
 		<!-- Reply to Comment -->
 		<CreateComment {postId} {parentId} />
+
   	</div>
+
+	<!-- Render nested children/replies -->
+	{#if comment.children && comment.children.length > 0}
+		{#each comment.children as child}
+			<CommentCard comment={child} depth={depth + 1} />
+		{/each}
+	{/if}
 </div>
