@@ -1,5 +1,5 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
-import { uploadProductImage } from '$lib/fileUpload.js';
+import { uploadProductImage } from '$lib/fileUpload.ts';
 import { CommentSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
 import { z } from 'zod';
@@ -22,9 +22,10 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
         const formData = await request.formData();
 
         // Extract form fields and convert types
-		const commentData = {
+        const parentIdValue = formData.get('parentId');
+        const commentData = {
 			postId: postId,
-			parentId: formData.get('parentId') ? parseInt(formData.get('parentId') as string) : null,
+            parentId: parentIdValue ? parseInt(parentIdValue as string) : null,
 			content: formData.get('content') as string,
 		}
 

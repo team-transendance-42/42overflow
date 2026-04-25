@@ -17,8 +17,8 @@ const ImageFileSchema = z.object({
 
 // Comment schema
 export const CommentSchema = z.object({
-	postId: z.number().int(),
-	parentId: z.number().int().nullable(),
+	postId: z.number().int().positive(),
+    parentId: z.number().int().positive().nullable().optional(),
 	content: z.string().min(1).max(500),
 });
 

@@ -3,13 +3,24 @@
     import { goto } from '$app/navigation';
 	import CommentCard from '$lib/components/CommentCard.svelte';
 	import CreateComment from '$lib/components/CreateComment.svelte';
-	import CreateComment2 from '$lib/components/CreateComment2.svelte';
 
+	// Define types for post and comments
 	type Comment = ComponentProps<typeof CommentCard>['comment'];
+	type Post = {
+		id: number;
+		title: string;
+		content: string;
+		user: { name: string; };
+		comments?: Comment[];
+	};
+	type PageData = { post: Post | null; };
 
-	let { data } = $props<{ data: any }>();
+	// Get data from props
+	let { data }: { data: PageData } = $props();
 	let post = $derived(data.post);
 	let comments = $derived<Comment[] | null>(data.post?.comments ?? []);
+
+	let postId = $derived(post?.id ?? 0);
 
 	function openProfile() {
         goto(`/profile/${post?.user.name}`);
@@ -35,8 +46,10 @@
 			</button>
 		</div>
 
-		<CreateComment2 />
+		<!-- Create Comment under Post -->
+		<CreateComment {postId} />
 
+		<!-- Show all Comments -->
 		{#each comments as comment}
 			<CommentCard {comment} />
 		{/each}
