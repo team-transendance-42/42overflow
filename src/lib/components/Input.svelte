@@ -4,6 +4,7 @@
   export let placeholder = "";
   export let value = "";
   export let name = "";
+  export let disabled = false;
 </script>
 
 <div class="input-group">
@@ -17,6 +18,7 @@
     name={name}
     id={name}
     placeholder={placeholder}
+	{disabled}
   />
 </div>
 
@@ -54,4 +56,9 @@
   input:focus {
     border-color: black;
   }
+
+  input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 </style>

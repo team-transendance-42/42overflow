@@ -93,8 +93,8 @@ async function handleUpdate() {
     <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
   </div>
   <Input label="User name" name="username" placeholder="User name" bind:value={username} />
-  <!-- Non-editable TODO -->
-  <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
+
+  <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} disabled  />
 
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
 
