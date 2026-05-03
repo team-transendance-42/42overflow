@@ -52,9 +52,20 @@
 	}
 </script>
 
+
+
 <div class="edit-user-page">
 	<a href="/users" class="back-link">Back to users</a>
-	<h1>Edit user</h1>
+		<nav class="tabs">
+ 			 <a
+				href="./"
+				class="tab"
+				class:active={true}
+				>Profile</a
+			>
+  			<a href="./{data.user.id}/posts" class="tab" class:active={false}>Posts</a>
+  			<a href="./{data.user.id}/comments" class="tab" class:active={false}>Comments</a>
+		</nav>
 
 	{#if form?.message}
 		<p class:success={form.success} class:error={!form.success}>{form.message}</p>
@@ -239,5 +250,29 @@
 			flex-direction: column;
 			gap: 0.2rem;
 		}
+	}
+
+	.tabs {
+		display: flex;
+		gap: 0.5rem;
+		border-bottom: 1px solid var(--color-neutral-300);
+		margin-bottom: 1rem;
+  	}
+
+  	.tab {
+		padding: 0.5rem 0.9rem;
+		text-decoration: none;
+		color: var(--color-text-primary);
+		background: transparent;
+		border: 1px solid transparent;
+		border-bottom: 1px solid transparent;
+		border-radius: 6px 6px 0 0;
+		font-weight: 600;
+  	}
+
+	.tab.active {
+		background: var(--color-neutral-100);
+		border-color: var(--color-neutral-300);
+		border-bottom-color: transparent;
 	}
 </style>
