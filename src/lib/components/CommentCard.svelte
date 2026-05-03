@@ -14,6 +14,26 @@
 	let postId = $derived(comment.postId);
 	let parentId = $derived(comment.id);
 
+	async function deleteComment() {
+		if (!confirm('Are you sure you want to delete this comment?')) {
+			return;
+		}
+		const response = await fetch(`/api/posts/${postId}/comments/${comment.id}/delete`, {
+			method: 'POST',
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json();
+			console.error('Failed to delete comment:', errorData);
+			alert('Failed to delete comment: ' + (errorData.message || 'Unknown error'));
+			return;
+		}
+
+		console.log(`Delete comment with ID: ${comment.id}`);
+		// Refresh the page or remove the comment from the UI
+		window.location.reload();
+	}
+
 	function openProfile() {
         goto(`/profile/${comment.user.name}`);
     }
@@ -28,7 +48,11 @@
 			aria-label="View {comment.user.name}'s profile'"
 		>
 			<p class="author">
-				Posted by: {comment.user.name}
+				{#if comment.deleted_at}
+					[Deleted User]
+				{:else}
+					Posted by: {comment.user.name}
+				{/if}
 			</p>
 		</button>
 
@@ -47,6 +71,15 @@
 
 		<!-- Reply to Comment -->
 		<CreateComment {postId} {parentId} />
+
+		<!-- Delete Comment -->
+		<button
+			class="bg-red-500 hover:bg-red-700"
+			onclick={deleteComment}
+			aria-label="Delete comment"
+		>
+			Delete
+		</button>
 
   	</div>
 

@@ -10,10 +10,10 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 			throw error(401, 'Unauthorized');
 		}
 
-		if (!params.id) {
+		if (!params.postId) {
 			throw error(400, 'Post ID is required');
 		}
-		const postId = parseInt(params.id);
+		const postId = parseInt(params.postId);
 
 		if (isNaN(postId)) {
 			throw error(400, 'Invalid Post ID');
