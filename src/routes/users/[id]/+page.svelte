@@ -52,19 +52,17 @@
 	}
 </script>
 
-
-
 <div class="edit-user-page">
 	<a href="/users" class="back-link">Back to users</a>
 		<nav class="tabs">
  			 <a
-				href="./"
+				href={`/users/${data.user.id}`}
 				class="tab"
 				class:active={true}
 				>Profile</a
 			>
-  			<a href="./{data.user.id}/posts" class="tab" class:active={false}>Posts</a>
-  			<a href="./{data.user.id}/comments" class="tab" class:active={false}>Comments</a>
+			<a href={`/users/${data.user.id}/posts`} class="tab" class:active={false}>Posts</a>
+			<a href={`/users/${data.user.id}/comments`} class="tab" class:active={false}>Comments</a>
 		</nav>
 
 	{#if form?.message}
@@ -72,7 +70,6 @@
 	{/if}
 
 	<section class="card">
-		<h2>Core details</h2>
 		<form method="POST" action="?/updateUserCore" class="form-grid">			
 			<label>
 				First name
@@ -130,24 +127,7 @@
 	<form method="POST" action="?/deleteUser" onsubmit={confirmDelete}>
 		<button type="submit" class="full-width" style="background-color: red;">Delete account</button>
 	</form>
-
-	<section class="card">
-		<h2>User posts (read-only)</h2>
-		{#if data.posts.length === 0}
-			<p>This user has no posts.</p>
-		{:else}
-			<ul class="posts-list">
-				{#each data.posts as post}
-					<li>
-						<span>{post.title}</span>
-						<small>
-							#{post.id} • {formatDate(post.created_at)}{post.deleted_at ? ' • deleted' : ''}
-						</small>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-	</section>
+	
 </div>
 
 <style>

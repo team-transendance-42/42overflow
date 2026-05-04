@@ -35,17 +35,45 @@ async function requireAdmin(actorId: string | undefined) {
 	}
 }
 
+async function requireStaff(actorId: string | undefined) {
+	if (!actorId) {
+		throw error(403, 'Forbidden');
+	}
+	
+	const actor = await prisma.user.findUnique({
+		where: { id: actorId },
+		select: { role: true }
+	});
+
+	if (actor?.role !== 'ADMIN' && actor?.role !== 'MODERATOR') {
+		throw error(403, 'Forbidden');
+	}
+
+	return actor.role;
+}
+
 export const load: PageServerLoad = async ({ locals, params }) => {
-	await requireAdmin(locals.user?.id);
+	const role = await requireStaff(locals.user?.id);
+
+	const isAdmin = role === 'ADMIN';
 
 	const user = await prisma.user.findUnique({
 		where: { id: params.id },
-		select: {
+		select: isAdmin ? {
 			id: true,
 			name: true,
 			first_name: true,
 			last_name: true,
 			email: true,
+			image: true,
+			role: true,
+			createdAt: true,
+			updatedAt: true,
+			biography: true,
+			interests: true
+		} : {
+			id: true,
+			name: true,
 			image: true,
 			role: true,
 			createdAt: true,
@@ -169,55 +197,6 @@ export const actions: Actions = {
 
 		return { success: true, message: 'User details updated' };
 	},
-
-	// updateProfile: async ({ request, locals, params }) => {
-	// 	await requireAdmin(locals.user?.id);
-
-	// 	const formData = await request.formData();
-	// 	const login = formData.get('login');
-	// 	const biography = formData.get('biography');
-
-	// 	if (
-	// 		typeof login !== 'string' ||
-	// 		typeof biography !== 'string'
-	// 	) {
-	// 		return fail(400, { message: 'Invalid form data' });
-	// 	}
-
-	// 	const userExists = await prisma.user.findUnique({
-	// 		where: { id: params.id },
-	// 		select: { id: true }
-	// 	});
-
-	// 	if (!userExists) {
-	// 		throw error(404, 'User not found');
-	// 	}
-
-	// 	const normalizedLogin = login.trim();
-	// 	if (normalizedLogin) {
-	// 		const loginInUse = await prisma.user.findFirst({
-	// 			where: {
-	// 				name: normalizedLogin,
-	// 				NOT: { id: params.id }
-	// 			},
-	// 			select: { id: true }
-	// 		});
-
-	// 		if (loginInUse) {
-	// 			return fail(400, { message: 'Intra profile is already in use' });
-	// 		}
-	// 	}
-
-	// 	await prisma.user.upsert({
-	// 		where: { id: params.id },
-	// 		update: {
-	// 			name: normalizedLogin || null,
-	// 			biography: biography.trim() || null
-	// 		}
-	// 	});
-
-	// 	return { success: true, message: 'Profile details updated' };
-	// },
 
 	deleteUser: async ({ locals, params }) => {
 		await requireAdmin(locals.user?.id);
