@@ -100,7 +100,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	return {
 		user,
-		posts
+		posts,
+		role
 	};
 };
 

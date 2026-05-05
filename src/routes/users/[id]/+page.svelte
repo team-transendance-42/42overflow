@@ -35,6 +35,7 @@
 		data: {
 			user: UserDetails;
 			posts: UserPost[];
+			role: UserRole;
 		};
 		form: FormState | null;
 	} = $props();
@@ -68,7 +69,8 @@
 	{#if form?.message}
 		<p class:success={form.success} class:error={!form.success}>{form.message}</p>
 	{/if}
-
+	
+	{#if data.role === 'ADMIN'}
 	<section class="card">
 		<form method="POST" action="?/updateUserCore" class="form-grid">			
 			<label>
@@ -119,18 +121,54 @@
 				<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
 				<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
 			</div>
-
+			
 			<button type="submit" class="full-width">Save core details</button>
+
 		</form>
 	</section>
-		
+
 	<form method="POST" action="?/deleteUser" onsubmit={confirmDelete}>
 		<button type="submit" class="full-width" style="background-color: red;">Delete account</button>
 	</form>
-	
+	{/if}
+
+	{#if data.role === 'MODERATOR'}
+	<section class="card">
+		<img src={data.user.image} alt={data.user.name} class="avatar" />
+		<label>
+			Username
+			<input value={data.user.name} disabled />
+		</label>
+		<label>
+			Biography
+			<textarea rows="5" disabled>{data.user.biography ?? ''}</textarea>
+		</label>
+		<label>
+			Interests
+			<input value={data.user.interests ?? ''} disabled />
+		</label>
+		<label>
+			Role
+			<input value={data.user.role} disabled />
+		</label>
+		<div class="timestamps">
+			<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
+			<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
+		</div>
+	</section>
+	{/if}
 </div>
 
 <style>
+
+	.avatar {
+		width: 42px;
+		height: 42px;
+		border-radius: 999px;
+		object-fit: cover;
+		border: 1px solid var(--color-neutral-400);
+	}
+
 	.edit-user-page {
 		width: 100%;
 		max-width: 900px;
