@@ -4,39 +4,23 @@
 
 	type UserDetails = {
 		id: string;
-		name: string;
-		first_name: string | null;
-		last_name: string | null;
-		email: string;
-		image: string | null;
-		role: UserRole;
-		createdAt: string | Date;
-		updatedAt: string | Date;
-		biography: string | null;
-		interests: string | null;
 	};
 
-	type UserPost = {
+	type Comment = {
 		id: number;
-		title: string;
+		content: string;
 		created_at: string | Date;
 		deleted_at: string | Date | null;
-	};
-
-	type FormState = {
-		success?: boolean;
-		message?: string;
+		postId: number;
 	};
 
 	let {
-		data,
-		form
+		data
 	}: {
 		data: {
 			user: UserDetails;
-			posts: UserPost[];
+			comments: Comment[];
 		};
-		form: FormState | null;
 	} = $props();
 
 	function formatDate(value: string | Date) {
@@ -64,6 +48,23 @@
 			<a href={`/users/${data.user.id}/posts`} class="tab" class:active={false}>Posts</a>
 			<a href={`/users/${data.user.id}/comments`} class="tab" class:active={true}>Comments</a>
 		</nav>
+
+		{#if data.comments.length === 0}
+			<p>This user has no comments.</p>
+		{:else}
+			{#each data.comments as comment}
+				<section class="card">
+					<p>{comment.content}</p>
+					<div class="post-actions">
+						<form method="POST" action="?/deleteComment" onsubmit={confirmDelete}>
+							<input type="hidden" name="commentId" value={comment.id} />
+							<button type="submit" style="background-color: red;">Delete comment</button>
+						</form>
+						<a href={`/posts/${comment.postId}`} style="color: blue;">View post</a>
+					</div>
+				</section>
+			{/each}
+		{/if}
 </div>
 
 <style>
@@ -99,6 +100,20 @@
 		width: 100%;
 		max-width: 900px;
 		display: grid;
+		gap: 1rem;
+	}
+
+	.card {
+		border: 1px solid var(--color-neutral-400);
+		border-radius: var(--radius-md);
+		padding: 1rem;
+		display: grid;
+		gap: 0.75rem;
+		background-color: var(--color-neutral-100);
+	}
+
+	.post-actions {
+		display: flex;
 		gap: 1rem;
 	}
 </style>

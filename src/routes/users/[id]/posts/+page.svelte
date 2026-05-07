@@ -19,6 +19,7 @@
 	type UserPost = {
 		id: number;
 		title: string;
+		content: string;
 		created_at: string | Date;
 		deleted_at: string | Date | null;
 	};
@@ -65,23 +66,23 @@
 			<a href={`/users/${data.user.id}/comments`} class="tab" class:active={false}>Comments</a>
 		</nav>
 
-	<section class="card">
-		<h2>User posts (read-only)</h2>
 		{#if data.posts.length === 0}
 			<p>This user has no posts.</p>
 		{:else}
-			<ul class="posts-list">
-				{#each data.posts as post}
-					<li>
-						<span>{post.title}</span>
-						<small>
-							#{post.id} • {formatDate(post.created_at)}{post.deleted_at ? ' • deleted' : ''}
-						</small>
-					</li>
-				{/each}
-			</ul>
+			{#each data.posts as post}
+				<section class="card">
+					<p>{post.title}</p>
+					<p>{post.content}</p>
+					<div class="post-actions">
+						<form method="POST" action="?/deletePost" onsubmit={confirmDelete}>
+							<input type="hidden" name="postId" value={post.id} />
+							<button type="submit" style="background-color: red;">Delete Post</button>
+						</form>
+						<a href={`/posts/${post.id}`} style="color: blue;">View Post</a>
+					</div>					
+				</section>
+			{/each}
 		{/if}
-	</section>
 </div>
 
 <style>
@@ -127,5 +128,10 @@
 		display: grid;
 		gap: 0.75rem;
 		background-color: var(--color-neutral-100);
+	}
+
+	.post-actions {
+		display: flex;
+		gap: 1rem;
 	}
 </style>

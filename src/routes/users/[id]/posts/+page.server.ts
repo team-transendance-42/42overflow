@@ -34,3 +34,22 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	
 	return { user, posts };
 };
+
+export const actions = {
+	deletePost: async ({ request, locals }) => {
+		await requireStaff(locals.user?.id);
+
+		const formData = await request.formData();
+		const postId = formData.get('postId') as string;
+
+		await prisma.post.update({
+			where: { id: Number(postId) },
+			data: { deleted_at: new Date(),
+				content: '[deleted by staff]',
+				title: '[deleted by staff]'
+			 }
+		});
+
+		return { success: true, message: 'Post deleted successfully' };
+	}
+};

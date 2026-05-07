@@ -27,5 +27,26 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		}
 	});
 	
-	return { user };
+	const comments = await prisma.comment.findMany({
+		where: { userId: params.id },
+		orderBy: { created_at: 'desc' }
+	});
+
+	return { user, comments };
+};
+
+export const actions = {
+	deleteComment: async ({ request, locals }) => {
+		await requireStaff(locals.user?.id);
+
+		const formData = await request.formData();
+		const commentId = formData.get('commentId') as string;
+
+		await prisma.comment.update({
+			where: { id: Number(commentId) },
+			data: { deleted_at: new Date(), content: '[deleted by staff]' }
+		});
+
+		return { success: true, message: 'Comment deleted successfully' };
+	}
 };
