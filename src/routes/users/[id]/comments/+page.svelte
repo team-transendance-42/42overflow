@@ -28,7 +28,7 @@
 	}
 
 	function confirmDelete(event: SubmitEvent) {
-		const ok = window.confirm('Are you sure you want to delete this user? This action cannot be undone.');
+		const ok = window.confirm('Are you sure you want to delete this comment? This action cannot be undone.');
 		if (!ok) {
 			// Prevent form submission
 			event.preventDefault();

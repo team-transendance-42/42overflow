@@ -28,7 +28,10 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	});
 
 	const posts = await prisma.post.findMany({ 
-		where: { userId: params.id },
+		where: { 
+			userId: params.id,
+			deleted_at: null
+		 },
 		orderBy: { created_at: 'desc' },
 	});
 	

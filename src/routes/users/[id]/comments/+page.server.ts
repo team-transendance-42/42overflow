@@ -28,7 +28,10 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	});
 	
 	const comments = await prisma.comment.findMany({
-		where: { userId: params.id },
+		where: { 
+			userId: params.id,
+			deleted_at: null
+		 },
 		orderBy: { created_at: 'desc' }
 	});
 
