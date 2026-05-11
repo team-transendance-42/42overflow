@@ -38,7 +38,7 @@ label {
 textarea {
   padding: 0.7rem 0.9rem;
   border-radius: 6px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-neutral-200);
   font-size: 1rem;
   outline: none;
   transition: border 0.2s ease;
@@ -47,6 +47,6 @@ textarea {
 }
 
 textarea:focus {
-  border-color: black;
+  border-color: var(--color-neutral-900);
 }
 </style>

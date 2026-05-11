@@ -21,19 +21,18 @@
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
   font-size: 0.8rem;
-  border: 1px solid #ccc;
-  background: #f3f3f3;
+  border: 1px solid var(--color-primary-dark-300);
+  background: var(--color-neutral-200);
 }
 
-
 .tag.memory {
-  background: #e3f2fd;
-  border-color: #64b5f6;
+  background: var(--color-neutral-200);
+  border-color:ar(--color-neutral-100);
 }
 
 .tag.webserv {
-  background: #e8f5e9;
-  border-color: #81c784;
+  background: var(--color-neutral-200);
+  border-color: var(--color-neutral-150);
 }
 
 .remove {

@@ -59,8 +59,6 @@
   .avatar-section { 
 	margin: 1rem 0;  }
 
-  .avatar-section.outlined { 
-	border: 2px solid black; }
 
   .interests { 
 	margin: 0.75rem 0; }

@@ -23,7 +23,7 @@ style="width: {width};">
 <style>
   .sidebar {
     background-color: var(--color-neutral-200);
-    color: black;
+    color: var(--color-neutral-900);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;

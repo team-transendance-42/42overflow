@@ -8,8 +8,6 @@
    		<a href="/" >@42overflow</a>
 	</div>
 
-	
-
    <div class="right">
 
 		{#if !user}
@@ -25,7 +23,6 @@
 	</div>
 	
 </header>
-
 
 <style>
   header {
@@ -46,7 +43,6 @@ header .right {
   font-size: 0.85rem; 
   font-weight: normal;
 }
-
 
 
   .settings-link {

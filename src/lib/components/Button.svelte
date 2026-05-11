@@ -10,8 +10,8 @@
 
 <style>
   button {
-    background-color: black;
-    color: white;
+    background-color: var(--color-neutral-900);
+    color: var(--color-neutral-200);
     padding: 0.6rem 1.2rem;
     border: none;
     border-radius: 6px;
