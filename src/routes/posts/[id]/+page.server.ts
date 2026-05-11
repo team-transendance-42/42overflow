@@ -5,7 +5,7 @@ import { db } from '$lib/server/db.js';
 async function fetchCommentWithChildren(commentId: number) {
 	const comment = await db.comment.findUnique({
 		where: { id: commentId },
-		include: { user: true }
+		include: { user: true, likes: true }
 	});
 
 	if (!comment) return null;
@@ -13,7 +13,7 @@ async function fetchCommentWithChildren(commentId: number) {
 	// Fetch and recursively process all children
 	const childComments = await db.comment.findMany({
 		where: { parentId: commentId },
-		include: { user: true },
+		include: { user: true, likes: true },
 		orderBy: { created_at: 'asc' }
 	});
 

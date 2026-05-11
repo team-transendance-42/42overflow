@@ -5,6 +5,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 
 	if (!locals.user) {
 		return {
+			user: null,
 			userRole: null
 		};
 	}
@@ -19,6 +20,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	});
 
 	return {
+		user: {
+			id: locals.user.id
+		},
 		userRole: dbUser?.role ?? null
 	};
 };

@@ -1,5 +1,6 @@
 <script lang=ts>
-    import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
     import CommentCard from './CommentCard.svelte';
 	import CreateComment from './CreateComment.svelte';
 
@@ -13,6 +14,10 @@
 	// Derive postId and parentId for creating replies to this comment
 	let postId = $derived(comment.postId);
 	let parentId = $derived(comment.id);
+	// Check if the current user has liked this comment
+	let isLiked = $derived.by(() =>
+		Boolean(page.data.user?.id && comment.likes?.some((l: { userId: string }) => l.userId === page.data.user.id))
+	);
 
 	async function deleteComment() {
 		if (!confirm('Are you sure you want to delete this comment?')) {
@@ -31,6 +36,23 @@
 
 		console.log(`Delete comment with ID: ${comment.id}`);
 		// Refresh the page or remove the comment from the UI
+		window.location.reload();
+	}
+
+	async function likeComment() {
+		// Toggle like/unlike based on current state
+		const response = await fetch(`/api/posts/${postId}/comments/${comment.id}/${isLiked ? 'unlike' : 'like'}`, {
+			method: 'POST',
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json();
+			console.error(`Failed to ${isLiked ? "unlike" : "like"} comment:`, errorData);
+			alert(`Failed to ${isLiked ? "unlike" : "like"} comment: ${errorData.message || 'Unknown error'}`);
+			return;
+		}
+
+		console.log(`Comment with ID: ${comment.id} ${isLiked ? 'unliked' : 'liked'}`);
 		window.location.reload();
 	}
 
@@ -81,7 +103,18 @@
 			Delete
 		</button>
 
-  	</div>
+		<!-- Show Likes -->
+		<p>{comment.likes.length ? `${comment.likes.length} Likes` : '0 Likes'}</p>
+
+		<!-- Like Button -->
+		<button
+			class="bg-blue-500 hover:bg-blue-700"
+			onclick={likeComment}
+			aria-label="Like comment"
+		>
+			{isLiked ? 'Unlike' : 'Like'}
+		</button>
+	</div>
 
 	<!-- Render nested children/replies -->
 	{#if comment.children && comment.children.length > 0}
