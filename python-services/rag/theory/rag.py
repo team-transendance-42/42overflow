@@ -46,12 +46,12 @@ def load_documents(directory: str) -> dict[str, str]:
 
 def chunk_text(text: str, chunk_size: int = 150, overlap: int = 30) -> list[str]:
     """Split text into overlapping word-windows of ~chunk_size words."""
-    words = text.split() # on whitespace, get list of words
+    words = text.split() # on whitespace, get list of words: arr of str
     chunks: list[str] = [] # empty list of type str
     start = 0
     while start < len(words):
         end = start + chunk_size
-        chunk = " ".join(words[start:end]).strip() # join words into a string, remove leading/trailing whitespace
+        chunk = " ".join(words[start:end]).strip() # single str, words separated by " " 
         if chunk:
             chunks.append(chunk)
         if end >= len(words):
@@ -76,20 +76,27 @@ def tokenize(text: str) -> list[str]:
     return [t for t in text.split() if len(t) > 1]
 
 
-# ── 4. TF-IDF Vectorizer ─────────────────────────────────────────────────────
+# ── 4. TF-IDF Vectorizer (term frequency - inverse document frequency) ─────────────────────────────────────────────────────
 # THEORY: To compare text by *meaning*, turn words into numbers (vectors).
-# TF-IDF is a classic sparse approach:
+# TF-IDF(term frequency - inverse document frequency) is a classic sparse approach:
 #
-#   TF(t, d)  = count(t in chunk d) / total_tokens(d)
+#   TF(t(term), d(doc))  = count(t in chunk d) / total_tokens(d)
 #               ↳ how often does this word appear IN THIS chunk?
 #
+# IDF measures how rare or unique a term is across all documents (or chunks). The more documents contain t, the lower its IDF
 #   IDF(t)    = log( N / (1 + df(t)) ) + 1   ← smoothed variant
-#               where N = total chunks, df(t) = chunks containing term t
-#               ↳ how RARE is this word across ALL chunks?
-#               Common words ("the", "a", "is") → df ≈ N → IDF ≈ 1 → low weight.
+#               where N = number of total chunks, df(t) = chunks containing term t
+#               ↳ how RARE is this word across ALL chunks?;
+#               Common words ("the", "a", "is") → df ≈ N → IDF ≈ 1 → low weight. (N is number of chunks, df is number of chunks containing the term in the document)
 #               Rare domain words ("eigenvalue") → df ≈ 1 → IDF ≈ log(N) → high weight.
+
+#               log(logarithm function). For our purposes, it’s just a way to “squash” big numbers into smaller ones, so rare words get higher scores, but not too high.
+#             1 + df(t): We add 1 to avoid dividing by zero if a word is super rare.
+#             So, IDF(t) = log(N / (1 + df(t))) + 1 means:
+#             If a word appears in almost every document, its IDF is low (not special).
+#             If a word appears in only a few documents, its IDF is high (it’s rare and important).
 #
-#   TF-IDF    = TF × IDF
+#             TF-IDF    = TF × IDF
 #               ↳ high score = word is frequent HERE but rare ELSEWHERE = meaningful signal.
 #
 # Result: a sparse dict {term: float} — the chunk's coordinate in vocabulary-space.
@@ -99,14 +106,15 @@ def tokenize(text: str) -> list[str]:
 # trained on billions of examples so semantically similar text lands near each other.
 
 class TFIDFVectorizer:
-    def __init__(self) -> None:
+    def __init__(self) -> None: # constructor
         self.idf: dict[str, float] = {}
         self.corpus_size: int = 0
 
+    # learns from the whole corpus(dir)
     def fit(self, corpus: list[str]) -> None:
         """Compute IDF weights over the full chunk corpus."""
-        self.corpus_size = len(corpus)
-        df: Counter = Counter()
+        self.corpus_size = len(corpus) # dir
+        df: Counter = Counter() # df=dictionary(hashmap: string → int) 
         for doc in corpus:
             # each term counted once per doc for IDF (not per occurrence)
             for token in set(tokenize(doc)):
@@ -116,12 +124,13 @@ class TFIDFVectorizer:
             for term, freq in df.items()
         }
 
+    # applies what was learned to a single input
     def transform(self, text: str) -> dict[str, float]:
         """Convert a single text to a TF-IDF sparse vector."""
         tokens = tokenize(text)
         if not tokens:
             return {}
-        tf = Counter(tokens)
+        tf = Counter(tokens) # tf = unordered map<string, int>+ counting logic, 
         total = len(tokens)
         return {
             term: (count / total) * self.idf[term]
@@ -189,6 +198,7 @@ class VectorStore:
         self.vectors.append(vector)
         self.metadata.append(meta or {})
 
+#  __ mean it’s a special method that Python recognizes for built-in operations (like len(), str(), iter(), etc.).
     def __len__(self) -> int:
         return len(self.texts)
 
@@ -201,14 +211,14 @@ class VectorStore:
 #   2. Score every stored chunk: similarity(query_vec, chunk_vec).
 #   3. Return the top-k highest-scoring chunks.
 #
-# Choosing K:
-#   Too small (k=1) → may miss complementary information spread across chunks.
-#   Too large (k=20) → LLM context fills with noise; cost/latency rises.
-#   Typical production K: 3-5 for Q&A chat, 10-20 for summarization.
+# Choosing N:
+#   Too small (n=1) → may miss complementary information spread across chunns.
+#   Too large (n=20) → LLM context fills with noise; cost/latency rises.
+#   Typical production n: 3-5 for Q&A chat, 10-20 for summarization.
 #
 # Advanced retrieval:
 #   • Hybrid search: combine dense (neural) + sparse (BM25/TF-IDF) scores.
-#   • Re-ranking: a cross-encoder model re-scores the top-K for precision.
+#   • Re-ranking: a cross-encoder model re-scores the top-n for precision.
 #   • HyDE: generate a hypothetical answer, embed it, retrieve — better recall.
 
 def retrieve(
@@ -219,6 +229,7 @@ def retrieve(
 ) -> list[tuple[float, str, dict]]:
     """Return [(score, text, meta), ...] sorted by descending cosine similarity."""
     query_vec = vectorizer.transform(query)
+    # [] specifically means: give me all results now, in a list.
     scored = [
         (cosine_similarity(query_vec, vec), text, meta)
         for vec, text, meta in zip(store.vectors, store.texts, store.metadata)
