@@ -1,6 +1,6 @@
-<script>
+<script lang="ts">
 	import Settingsicon from '$lib/components/Settingsicon.svelte';
-	export let user = null;
+	export let user: { name?: string | null, email?: string } | null = null;
 </script>
 
 <header>

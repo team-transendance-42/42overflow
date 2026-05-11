@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   export let text = "";
   export let category = "default";
   export let removable = false;

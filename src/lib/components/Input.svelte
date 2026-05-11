@@ -1,4 +1,4 @@
-<script>
+<script lang=ts>
   export let label = "";
   export let type = "text";
   export let placeholder = "";
