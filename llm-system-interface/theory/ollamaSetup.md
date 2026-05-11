@@ -16,14 +16,14 @@ Ollama serves its local API automatically when running. The API base URL is http
 Open a second terminal after that.
 
 Step 4 — download a model
-ollama pull gemma3
+ollama pull gemma4
 
 ollama pull is the official command for downloading a model.
 
-You can replace gemma3 with another model name later.
+You can replace gemma4 with another model name later.
 
 Step 5 — run it interactively
-ollama run gemma3
+ollama run gemma4
 
 That is the documented pattern.
 
@@ -35,12 +35,12 @@ ollama ls
 Official CLI command.
 
 Step 7 — stop a loaded model
-ollama stop gemma3
+ollama stop gemma4
 
 Official CLI command.
 
 Step 8 — remove a model
-ollama rm gemma3
+ollama rm gemma4
 
 Official CLI command.
 =============================
@@ -48,7 +48,7 @@ Official CLI command.
 call Ollama from curl
 Simple generate request
 curl http://localhost:11434/api/generate -d '{
-  "model": "gemma3",
+  "model": "gemma4",
   "prompt": "Explain pointers like I am a beginner."
 }'
 
@@ -56,7 +56,7 @@ This follows Ollama’s documented local API pattern.
 
 Chat request
 curl http://localhost:11434/api/chat -d '{
-  "model": "gemma3",
+  "model": "gemma4",
   "messages": [
     { "role": "user", "content": "Explain epoll simply." }
   ]
@@ -99,7 +99,7 @@ type ChatResponse struct {
 
 func main() {
 	reqBody := ChatRequest{
-		Model: "gemma3",
+		Model: "gemma4",
 		Messages: []ChatMessage{
 			{Role: "user", Content: "Explain goroutines simply."},
 		},
@@ -155,7 +155,7 @@ Example:
 
 Modelfile
 
-FROM gemma3
+FROM gemma4
 SYSTEM """You are a careful programming tutor. 
 Explain simply, step by step, with short examples."""
 PARAMETER temperature 0.2

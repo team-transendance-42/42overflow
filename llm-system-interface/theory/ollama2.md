@@ -24,7 +24,7 @@ Ollama’s docs show:
 
 install on Linux with curl -fsSL https://ollama.com/install.sh | sh
 start with ollama serve
-run models with commands like ollama run gemma3
+run models with commands like ollama run gemma4
 pull models with ollama pull ...
 list with ollama ls
 =================

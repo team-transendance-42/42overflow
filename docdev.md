@@ -73,4 +73,7 @@ docker compose up -d --build caddy app
 
 for deleted files:
 git add -A
+==============================
+docker exec 42overflow-ollama-1 ollama list
+// shows the models currently available in the Ollama container
 

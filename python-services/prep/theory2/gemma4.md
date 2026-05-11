@@ -1,0 +1,1 @@
+gemma4:e4b is available on Ollama right now. The "E4B" stands for Effective 4B — it's a 26B Mixture of Experts model with only 4B active parameters, so it behaves like a 4B model in terms of compute and memory while having the capacity of a much larger one

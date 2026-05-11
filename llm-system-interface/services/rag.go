@@ -68,7 +68,7 @@ func embedModelName() string {
 func chatModelName() string {
 	v := os.Getenv("OLLAMA_MODEL")
 	if strings.TrimSpace(v) == "" {
-		return "gemma3:4b"
+		return "gemma4:e4b" // todo: plan is to upgrade to gemma4 once it's available in the Ollama container
 	}
 	return v
 }

@@ -48,7 +48,7 @@ Model loading (once at startup):
 
 model = WhisperModel("base", device="cpu", compute_type="int8")
 "base" — ~140MB model, good balance of speed/accuracy
-device="cpu" — runs on CPU, not GPU (GPU is reserved for Ollama/gemma3)
+device="cpu" — runs on CPU, not GPU (GPU is reserved for Ollama/gemma4)
 compute_type="int8" — 8-bit quantization: smaller, faster, slight quality loss
 Model stays in RAM after first load — no reload cost per request.
 

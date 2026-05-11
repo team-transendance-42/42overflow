@@ -95,7 +95,6 @@ cos(180°) = -1.0  → opposite          → opposite meaning (rare in practice)
   In 768 Dimensions — Same Idea, Unvisualizable
 You can't draw 768D space, but the math is identical:
 
-
 # 3D: direction = angle in 3D space
 cat_3d = [0.9, 0.1, 0.05]
 dog_3d = [0.8, 0.2, 0.10]
@@ -103,5 +102,5 @@ dog_3d = [0.8, 0.2, 0.10]
 # 768D: direction = angle in 768D space
 cat_768d = [0.031, -0.124, 0.887, 0.003, ...]   # 768 numbers
 dog_768d  = [0.029, -0.118, 0.901, 0.001, ...]   # similar pattern
-The formula (A·B) / (|A|×|B|) computes the same angle, just across 768 terms instead of 2 or 3. The geometry is the same — you just can't draw it.
+The formula (A·B) / (|A|x|B|) computes the same angle, just across 768 terms instead of 2 or 3. The geometry is the same — you just can't draw it.
 

@@ -28,7 +28,7 @@ This folder documents the Go-first RAG flow used by `llm-server`.
 
 - `CHROMA_URL` (default: `http://chromadb:8000`)
 - `OLLAMA_URL` (default: `http://ollama:11434`)
-- `OLLAMA_MODEL` (default: `gemma3:4b`)
+- `OLLAMA_MODEL` (default: `gemma4:4b`)
 - `OLLAMA_EMBED_MODEL` (default: `nomic-embed-text`)
 
 ## Why no Python SDK

@@ -33,10 +33,6 @@ curl http://localhost:11434/api/chat -d '{
 After that, connect your Go backend to http://localhost:11434/api/chat. // default Ollama chat API endpoint
 ===========================
 
-Best default: codellama
-If your machine is weaker: qwen3:4b
-If you want tiny and easy: gemma3:4b or gemma3:1b
-===========================
 Your request to Ollama should go to:
 
 POST http://localhost:11434/api/chat

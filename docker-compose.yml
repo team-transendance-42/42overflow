@@ -68,8 +68,10 @@ services:
 
   chromadb:
     image: chromadb/chroma:0.5.5
-    expose:
-      - "8000"
+    # expose:
+    #   - "8000"
+    ports:
+      - "8000:8000" # this is only for dev: todo: rmv and uncomment expose
     volumes:
       - chroma-data:/chroma/chroma
     restart: unless-stopped
@@ -123,8 +125,10 @@ services:
 
   ollama:
     image: ollama/ollama:0.20.5
-    expose:
-      - "11434"
+    # expose: revert for prod
+    #   - "11434"
+    ports:
+        - "11434:11434" # this is only for dev: todo: rmv and uncomment expose
     volumes:
       - ollama-data:/root/.ollama
     restart: unless-stopped

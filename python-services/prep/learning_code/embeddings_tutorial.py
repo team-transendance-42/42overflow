@@ -620,7 +620,7 @@ def section_10_mini_rag():
     print("\n" + "="*60)
     print("SECTION 10 — Mini RAG From Scratch (No Libraries)")
     print("="*60)
-    print("(Requires Ollama with nomic-embed-text + gemma3:4b)\n")
+    print("(Requires Ollama with nomic-embed-text + gemma whichever model is available)\n")
 
     # --- INGESTION PHASE ---
     documents = [
@@ -682,7 +682,7 @@ def section_10_mini_rag():
         print(f"  {'-'*40}\n")
 
         # Step 4: generate
-        print("  Calling Ollama (gemma3:4b)...")
+        print("  Calling Ollama (gemma4:e4b)...")
         answer = call_ollama_chat(prompt)
         print(f"\n  Answer:\n  {answer}\n")
 

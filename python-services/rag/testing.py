@@ -1,0 +1,59 @@
+"""
+Run: uv run python testing.py
+Tests only what exists so far. Add sections as new modules are built.
+"""
+
+from collections import Counter
+
+VALID_TOPICS = {"c", "python", "networking", "maze", "drone", "agentspit", "rag"}
+VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced"}
+REQUIRED_FIELDS = {"question", "answer", "topic", "difficulty", "tags"}
+
+
+def test_seed():
+    from seed import load_seed
+
+    pairs = load_seed()
+
+    assert len(pairs) == 40, f"Expected 40 pairs, got {len(pairs)}"
+
+    for i, pair in enumerate(pairs):
+        missing = REQUIRED_FIELDS - pair.keys()
+        assert not missing, f"Pair {i} missing fields: {missing}"
+        assert pair["question"].strip(), f"Pair {i} empty question"
+        assert pair["answer"].strip(), f"Pair {i} empty answer"
+        assert pair["topic"] in VALID_TOPICS, f"Pair {i} invalid topic: {pair['topic']}"
+        assert pair["difficulty"] in VALID_DIFFICULTIES, f"Pair {i} invalid difficulty: {pair['difficulty']}"
+        assert isinstance(pair["tags"], list) and pair["tags"], f"Pair {i} tags must be non-empty list"
+
+    dist = Counter(p["topic"] for p in pairs)
+    print(f"✓ seed: {len(pairs)} pairs loaded, all fields valid")
+    print(f"  topic distribution: {dict(sorted(dist.items()))}")
+
+
+def test_merge():
+    from main import _merge
+
+    seed = [
+        {"question": "What is X?", "answer": "seed answer", "topic": "c",
+         "difficulty": "beginner", "tags": ["x"]},
+    ]
+    db = [
+        {"question": "What is X?", "answer": "db answer", "topic": "c",
+         "difficulty": "beginner", "tags": ["x"]},          # same question → DB wins
+        {"question": "What is Y?", "answer": "db only", "topic": "python",
+         "difficulty": "intermediate", "tags": ["y"]},      # new from DB
+    ]
+    result = _merge(seed, db)
+
+    assert len(result) == 2, f"Expected 2, got {len(result)}"
+    by_q = {r["question"]: r for r in result}
+    assert by_q["What is X?"]["answer"] == "db answer", "DB should overwrite seed"
+    assert "What is Y?" in by_q, "DB-only pair should be included"
+    print("✓ merge: DB overwrites seed on duplicate question, additives included")
+
+
+if __name__ == "__main__":
+    test_seed()
+    test_merge()
+    print("\nAll tests passed.")

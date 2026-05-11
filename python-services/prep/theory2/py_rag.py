@@ -277,7 +277,7 @@ def build_prompt(question: str, results: list[tuple[float, str, dict]]) -> str:
 # ── 9. Generation (mock) ──────────────────────────────────────────────────────
 # THEORY: The assembled prompt is sent to an LLM which reads the context and
 # generates a grounded, coherent answer. Common options:
-#   Local:  Ollama → POST /api/chat  {"model": "gemma3:4b", "messages": [...]}
+#   Local:  Ollama → POST /api/chat  {"model": "gemma4:4b", "messages": [...]}
 #   Cloud:  OpenAI → POST /v1/chat/completions
 #           Anthropic → POST /v1/messages
 #
