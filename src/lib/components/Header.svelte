@@ -1,5 +1,3 @@
-<!-- src/lib/components/header.svelte -->
-
 <script>
 	import Settingsicon from '$lib/components/Settingsicon.svelte';
 	export let user = null;
@@ -20,6 +18,7 @@
 		<a href="/profile">Profile  </a>
 		<a href="/settings" class="settings-link">
 		<Settingsicon size="15px" />  </a>
+
 		<p> Welcome{user ? `, ${user.name}` : ''} </p>
 
 		

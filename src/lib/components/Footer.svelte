@@ -1,5 +1,3 @@
-<!-- src/lib/components/footer.svelte -->
-
 <footer>
   <p>© 2026 42overflow. All rights reserved.    <a href="/privacy-policy">Privacy Policy.</a>  </p>
   <p> <a href="/terms-conditions">Terms & Conditions </a></p>

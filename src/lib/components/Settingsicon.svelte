@@ -1,13 +1,14 @@
 <script lang="ts">
   export let size: string = '30px'; 
+  export let onClick = () => {};
 </script>
 
 
-<div class="settings-icon" style="width: {size}; height: {size};" on:click={onClick}>
+<button class="settings-icon" style="width: {size}; height: {size};" onclick={onClick} aria-label="Settings">
   <span></span>
   <span></span>
   <span></span>
-</div>
+</button>
 
 <style>
 .settings-icon {
