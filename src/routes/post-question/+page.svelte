@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { goto } from '$app/navigation'; 
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
@@ -96,7 +96,7 @@
     text-align: left;
   }
   .error {
-    color: red;
+    color: var(--color-error-250);
     font-size: 0.875rem;
     margin-bottom: 0.5rem;
   }

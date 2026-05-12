@@ -44,9 +44,6 @@
     <a href="/edit-profile" class="edit-btn">Edit profile</a>
   {/if}
 
-  {#if profile?.quote}
-    <p class="quote">"{profile.quote}"</p>
-  {/if}
 
   {#if profile?.interests}
     <div class="section">

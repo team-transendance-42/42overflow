@@ -41,7 +41,7 @@ export const actions: Actions = {
     await db.user.update({
       where: { id: locals.user.id },
       data: {
-        login: data.get('intraprofile') as string || undefined,
+        //login: data.get('intraprofile') as string || undefined,
         interests: data.get('interests') as string || undefined,
         name: data.get('username') as string || undefined,
       },

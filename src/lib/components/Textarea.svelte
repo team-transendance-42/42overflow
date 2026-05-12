@@ -1,9 +1,10 @@
 <script lang="ts">
   export let label = "";
-  export let placeholder = "";
-  export let value = "";
   export let name = "";
-  export let rows = 4; // default height
+  export let value = "";
+  export let placeholder = "";
+  export let rows = 4; 
+  
 </script>
 
 <div class="textarea-group">

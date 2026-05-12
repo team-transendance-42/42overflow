@@ -8,7 +8,6 @@
   footer {
     background-color: var(--color-primary-dark-300);
     color: var(--color-neutral-900);
-    font-family: var(--font-family-base);
     font-size: var(--font-size-small);
     padding: var(--space-md) var(--space-lg);
     text-align: center;

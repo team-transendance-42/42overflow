@@ -31,19 +31,16 @@
   	align-items: center;         
     background-color: var(--color-primary-400);
     color: var(--color-neutral-900);
-    font-family: var(--font-family-base);
     font-size: var(--font-size-medium);
 	font-weight: bold;
     padding: var(--space-sm) var(--space-lg);
    
   }
 
-
 header .right {
   font-size: 0.85rem; 
   font-weight: normal;
 }
-
 
   .settings-link {
     display: inline-flex;
@@ -54,7 +51,6 @@ header .right {
 	font-weight: bold;
 	
   }
-
 
 
 </style>

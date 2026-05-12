@@ -81,7 +81,7 @@
     text-decoration: underline;}
 
   .following-link {
-  	color: #a5c11a;
+  	color: var(--color-primary-dark-400);
  }
 
   

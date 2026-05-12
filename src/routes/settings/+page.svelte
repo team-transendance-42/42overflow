@@ -11,7 +11,7 @@
 
 
 <div class="settings-page">
-  <h1><strong>SETTINGS<strong/></h1>
+  <h1><strong>SETTINGS</strong></h1>
 
 
   <p> Preferences</p>
