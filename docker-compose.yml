@@ -25,6 +25,11 @@ services:
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/transcendance_db"
     depends_on:
       - postgres
+    command: >
+      sh -c "npm ci --no-audit --prefer-offline &&
+      npx prisma generate &&
+      npx prisma db push &&
+      npm run dev -- --host"
 
 volumes:
   postgres-data:

@@ -17,7 +17,7 @@
       return;
     }
 
-    const res = await fetch('/api/questions', {
+    const res = await fetch('/api/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -27,7 +27,7 @@
     });
 
     if (res.ok) {
-      goto('/questions');
+      goto('/posts');
     } else if (res.status === 401) {
       error = "You must be logged in to post a question.";
     } else {
