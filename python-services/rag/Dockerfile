@@ -16,7 +16,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 COPY pyproject.toml ./
 RUN uv sync --no-dev
 
-COPY main.py ./
+COPY . ./
 
 EXPOSE 8090
 

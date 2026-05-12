@@ -34,4 +34,4 @@ Minimal overhead — 15MB vs venv baggage
 
 Best for your case: Use uv with a pyproject.toml + uv.lock for reproducible deployments across containers.
 ==============================
-uv manages project dependencies and environments, with support for lockfiles, workspaces, and more, similar to rye or poetry:
+uv manages project dependencies and environments, with support for lockfiles, workspaces

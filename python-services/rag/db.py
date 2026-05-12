@@ -4,7 +4,11 @@ Returns an empty list (never crashes) if the DB is unreachable or the table
 doesn't exist yet — the service falls back to seed-only mode gracefully.
 """
 
-import asyncpg
+import asyncpg # async Postgres client library — more modern than psycopg, works well with FastAPI
+"""
+Allows Python code to connect to, query, and interact with a PostgreSQL database using async/await syntax.
+Enables non-blocking database operations, which is important for high-performance web servers and APIs.
+"""
 
 from config import DB_URL
 
@@ -23,14 +27,14 @@ _TABLE_EXISTS_QUERY = """
     )
 """
 
-
+# todo: need to adjust values: what are the real fields and real table name etc
 async def load_db_pairs() -> list[dict]:
     if not DB_URL:
         print("[db] DB_URL not set — skipping DB sync")
         return []
 
     try:
-        conn = await asyncpg.connect(DB_URL)
+        conn = await asyncpg.connect(DB_URL) # asyncpg= async Postgres
     except Exception as exc:
         print(f"[db] could not connect to Postgres: {exc}")
         return []
@@ -44,7 +48,7 @@ async def load_db_pairs() -> list[dict]:
         rows = await conn.fetch(_QUERY)
         pairs = [
             {
-                "id": f"db-{row['id']}",       # prefix avoids collision with seed IDs
+                "id": f"db-{row['id']}",    # prefix avoids collision with seed IDs
                 "question": row["question"],
                 "answer": row["answer"],
                 "topic": row["topic"],

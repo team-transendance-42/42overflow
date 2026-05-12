@@ -68,10 +68,8 @@ services:
 
   chromadb:
     image: chromadb/chroma:0.5.5
-    # expose:
-    #   - "8000"
-    ports:
-      - "8000:8000" # this is only for dev: todo: rmv and uncomment expose
+    expose:
+      - "8000"
     volumes:
       - chroma-data:/chroma/chroma
     restart: unless-stopped
@@ -125,10 +123,8 @@ services:
 
   ollama:
     image: ollama/ollama:0.20.5
-    # expose: revert for prod
-    #   - "11434"
-    ports:
-        - "11434:11434" # this is only for dev: todo: rmv and uncomment expose
+    expose:
+      - "11434"
     volumes:
       - ollama-data:/root/.ollama
     restart: unless-stopped
@@ -170,7 +166,7 @@ volumes:
   postgres-data:
   ollama-data:
   chroma-data:
-  uploads-data:
+  uploads-data: # todo: for now not used, but might be needed for file uploads in RAG
   whisper-model-cache:
 
 networks:

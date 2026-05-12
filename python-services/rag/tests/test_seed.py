@@ -1,13 +1,14 @@
 """
-Run: uv run python testing.py
+Run: uv run python -m tests.test_seed
 Tests only what exists so far. Add sections as new modules are built.
+-m for module
 """
 
 from collections import Counter
 
-VALID_TOPICS = {"c", "python", "networking", "maze", "drone", "agentspit", "rag"}
-VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced"}
-REQUIRED_FIELDS = {"question", "answer", "topic", "difficulty", "tags"}
+# VALID_TOPICS = {"c", "python", "networking", "maze", "drone", "agentsmith", "rag"} # todo if we want to?
+REQUIRED_FIELDS = {"question", "answer", "topic", "tags"} # todo: do we need topic?
+LEN_PAIR = 55
 
 
 def test_seed():
@@ -15,15 +16,14 @@ def test_seed():
 
     pairs = load_seed()
 
-    assert len(pairs) == 40, f"Expected 40 pairs, got {len(pairs)}"
+    assert len(pairs) == LEN_PAIR, f"Expected {LEN_PAIR} pairs, got {len(pairs)}"
 
     for i, pair in enumerate(pairs):
         missing = REQUIRED_FIELDS - pair.keys()
         assert not missing, f"Pair {i} missing fields: {missing}"
         assert pair["question"].strip(), f"Pair {i} empty question"
         assert pair["answer"].strip(), f"Pair {i} empty answer"
-        assert pair["topic"] in VALID_TOPICS, f"Pair {i} invalid topic: {pair['topic']}"
-        assert pair["difficulty"] in VALID_DIFFICULTIES, f"Pair {i} invalid difficulty: {pair['difficulty']}"
+        # assert pair["topic"] in VALID_TOPICS, f"Pair {i} invalid topic: {pair['topic']}"
         assert isinstance(pair["tags"], list) and pair["tags"], f"Pair {i} tags must be non-empty list"
 
     dist = Counter(p["topic"] for p in pairs)

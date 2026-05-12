@@ -59,7 +59,9 @@ docker volume prune -f
 docker network prune -f
 ===================================
 Remove everything (be careful!):
-docker system prune -af
+docker system prune -af --volumes --no-cache
+
+ docker builder prune -af --volumes --no-cache
 ====================================
 
 //shows disk usage broken down by images, containers, volumes, and build cache.

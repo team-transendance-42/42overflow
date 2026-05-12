@@ -1,0 +1,100 @@
+
+  step 1 
+  =======
+  py_rag.py: load_documents (theory2/py_rag.py)
+  Production equivalent: load_seed() + load_db_pairs() + _merge()
+  Where: seed.py, db.py, main.py
+  Notes: Data is structured Q&A pairs, not raw files
+  ======================
+  step 2
+  ======
+  py_rag.py: chunk_text
+  Production equivalent: format_doc(q, a)
+  Where: embedder.py
+  Notes: No chunking needed — each Q&A pair IS already one chunk. "Q:
+    ...\nA: ..." is the chunk.
+==========================
+step 3
+================
+ py_rag.py: tokenize
+Production equivalent: Under the hood
+Where: nomic-embed-text model (dense) + rank_bm25 (sparse, Step 4)
+Notes: The embed model tokenizes internally with subword BPE. BM25 does .lower().split(). You never call this yourself.
+===================================
+step 4
+===================
+py_rag.py: TFIDFVectorizer
+Production equivalent: Under the hood (dense) + BM25 (sparse)
+Where: nomic-embed-text model + bm25_index.py (Step 4)
+Notes: TF-IDF is replaced by two better things: neural embeddings for
+semantic meaning, BM25 for keyword matching.
+==========================
+step 5
+==========================
+py_rag.py: cosine_similarity
+Production equivalent: Under the hood
+Where: ChromaDB (HNSW index)
+Notes: ChromaDB computes this internally during col.query(). You never call it yourself.
+========================
+step 6
+========================
+py_rag.py: VectorStore
+Production equivalent: ChromaDB
+Where: store.py
+Notes: Persistent, HNSW-indexed, survives restarts. store.py is the
+  wrapper.
+==========================
+step 7
+=========================
+py_rag.py: retrieve
+Production equivalent: hybrid_search()
+Where: retriever.py (Step 5)
+Notes: Dense (ChromaDB) + sparse (BM25) combined with RRF — much better than cosine-only.
+===================
+step 8
+===============
+py_rag.py: build_prompt
+Production equivalent: prompt assembly
+Where: generator.py (Step 6)
+Notes: Same concept, same structure
+===================
+step 9
+==============
+py_rag.py: generate
+Production equivalent: ask_ollama()
+Where: generator.py (Step 6)
+Notes: Real HTTP call to Ollama /api/chat
+=========================
+step 10
+===================
+py_rag.py: build_index
+Production equivalent: _sync_to_chroma() + BM25 build
+Where: main.py 
+====================
+step 11
+=====================
+py_rag.py: ask
+Production equivalent: /rag/ask endpoint
+Where: router.py (Step 7)
+Notes: Orchestrates retriever + generator. The FastAPI route is the entry point.
+=====================
+load_documents, chunk_text, VectorStore,
+build_index
+
+Done under the hood by the embed model (nomic-embed-text): tokenize,
+TFIDFVectorizer (dense half), cosine_similarity
+
+todo: retrieve → Step 4 (BM25) + Step 5 (retriever.py), then
+build_prompt + generate → Step 6 (generator.py), then ask → Step 7
+(router.py)
+
+
+
+
+
+
+
+
+
+
+
