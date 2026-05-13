@@ -52,6 +52,18 @@ def test_embed_texts_missing_embeddings_key():
             asyncio.run(embed_texts(["hello"]))
 
 
+def test_embed_texts_timeout():
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post.side_effect = httpx.TimeoutException("Request timed out")
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(RuntimeError, match="Ollama timed out"):
+            asyncio.run(embed_texts(["hello"]))
+
+
 def test_helpers():
     assert format_doc("What is X?", "X is Y.") == "Q: What is X?\nA: X is Y."
 
