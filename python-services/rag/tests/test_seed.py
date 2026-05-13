@@ -4,7 +4,10 @@ Tests only what exists so far. Add sections as new modules are built.
 -m for module
 """
 
+import json
+import pytest
 from collections import Counter
+from unittest.mock import patch
 
 # VALID_TOPICS = {"c", "python", "networking", "maze", "drone", "agentsmith", "rag"} # todo if we want to?
 REQUIRED_FIELDS = {"question", "answer", "topic", "tags"} # todo: do we need topic?
@@ -51,6 +54,22 @@ def test_merge():
     assert by_q["What is X?"]["answer"] == "db answer", "DB should overwrite seed"
     assert "What is Y?" in by_q, "DB-only pair should be included"
     print("✓ merge: DB overwrites seed on duplicate question, additives included")
+
+
+def test_load_seed_missing_file():
+    with patch("seed._SEED_FILE") as mock_path:
+        mock_path.read_text.side_effect = FileNotFoundError("seed.json not found")
+        with pytest.raises(RuntimeError, match="Seed file not found"):
+            from seed import load_seed
+            load_seed()
+
+
+def test_load_seed_bad_json():
+    with patch("seed._SEED_FILE") as mock_path:
+        mock_path.read_text.return_value = "not valid json {"
+        with pytest.raises(RuntimeError, match="Seed file contains invalid JSON"):
+            from seed import load_seed
+            load_seed()
 
 
 if __name__ == "__main__":
