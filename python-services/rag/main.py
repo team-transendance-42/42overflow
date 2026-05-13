@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi    import FastAPI
 
+from bm25_index import BM25Index
 from db         import load_db_pairs
 from embedder   import embed_texts, format_doc, make_doc_hash, make_doc_id
 from seed       import load_seed
@@ -26,7 +27,7 @@ from store      import ensure_collection, get_existing_hashes, upsert
 # Use distributed caching (e.g., Redis) if you need fast access to frequently used data.
 # Keep your in-memory cache in sync with DB updates, or use the DB directly for retrieval.
 # Add monitoring, logging, and error handling for robustness.
-qa_cache: dict = {"qa_pairs": []}
+qa_cache: dict = {"qa_pairs": [], "bm25": None}
 
 
 def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
@@ -108,7 +109,16 @@ async def lifespan(app: FastAPI): # will run when the app starts and stops.
     except RuntimeError as exc:
         print(f"[startup] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
 
-    # Step 4 (BM25 index) will be added here
+    # Step 4: build BM25 index in RAM from the same texts embedded into ChromaDB.
+    # We compute text/id fresh here — cheap string ops, no I/O — so Step 4
+    # works correctly even if Step 3 failed (ChromaDB unreachable).
+    bm25 = BM25Index()
+    bm25.build(
+        documents=[format_doc(p["question"], p["answer"]) for p in qa_cache["qa_pairs"]],
+        ids=[make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]],
+    )
+    qa_cache["bm25"] = bm25
+    print(f"[startup] step 4 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
 
     yield # app runs and answers questions for users.
 

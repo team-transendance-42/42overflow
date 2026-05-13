@@ -1,4 +1,11 @@
+  - Step 1: seed loads 55 QA pairs
+  - Step 2: DB merge (no DB pairs, stays 55)
+  - Step 3: ChromaDB already has all 55 — skips embedding (smart sync
+  working)
+  - Step 4: BM25Plus index built in RAM over all 55 docs — available at
+  query time via qa_cache["bm25"]
 
+============================
   step 1 
   =======
   py_rag.py: load_documents (theory2/py_rag.py)

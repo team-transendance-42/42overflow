@@ -74,3 +74,51 @@ def upsert(
         col.upsert(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
     except Exception as exc:
         raise _chroma_error("upsert", exc) from exc
+
+
+def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
+    """Fetch documents, embeddings, and metadatas for the given IDs from ChromaDB."""
+    try:
+        col = _client().get_or_create_collection(name)
+        return col.get(ids=ids, include=["embeddings", "documents", "metadatas"])
+    except Exception as exc:
+        raise _chroma_error("retrieve", exc) from exc
+
+
+# performs a vector similarity search in a ChromaDB collection(table)
+# Takes an embedding (a list of floats representing a vector), a number n, and a collection name.
+# Connects to ChromaDB and retrieves the specified collection.Uses ChromaDB’s HNSW index to find the n most similar vectors (nearest neighbors) to the given embedding in the collection.
+# Returns a list of dictionaries, each containing the id, document, and distance (similarity score) for each neighbor, sorted by similarity (most similar first).
+def query_dense(
+    embedding: list[float],
+    n: int = 20,
+    name: str = _DEFAULT_COLLECTION,
+) -> list[dict]:
+    """
+    Find the n nearest neighbours to embedding in the collection.
+
+    Uses ChromaDB's HNSW index under the hood — approximate nearest
+    neighbour search (O(log n)) rather than brute-force (O(n)).
+    Distance metric is L2 by default for ChromaDB collections; lower
+    distance = more similar.
+
+    Returns: [{"id": ..., "document": ..., "distance": ...}, ...]
+    sorted by ascending distance (most similar first).
+    """
+    try:
+        col = _client().get_or_create_collection(name)
+        result = col.query(
+            query_embeddings=[embedding],
+            n_results=min(n, col.count()),  # guard: can't request more than collection size
+            include=["documents", "distances"],
+        )
+    except Exception as exc:
+        raise _chroma_error("query_dense", exc) from exc
+
+    ids        = result["ids"][0]
+    documents  = result["documents"][0]
+    distances  = result["distances"][0]
+    return [
+        {"id": id_, "document": doc, "distance": dist}
+        for id_, doc, dist in zip(ids, documents, distances)
+    ]
