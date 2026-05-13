@@ -130,13 +130,5 @@ async function handleUpdate() {
   display: flex;
 }
 
-.remove-btn input {
-  display: none;
-}
-
-.file-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
 
 </style>
