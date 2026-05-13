@@ -3,7 +3,7 @@
   import Input from '$lib/components/Input.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import { authClient } from '$lib/auth-client';
-
+  import { invalidateAll } from '$app/navigation';
   export let data;
 
   let firstname = data.user?.first_name ?? '';

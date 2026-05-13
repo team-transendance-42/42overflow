@@ -21,7 +21,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 
     return {
         user: {
-            id: locals.user.id
+            id: locals.user.id,
+			name: locals.user.name,
         },
         userRole: dbUser?.role ?? null
     };
