@@ -3,7 +3,53 @@ Run: uv run python test_embedder.py
 Requires: Ollama running (docker compose up -d)
 """
 import asyncio
+import pytest
+import httpx
+from unittest.mock import AsyncMock, patch, MagicMock
 from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
+
+
+def test_embed_texts_ollama_unreachable():
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post.side_effect = httpx.ConnectError("Connection refused")
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(RuntimeError, match="Could not reach Ollama"):
+            asyncio.run(embed_texts(["hello"]))
+
+
+def test_embed_texts_http_error():
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "500", request=MagicMock(), response=MagicMock(status_code=500)
+        )
+        mock_client.post.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(RuntimeError, match="Ollama returned HTTP error"):
+            asyncio.run(embed_texts(["hello"]))
+
+
+def test_embed_texts_missing_embeddings_key():
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"unexpected_key": []}
+        mock_client.post.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(RuntimeError, match="Ollama response missing 'embeddings'"):
+            asyncio.run(embed_texts(["hello"]))
 
 
 def test_helpers():
