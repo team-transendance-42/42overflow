@@ -1,6 +1,5 @@
 """
 Run: uv run python -m tests.test_seed
-Tests only what exists so far. Add sections as new modules are built.
 -m for module
 """
 

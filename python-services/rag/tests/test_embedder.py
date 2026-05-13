@@ -1,5 +1,6 @@
 """
-Run: uv run python test_embedder.py
+Run: docker exec -it 42overflow-ollama-1 /bin/bash
+uv run python -m tests.test_embedder
 Requires: Ollama running (docker compose up -d)
 """
 import asyncio
@@ -78,7 +79,7 @@ def test_helpers():
 
 
 def test_embed_texts():
-    result = asyncio.run(embed_texts(["hello world", "free the pointer"]))
+    result = asyncio.run(embed_texts(["hello world", "free the pointer"])) #  asyncio is used to execute code written with async def and await, from regular (non-async) code.
 
     assert isinstance(result, list), "result must be a list"
     assert len(result) == 2, f"expected 2 vectors, got {len(result)}"

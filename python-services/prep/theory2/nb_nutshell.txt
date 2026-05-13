@@ -16,10 +16,10 @@
 ==========================
 step 3
 ================
- py_rag.py: tokenize
+py_rag.py: tokenize
 Production equivalent: Under the hood
 Where: nomic-embed-text model (dense) + rank_bm25 (sparse, Step 4)
-Notes: The embed model tokenizes internally with subword BPE. BM25 does .lower().split(). You never call this yourself.
+Notes: The embed model tokenizes internally with subword BPE. BM25 does .lower().split()
 ===================================
 step 4
 ===================

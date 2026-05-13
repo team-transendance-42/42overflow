@@ -47,12 +47,9 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
 
         data = response.json()
         try:
-            return data["embeddings"]
-        except KeyError:
+            return data["embeddings"] 
+        except KeyError: 
             raise RuntimeError(
                 f"Ollama response missing 'embeddings' key. Got keys: {list(data.keys())}"
             ) from None
-        # example:
-        #   { "embeddings": [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
-        #     "other_info": "something"
-        #   }
+        

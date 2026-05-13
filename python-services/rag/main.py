@@ -1,32 +1,57 @@
 from contextlib import asynccontextmanager
+from fastapi    import FastAPI
 
-from fastapi import FastAPI
+from db         import load_db_pairs
+from embedder   import embed_texts, format_doc, make_doc_hash, make_doc_id
+from seed       import load_seed
+from store      import ensure_collection, get_existing_hashes, upsert
 
-from db import load_db_pairs
-from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
-from seed import load_seed
-from store import ensure_collection, get_existing_hashes, upsert
+# qa_cache shared across requests — populated at startup
+# solid and practical approach for small to medium-scale RAG (Retrieval-Augmented Generation) systems, especially for prototyping or internal tools:
+# Strengths:
+# Fast in-memory access to QA pairs for quick retrieval.
+# Persistent vector storage in ChromaDB for scalable similarity search.
+# Clear separation: text data in memory, vectors in a vector DB.
+# Easy to extend and debug.
 
-# State shared across requests — populated at startup
-state: dict = {"qa_pairs": []}
+# Limitations for large-scale/production:
+# In-memory cache (qa_cache["qa_pairs"]) may not scale for millions of documents or distributed systems.
+# No real-time sync between memory and DB if data changes after startup.
+# No advanced retrieval (e.g., hybrid search, filtering, sharding).
+# Lacks user/session management, security, and distributed cache.
+# Best practices for production RAG:
+
+# Use a scalable vector DB (like ChromaDB, Pinecone, Weaviate, etc.) as the single source of truth.
+# Implement efficient retrieval pipelines (possibly with hybrid search: vectors + metadata filters).
+# Use distributed caching (e.g., Redis) if you need fast access to frequently used data.
+# Keep your in-memory cache in sync with DB updates, or use the DB directly for retrieval.
+# Add monitoring, logging, and error handling for robustness.
+qa_cache: dict = {"qa_pairs": []}
 
 
 def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
     """Seed is the baseline. DB pairs are additive; DB wins on duplicate questions."""
-    merged: dict[str, dict] = {key["question"]: key for key in seed_pairs} # merged = { q: {question, answer, ...} } for all seed pairs
+    try:
+        merged: dict[str, dict] = {p["question"]: p for p in seed_pairs}
+    except KeyError as exc:
+        raise ValueError(f"Seed pair missing 'question' field: {exc}") from exc
 
     for p in db_pairs:
-        merged[p["question"]] = p  # DB overwrites seed if same question
+        try:
+            merged[p["question"]] = p
+        except KeyError as exc:
+            raise ValueError(f"DB pair missing 'question' field: {exc}") from exc
     return list(merged.values())
 
 
 async def _sync_to_chroma(pairs: list[dict]) -> None:
+    ''' Syncs the given question-answer pairs to ChromaDB. generates unique IDs and hashes for each pair and checks which pairs are new or changed compared to existing entries in ChromaDB. Only new or changed pairs are embedded and upserted to ChromaDB, optimizing performance by avoiding unnecessary operations on unchanged data.'''
     for p in pairs:
         p["_id"]   = make_doc_id(p["question"])
         p["_hash"] = make_doc_hash(p["question"], p["answer"])
         p["_text"] = format_doc(p["question"], p["answer"])
 
-    ensure_collection()
+    ensure_collection() # has try/catch for connection issues, will raise RuntimeError if ChromaDB is unreachable
     existing = get_existing_hashes([p["_id"] for p in pairs])
 
     to_update = [
@@ -60,25 +85,10 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
 
 """
 @asynccontextmanager
---------------------------------
-• Tdecorator from contextlib for writing async context managers.
+• decorator from contextlib for writing async context managers.
 • Lets you manage setup and cleanup logic for resources (e.g., DB connections, caches) asynchronously.
 • Code before 'yield' runs at startup (setup), code after 'yield' runs at shutdown (cleanup).
 • Used by FastAPI for lifespan events (app startup/shutdown).
-
-@asynccontextmanager
-This is a special label that tells Python, “The next function will help set things up and clean up when the app starts and stops.”
-Example:
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app):
-    # Setup code here
-    yield
-    # Cleanup code here
-
-app = FastAPI(lifespan=lifespan)
---------------------------------
 """
 @asynccontextmanager
 async def lifespan(app: FastAPI): # will run when the app starts and stops.
@@ -88,23 +98,26 @@ async def lifespan(app: FastAPI): # will run when the app starts and stops.
 
     # Step 2: try DB, merge
     db_pairs = await load_db_pairs()
-    state["qa_pairs"] = _merge(seed_pairs, db_pairs)
-    print(f"[startup] step 2 — {len(state['qa_pairs'])} pairs total after merge")
+    qa_cache["qa_pairs"] = _merge(seed_pairs, db_pairs)
+    print(f"[startup] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
 
-    # Step 3: smart sync to ChromaDB
-    await _sync_to_chroma(state["qa_pairs"])
-    print("[startup] step 3 — ChromaDB sync complete")
+    # Step 3: ChromaDB + Ollama sync is optional at startup
+    try:
+        await _sync_to_chroma(qa_cache["qa_pairs"])
+        print("[startup] step 3 — ChromaDB sync complete")
+    except RuntimeError as exc:
+        print(f"[startup] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
 
     # Step 4 (BM25 index) will be added here
 
     yield # app runs and answers questions for users.
 
-    state["qa_pairs"] = [] # when app shutdown, clear the state to free memory:needed if used not in a docker container, but in a serverless environment like AWS Lambda where the same instance may be reused for multiple requests. Clearing the state on shutdown helps prevent data leakage between requests and ensures that each request starts with a clean slate.
+    qa_cache["qa_pairs"] = [] # when app shutdown, clear the qa_cache to free memory:needed if used not in a docker container, but in a serverless environment like AWS Lambda where the same instance may be reused for multiple requests. Clearing the qa_cache on shutdown helps prevent data leakage between requests and ensures that each request starts with a clean slate.
 
-
+# docker compose logs -f python-rag
 app = FastAPI(lifespan=lifespan) #  use the lifespan func for start and shuttdown the app.
 
 
 @app.get("/healthz")
 def healthz():
-    return {"status": "ok", "qa_count": len(state["qa_pairs"])}
+    return {"status": "ok", "qa_count": len(qa_cache["qa_pairs"])}

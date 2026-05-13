@@ -4,6 +4,9 @@ Run:  docker exec -it 42overflow-python-rag-1 bash // enter container
 Requires: ChromaDB running (docker compose up -d)
 Uses collection 'qa_pairs_test' — safe to run anytime.
 """
+import pytest
+from unittest.mock import patch, MagicMock
+
 from store import ensure_collection, get_existing_hashes, upsert
 
 _TEST = "qa_pairs_test"
@@ -44,6 +47,38 @@ def test_upsert_overwrites_on_second_run():
     hashes = get_existing_hashes(["id-1"], name=_TEST)
     assert hashes["id-1"] == "hash-updated", "second upsert must overwrite hash"
     print("✓ upsert overwrites: hash updated correctly on re-upsert")
+
+
+def test_ensure_collection_chroma_down():
+    with patch("store._client") as mock_client_fn:
+        mock_client_fn.return_value.get_or_create_collection.side_effect = Exception(
+            "Connection refused"
+        )
+        with pytest.raises(RuntimeError, match="Could not connect to ChromaDB"):
+            ensure_collection()
+
+
+def test_get_existing_hashes_chroma_down():
+    with patch("store._client") as mock_client_fn:
+        mock_client_fn.return_value.get_or_create_collection.side_effect = Exception(
+            "Connection refused"
+        )
+        with pytest.raises(RuntimeError, match="Could not connect to ChromaDB"):
+            get_existing_hashes(["id-1"])
+
+
+def test_upsert_chroma_down():
+    with patch("store._client") as mock_client_fn:
+        mock_client_fn.return_value.get_or_create_collection.side_effect = Exception(
+            "Connection refused"
+        )
+        with pytest.raises(RuntimeError, match="Could not connect to ChromaDB"):
+            upsert(
+                ids=["id-1"],
+                documents=["doc"],
+                embeddings=[[0.1, 0.2]],
+                metadatas=[{"doc_hash": "h"}],
+            )
 
 
 if __name__ == "__main__":
