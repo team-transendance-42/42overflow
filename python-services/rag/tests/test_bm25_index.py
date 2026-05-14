@@ -1,5 +1,5 @@
 """
-Run: uv run python test_bm25_index.py
+Run: uv run python -m tests.test_bm25_index
 No services required — BM25 is pure in-memory math.
 
 Note: BM25 scores are raw floats, not normalized to [0, 1].

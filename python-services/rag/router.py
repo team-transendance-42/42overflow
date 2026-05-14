@@ -13,8 +13,7 @@ class AskRequest(BaseModel):
 
 
 class AskResponse(BaseModel):
-    answer:   str
-    contexts: list[dict]  # [{"id", "text", "rrf_score"}, ...]
+    answer: str
 
 
 class RetrieveResponse(BaseModel):
@@ -68,4 +67,4 @@ async def ask(body: AskRequest, request: Request) -> AskResponse:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"LLM unavailable: {exc}")
 
-    return AskResponse(answer=answer, contexts=contexts)
+    return AskResponse(answer=answer)

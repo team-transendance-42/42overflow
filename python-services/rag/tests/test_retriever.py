@@ -1,5 +1,6 @@
 """
-Run: uv run python test_retriever.py
+Run:  docker exec -it 42overflow-python-rag-1 bash // enter container
+      uv run python -m tests.test_retriever
 Requires: Ollama + ChromaDB running (docker compose up -d).
 Uses the production 'qa_pairs' collection — must be synced first.
 
@@ -9,13 +10,15 @@ These are integration tests: they verify the full retrieval pipeline
 import asyncio
 
 from bm25_index import BM25Index
-from embedder   import embed_texts, format_doc, make_doc_id
+from embedder   import format_doc, make_doc_id
 from retriever  import hybrid_search
 from seed       import load_seed
 
 
 def _build_test_fixtures():
-    """Build BM25 index and id_to_text from seed — same as startup does."""
+    """
+    Build BM25 index and id_to_text from seed — same as startup does.
+    This ensures our tests run against the same data and BM25 state as the real retriever."""
     pairs = load_seed()
     id_to_text = {
         make_doc_id(p["question"]): format_doc(p["question"], p["answer"])

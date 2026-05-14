@@ -62,6 +62,11 @@ class BM25Index:
         """
         if self._bm25 is None:
             return []
-        scores = self._bm25.get_scores(_tokenize(query))
+        scores = self._bm25.get_scores(_tokenize(query)) # a list of floats, one score per document, in the same order as the input documents
+        #  sorted(takes iterable like list, tuple, str, dict, rage, set, bytes, etc) asc, sorted(numbers, reverse=True) in desc
+        # enumerate(creates pairs(index, score) for each doc)
+        # numbers = [10, 20, 30]
+        # for idx, val in enumerate(numbers):
+        #     print(idx, val)
         top_n = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:n]
         return [{"id": self._ids[i], "score": float(s)} for i, s in top_n if s > 0]

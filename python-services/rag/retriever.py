@@ -7,13 +7,14 @@ Why two retrievers?
     exact words. Weak on exact tokens like ft_printf, %d, NULL.
   Sparse (BM25+): catches exact keyword matches — ft_printf, NULL, errno
     score high when those tokens appear verbatim. Blind to synonyms.
-  RRF merge: combines both ranked lists by position, not score magnitude,
+  RRF(reciprocal rank fusion) merge: combines both ranked lists by position, not score magnitude,
     so the incompatible numeric ranges don't matter.
 
 This module is stateless — takes all inputs as parameters, returns results.
 The caller (router.py) injects the BM25 index and id_to_text lookup.
 """
-from collections import defaultdict
+from collections import defaultdict # automatically creates a default value for any missing key, using provided func. d = defaultdict(int)
+# d['a'] += 1  # No KeyError, 'a' is created with value 0, then incremented to 1  print(d['a'])  # 1
 
 from bm25_index import BM25Index
 from embedder   import embed_texts
@@ -22,12 +23,7 @@ from store      import query_dense
 _RRF_K = 60  # standard constant — dampens rank-1 dominance
 
 
-async def hybrid_search(
-    question: str,
-    bm25_index: BM25Index,
-    id_to_text: dict[str, str],
-    top_k: int = 5,
-) -> list[dict]:
+async def hybrid_search( question: str, bm25_index: BM25Index, id_to_text: dict[str, str], top_k: int = 5, ) -> list[dict]:
     """
     Run dense + sparse retrieval and merge results with RRF.
 
@@ -54,7 +50,7 @@ async def hybrid_search(
     #    rank 0 (best) → 1/(0+60) = 0.0167
     #    rank 19 (worst in top-20) → 1/(19+60) = 0.0127
     #    A doc ranked top-5 in both lists beats a doc ranked #1 in one list only.
-    rrf_scores: dict[str, float] = defaultdict(float)
+    rrf_scores: dict[str, float] = defaultdict(float) # default value of 0.0 for any new key
 
     for rank, hit in enumerate(dense_hits):
         rrf_scores[hit["id"]] += 1.0 / (rank + _RRF_K)
@@ -70,7 +66,7 @@ async def hybrid_search(
     #    that appear in dense results but aren't in the current seed.
     chroma_text: dict[str, str] = {hit["id"]: hit["document"] for hit in dense_hits}
 
-    top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k]
+    top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k] # sorts by key by default, but we want to sort by value (the RRF score), so we use rrf_scores.__getitem__ as the key function, which retrieves the score for each id. reverse=True for descending order. Then we take the top_k ids.
     return [
         {
             "id":        id_,

@@ -14,9 +14,3 @@ type TextRequest struct {
 	Model    string    `json:"model,omitempty"`
 	Stream   bool      `json:"stream,omitempty"`
 }
-
-// todo: not implemented yet
-//type ImageRequest struct {
-//	Prompt string `json:"prompt"`
-//	Size   string `json:"size,omitempty"`
-//}

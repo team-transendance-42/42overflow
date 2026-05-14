@@ -2,12 +2,17 @@
 Run:  docker exec -it 42overflow-python-rag-1 bash // enter container
       uv run python -m tests.test_store
 Requires: ChromaDB running (docker compose up -d)
-Uses collection 'qa_pairs_test' — safe to run anytime.
+Uses collection 'qa_pairs_test' for write tests — safe to run anytime.
+test_query_dense also requires Ollama running and 'qa_pairs' synced.
 """
+import asyncio
+
 import pytest
 from unittest.mock import patch, MagicMock
 
-from store import ensure_collection, get_existing_hashes, upsert
+from embedder import embed_texts, format_doc, make_doc_id
+from seed     import load_seed
+from store    import ensure_collection, get_existing_hashes, query_dense, upsert
 
 _TEST = "qa_pairs_test"
 
@@ -81,8 +86,70 @@ def test_upsert_chroma_down():
             )
 
 
+def test_query_dense():
+    """
+    Sanity-check query_dense using data already in ChromaDB.
+
+    Strategy: use col.get(limit=1) to pull one stored doc + its embedding
+    directly from ChromaDB, then pass that embedding to query_dense.
+    The same doc MUST come back as top-1 — a vector is always its own
+    nearest neighbour.
+
+    No Ollama, no seed loading. Pure ChromaDB round-trip.
+    Requires: 'qa_pairs' synced (docker compose up -d).
+    """
+    import chromadb
+    from urllib.parse import urlparse
+    from config import CHROMA_URL
+
+    # grab one stored doc directly via ChromaDB's built-in collection API
+    parsed = urlparse(CHROMA_URL)
+    col    = chromadb.HttpClient(host=parsed.hostname, port=parsed.port) \
+                     .get_or_create_collection("qa_pairs")
+
+    raw = col.get(limit=1, include=["embeddings", "documents"])
+    assert raw["ids"], "qa_pairs collection is empty — run docker compose up -d first"
+
+    doc_id    = raw["ids"][0]
+    embedding = raw["embeddings"][0]
+    document  = raw["documents"][0]
+
+    print("\n── query_dense input ───────────────────────────────────")
+    print(f"  doc_id    : {doc_id}")
+    print(f"  document  : {document[:80]!r}{'...' if len(document) > 80 else ''}")
+    print(f"  embedding : [{embedding[0]:.4f}, {embedding[1]:.4f}, ...]  dim={len(embedding)}")
+
+    # ── CALL ─────────────────────────────────────────────────────────
+    results = query_dense(embedding, n=5)
+
+    # ── OUTPUT ───────────────────────────────────────────────────────
+    print("\n── query_dense output (top 5) ──────────────────────────")
+    for i, r in enumerate(results):
+        marker = "  ← expected" if r["id"] == doc_id else ""
+        print(f"  [{i+1}] distance={r['distance']:.6f}  id={r['id'][:16]}...{marker}")
+        print(f"       {r['document'][:70]!r}{'...' if len(r['document']) > 70 else ''}")
+
+    # ── COMPARISON ───────────────────────────────────────────────────
+    top_id = results[0]["id"]
+    match  = top_id == doc_id
+    print("\n── comparison ──────────────────────────────────────────")
+    print(f"  expected top-1 id : {doc_id}")
+    print(f"  got      top-1 id : {top_id}")
+    print(f"  top-1 distance    : {results[0]['distance']:.6f}  (0.0 = exact match)")
+    print(f"  result            : {'✓ match' if match else '✗ mismatch'}")
+
+    assert len(results) > 0, "query_dense returned no results"
+    assert match, (
+        f"A doc's own embedding must return itself as top-1.\n"
+        f"  expected: {doc_id}\n  got: {top_id}"
+    )
+    print("\n✓ query_dense: correct doc returned as top-1")
+
+
 if __name__ == "__main__":
     test_upsert_and_retrieve()
     test_get_hashes_only_returns_existing()
     test_upsert_overwrites_on_second_run()
+    print()
+    test_query_dense()
     print("\nAll store tests passed.")

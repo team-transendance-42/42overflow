@@ -1,20 +1,30 @@
 from   urllib.parse import urlparse
 import chromadb
+from chromadb.config import Settings
 from   config import CHROMA_URL
 
 '''
 ChromaDB is a special database designed for storing and searching vectors (embeddings), handles high-dimensional data. The functs here are focused on managing a collection of question-answer pairs, where each pair is represented as a document with an associated embedding and metadata.
+each collection(table) stores fields:
+id: str — unique identifier for the document
+document: str — the main text/content
+embedding: list[float] — the vector representation of the document
+metadatas: dict — extra info (e.g., doc_hash, tags, etc.)
 '''
 
 _DEFAULT_COLLECTION = "qa_pairs"
 
-# create a client connection to ChromaDB using the provided URL. 
+
 """
 Create a client connection to ChromaDB using the provided URL from config.
 """
 def _client() -> chromadb.HttpClient:
     parsed = urlparse(CHROMA_URL)
-    return chromadb.HttpClient(host=parsed.hostname, port=parsed.port)
+    return chromadb.HttpClient(
+        host=parsed.hostname,
+        port=parsed.port,
+        settings=Settings(anonymized_telemetry=False),
+    )
 
 
 def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
@@ -44,7 +54,7 @@ Used to check if documents are up to date.
 def get_existing_hashes(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict[str, str]:
     try:
         col = _client().get_or_create_collection(name)
-        result = col.get(ids=ids, include=["metadatas"])
+        result = col.get(ids=ids, include=["metadatas"]) # include=["field"] returns the id and feild specified
     except Exception as exc:
         raise _chroma_error("get_existing_hashes", exc) from exc
 
@@ -55,12 +65,9 @@ def get_existing_hashes(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict
     }
 
 
-# Insert or update documents in the ChromaDB collection. (upsert)
-# This func stores the document text, its embedding, and metadata for each document in the specified collection. Useful for keeping the vector database in sync with the latest data.
-# wrapper for build in upsert func of chromadb
 """
 Insert or update (upsert) documents, embeddings, and metadata in the ChromaDB collection.
-Keeps the vector database in sync with the latest data.
+Keeps the vector database in sync with the latest data. Wrapper of ChromaDB's upsert method with error handling.
 """
 def upsert(
     ids: list[str],
@@ -87,7 +94,7 @@ def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
 
 # performs a vector similarity search in a ChromaDB collection(table)
 # Takes an embedding (a list of floats representing a vector), a number n, and a collection name.
-# Connects to ChromaDB and retrieves the specified collection.Uses ChromaDB’s HNSW index to find the n most similar vectors (nearest neighbors) to the given embedding in the collection.
+# Connects to ChromaDB and retrieves the specified collection. Uses ChromaDB’s HNSW index to find the n most similar vectors (nearest neighbors) to the given embedding in the collection.
 # Returns a list of dictionaries, each containing the id, document, and distance (similarity score) for each neighbor, sorted by similarity (most similar first).
 def query_dense(
     embedding: list[float],
@@ -95,11 +102,11 @@ def query_dense(
     name: str = _DEFAULT_COLLECTION,
 ) -> list[dict]:
     """
-    Find the n nearest neighbours to embedding in the collection.
+    Find the n nearest neighbours to embedding in the collection. (neighbour = most similar vectors (chunks) to the query embedding, based on a distance metric.)
 
     Uses ChromaDB's HNSW index under the hood — approximate nearest
     neighbour search (O(log n)) rather than brute-force (O(n)).
-    Distance metric is L2 by default for ChromaDB collections; lower
+    Distance metric is L2(Euclidean) by default for ChromaDB collections; lower
     distance = more similar.
 
     Returns: [{"id": ..., "document": ..., "distance": ...}, ...]
@@ -108,7 +115,7 @@ def query_dense(
     try:
         col = _client().get_or_create_collection(name)
         result = col.query(
-            query_embeddings=[embedding],
+            query_embeddings=[embedding], # input vector (embedding) to ChromaDB, which computes automatically distances to all stored vectors and returns the n closest matches, sorted by similarity.
             n_results=min(n, col.count()),  # guard: can't request more than collection size
             include=["documents", "distances"],
         )

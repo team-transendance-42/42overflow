@@ -93,20 +93,20 @@ func doOllamaRequest(ctx context.Context, ollamaURL, model string, req models.Te
 /*
 defer: no matter what happens (early return, error, normal exit) the body always gets closed and no resources are leaked
 */
-func readOllamaToChannel(resp *http.Response, ch chan string) {
+func readOllamaToChannel(ctx context.Context, resp *http.Response, ch chan string) {
 	defer close(ch)
-	defer resp.Body.Close() // close the ioReader
+	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
 	for {
 		var r OllamaResponse
 		if err := decoder.Decode(&r); err != nil {
-			if err != io.EOF {
-				log.Printf("Ollama decode error: %v", err) // %v = format verb(prints the value in its natural representation)
+			if err != io.EOF && ctx.Err() == nil {
+				log.Printf("Ollama decode error: %v", err)
 			}
 			break
 		}
 		if r.Message.Content != "" {
-			ch <- r.Message.Content //Every ch <- r.Message.Content blocks until someone reads from the other end; unbuffered chan
+			ch <- r.Message.Content
 		}
 		if r.Done {
 			break
@@ -127,6 +127,6 @@ func StreamOllama(ctx context.Context, req models.TextRequest) (<-chan string, e
 	}
 
 	ch := make(chan string)
-	go readOllamaToChannel(resp, ch)
+	go readOllamaToChannel(ctx, resp, ch)
 	return ch, nil
 }

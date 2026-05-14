@@ -4,6 +4,7 @@ from fastapi    import FastAPI
 from bm25_index import BM25Index
 from db         import load_db_pairs
 from embedder   import embed_texts, format_doc, make_doc_hash, make_doc_id
+from router     import router as rag_router
 from seed       import load_seed
 from store      import ensure_collection, get_existing_hashes, upsert
 
@@ -120,12 +121,20 @@ async def lifespan(app: FastAPI): # will run when the app starts and stops.
     qa_cache["bm25"] = bm25
     print(f"[startup] step 4 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
 
+    # expose indexes to router via app.state (avoids circular imports)
+    app.state.bm25       = bm25
+    app.state.id_to_text = {
+        make_doc_id(p["question"]): format_doc(p["question"], p["answer"])
+        for p in qa_cache["qa_pairs"]
+    }
+
     yield # app runs and answers questions for users.
 
     qa_cache["qa_pairs"] = [] # when app shutdown, clear the qa_cache to free memory:needed if used not in a docker container, but in a serverless environment like AWS Lambda where the same instance may be reused for multiple requests. Clearing the qa_cache on shutdown helps prevent data leakage between requests and ensures that each request starts with a clean slate.
 
 # docker compose logs -f python-rag
-app = FastAPI(lifespan=lifespan) #  use the lifespan func for start and shuttdown the app.
+app = FastAPI(lifespan=lifespan)
+app.include_router(rag_router)
 
 
 @app.get("/healthz")
