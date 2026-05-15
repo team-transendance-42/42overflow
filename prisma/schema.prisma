@@ -13,6 +13,12 @@ enum Role {
   ADMIN
 }
 
+enum SubjectRole {
+  MEMBER
+  CURATOR
+  OWNER
+}
+
 // ─── better-auth required tables ─────────────────────────────────────────────
 
 model User {
@@ -36,10 +42,11 @@ model User {
   updatedAt    DateTime  @updatedAt
   role         Role      @default(USER)
 
-  followers Follow[]  @relation("Follower")
-  following Follow[]  @relation("Following")
-  posts     Post[]
-  comments  Comment[]
+  followers   Follow[]  @relation("Follower")
+  following   Follow[]  @relation("Following")
+  memberships SubjectMember[]
+  posts       Post[]
+  comments    Comment[]
 
   sessions Session[]
   accounts Account[]
@@ -103,14 +110,16 @@ model Post {
   title   String
   content String
 
-  userId String
+  userId    String
+  subjectId Int
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
-  user     User      @relation(fields: [userId], references: [id])
-  comments Comment[]
+  user      User      @relation(fields: [userId], references: [id])
+  subject   Subject   @relation(fields: [subjectId], references: [id])
+  comments  Comment[]
 }
 
 model Comment {
@@ -130,4 +139,30 @@ model Comment {
   user     User      @relation(fields: [userId], references: [id])
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
+}
+
+model Subject {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  memberships SubjectMember[]
+  posts       Post[]
+}
+
+model SubjectMember {
+  id        Int         @id @default(autoincrement())
+  userId    String
+  subjectId Int
+  role      SubjectRole @default(MEMBER)
+  joined_at DateTime    @default(now())
+
+  user      User    @relation(fields: [userId], references: [id])
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId])
 }
