@@ -79,7 +79,6 @@
   h1 { margin: 0; }
   .online-text { font-size: 0.8rem; color: var(--color-text-secondary); margin: 0; }
   .counts { display: flex; gap: 1rem; font-size: 0.875rem; color: var(--color-text-secondary); }
-  .quote { font-style: italic; color: var(--color-text-secondary); margin: 1rem 0; }
   .section { margin: 0.75rem 0; }
   .label { font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
   .follow-btn {

@@ -11,5 +11,8 @@
   border-radius: var(--radius-md);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
+  font-family: var(--font-family-base);
 }
 </style>
+
+
