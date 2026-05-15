@@ -9,10 +9,18 @@ from router import router
 
 
 def _make_client(bm25=None):
+    from numpy_index import NumpyIndex
     app = FastAPI()
     app.include_router(router)
-    app.state.bm25 = bm25
-    app.state.id_to_text = {}
+    # Set all five fields the router reads unconditionally.
+    # numpy_index, id_to_topic, centroids were added in the performance
+    # optimisation (Steps 2-4) — unit tests mock hybrid_search so the
+    # index is never actually queried, but the attribute reads still happen.
+    app.state.bm25         = bm25
+    app.state.numpy_index  = NumpyIndex()   # empty index — safe, hybrid_search is mocked
+    app.state.id_to_text   = {}
+    app.state.id_to_topic  = {}
+    app.state.centroids    = {}
     return TestClient(app)
 
 

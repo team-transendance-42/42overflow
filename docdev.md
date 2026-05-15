@@ -78,4 +78,7 @@ git add -A
 ==============================
 docker exec 42overflow-ollama-1 ollama list
 // shows the models currently available in the Ollama container
+==============
 
+if running on a machine with an NVIDIA GPU : 
+ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up

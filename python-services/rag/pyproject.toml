@@ -21,3 +21,4 @@ dev-dependencies = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]   # lets tests import from python-services/rag/ root

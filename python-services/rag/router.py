@@ -29,14 +29,19 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
     Used by the Go streaming Community endpoint.
     503 if BM25 index isn't ready. 502 if embedding service is unreachable.
     """
-    bm25_index = request.app.state.bm25
+    bm25_index  = request.app.state.bm25
+    numpy_index = request.app.state.numpy_index
     id_to_text  = request.app.state.id_to_text
+    id_to_topic = request.app.state.id_to_topic
+    centroids   = request.app.state.centroids
 
     if bm25_index is None:
         raise HTTPException(status_code=503, detail="RAG index not ready — try again shortly")
 
     try:
-        contexts = await hybrid_search(body.question, bm25_index, id_to_text)
+        contexts = await hybrid_search(
+            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -51,14 +56,19 @@ async def ask(body: AskRequest, request: Request) -> AskResponse:
     Returns the answer and the retrieved context docs.
     503 if the BM25 index isn't ready. 502 if Ollama is unreachable.
     """
-    bm25_index = request.app.state.bm25
-    id_to_text = request.app.state.id_to_text
+    bm25_index  = request.app.state.bm25
+    numpy_index = request.app.state.numpy_index
+    id_to_text  = request.app.state.id_to_text
+    id_to_topic = request.app.state.id_to_topic
+    centroids   = request.app.state.centroids
 
     if bm25_index is None:
         raise HTTPException(status_code=503, detail="RAG index not ready — try again shortly")
 
     try:
-        contexts = await hybrid_search(body.question, bm25_index, id_to_text)
+        contexts = await hybrid_search(
+            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 

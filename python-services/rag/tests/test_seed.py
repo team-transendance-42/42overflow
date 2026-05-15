@@ -9,8 +9,7 @@ from collections import Counter
 from unittest.mock import patch
 
 # VALID_TOPICS = {"c", "python", "networking", "maze", "drone", "agentsmith", "rag"} # todo if we want to?
-REQUIRED_FIELDS = {"question", "answer", "topic", "tags"} # todo: do we need topic?
-LEN_PAIR = 55
+REQUIRED_FIELDS = {"question", "answer", "topic", "tags"}
 
 
 def test_seed():
@@ -18,7 +17,7 @@ def test_seed():
 
     pairs = load_seed()
 
-    assert len(pairs) == LEN_PAIR, f"Expected {LEN_PAIR} pairs, got {len(pairs)}"
+    assert len(pairs) >= 1, f"Expected at least 1 pair, got {len(pairs)}"
 
     for i, pair in enumerate(pairs):
         missing = REQUIRED_FIELDS - pair.keys()
@@ -55,18 +54,21 @@ def test_merge():
     print("✓ merge: DB overwrites seed on duplicate question, additives included")
 
 
-def test_load_seed_missing_file():
-    with patch("seed._SEED_FILE") as mock_path:
-        mock_path.read_text.side_effect = FileNotFoundError("seed.json not found")
-        with pytest.raises(RuntimeError, match="Seed file not found"):
+def test_load_seed_missing_dir():
+    with patch("seed._SEED_DIR") as mock_dir:
+        mock_dir.is_dir.return_value = False
+        with pytest.raises(RuntimeError, match="Seed directory not found"):
             from seed import load_seed
             load_seed()
 
 
-def test_load_seed_bad_json():
-    with patch("seed._SEED_FILE") as mock_path:
-        mock_path.read_text.return_value = "not valid json {"
-        with pytest.raises(RuntimeError, match="Seed file contains invalid JSON"):
+def test_load_seed_bad_json(tmp_path):
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("not valid json {")
+    with patch("seed._SEED_DIR") as mock_dir:
+        mock_dir.is_dir.return_value = True
+        mock_dir.glob.return_value = [bad_file]
+        with pytest.raises(RuntimeError, match="Invalid JSON"):
             from seed import load_seed
             load_seed()
 

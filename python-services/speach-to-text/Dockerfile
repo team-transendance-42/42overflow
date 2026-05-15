@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y ffmpeg git curl ca-certificates && rm -
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev
 
 COPY . .

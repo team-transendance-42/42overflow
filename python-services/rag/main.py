@@ -1,12 +1,14 @@
 from contextlib import asynccontextmanager
 from fastapi    import FastAPI
 
-from bm25_index import BM25Index
-from db         import load_db_pairs
-from embedder   import embed_texts, format_doc, make_doc_hash, make_doc_id
-from router     import router as rag_router
-from seed       import load_seed
-from store      import ensure_collection, get_existing_hashes, upsert
+from bm25_index  import BM25Index
+from db          import load_db_pairs
+from detector    import build_topic_centroids
+from embedder    import embed_texts, format_doc, make_doc_hash, make_doc_id
+from numpy_index import NumpyIndex
+from router      import router as rag_router
+from seed        import load_seed
+from store       import ensure_collection, get_existing_hashes, upsert
 
 # qa_cache shared across requests — populated at startup
 # solid and practical approach for small to medium-scale RAG (Retrieval-Augmented Generation) systems, especially for prototyping or internal tools:
@@ -35,14 +37,14 @@ def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
     """Seed is the baseline. DB pairs are additive; DB wins on duplicate questions."""
     try:
         merged: dict[str, dict] = {p["question"]: p for p in seed_pairs}
-    except KeyError as exc:
-        raise ValueError(f"Seed pair missing 'question' field: {exc}") from exc
+    except KeyError as ex:
+        raise ValueError(f"Seed pair missing 'question' field: {ex}") from ex
 
     for p in db_pairs:
         try:
             merged[p["question"]] = p
-        except KeyError as exc:
-            raise ValueError(f"DB pair missing 'question' field: {exc}") from exc
+        except KeyError as ex:
+            raise ValueError(f"DB pair missing 'question' field: {ex}") from ex
     return list(merged.values())
 
 
@@ -51,7 +53,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
     for p in pairs:
         p["_id"]   = make_doc_id(p["question"])
         p["_hash"] = make_doc_hash(p["question"], p["answer"])
-        p["_text"] = format_doc(p["question"], p["answer"])
+        p["_text"] = format_doc(p["question"], p["answer"], p.get("tags", []))
 
     ensure_collection() # has try/catch for connection issues, will raise RuntimeError if ChromaDB is unreachable
     existing = get_existing_hashes([p["_id"] for p in pairs])
@@ -76,7 +78,6 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
         metadatas=[
             {
                 "topic":      p.get("topic", ""),
-                "difficulty": p.get("difficulty", ""),
                 "doc_hash":   p["_hash"],
             }
             for p in to_update
@@ -110,23 +111,56 @@ async def lifespan(app: FastAPI): # will run when the app starts and stops.
     except RuntimeError as exc:
         print(f"[startup] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
 
-    # Step 4: build BM25 index in RAM from the same texts embedded into ChromaDB.
-    # We compute text/id fresh here — cheap string ops, no I/O — so Step 4
-    # works correctly even if Step 3 failed (ChromaDB unreachable).
+    # Step 4: embed all pairs → compute topic centroids → build BM25.
+    # We embed the full corpus here (not just changed docs) so centroids
+    # represent all topics correctly even when ChromaDB skipped some docs.
+    all_texts  = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in qa_cache["qa_pairs"]]
+    all_ids    = [make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]]
+    all_topics = [p.get("topic", "unknown") for p in qa_cache["qa_pairs"]]
+
+    # Initialise before try so NumpyIndex build below always has a defined variable.
+    # Edge case: if embed_texts raises, all_embeddings stays [] → NumpyIndex skipped,
+    # BM25 still works, dense search returns [] (degraded but not crashed).
+    all_embeddings: list[list[float]] = []
+    try:
+        all_embeddings  = await embed_texts(all_texts)
+        topic_centroids = build_topic_centroids(qa_cache["qa_pairs"], all_embeddings)
+        print(f"[startup] step 4 — topic centroids built: {sorted(topic_centroids.keys())}")
+    except Exception as exc:
+        print(f"[startup] WARNING: centroid computation failed — topic detection disabled: {exc}")
+        topic_centroids = {}
+
     bm25 = BM25Index()
-    bm25.build(
-        documents=[format_doc(p["question"], p["answer"]) for p in qa_cache["qa_pairs"]],
-        ids=[make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]],
-    )
+    bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
     qa_cache["bm25"] = bm25
-    print(f"[startup] step 4 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
+    print(f"[startup] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
+
+    # Build NumpyIndex from the embeddings computed above.
+    # Why: replaces ChromaDB HTTP roundtrip (~50–150ms) with an in-process
+    # matrix-vector multiply (~0.05ms). Embeddings are already in memory from
+    # the centroid computation step — no extra embed call needed.
+    # Edge case: if centroid computation failed, all_embeddings is empty → fall
+    # back to a zero matrix. dense search returns [] but BM25 still works.
+    numpy_idx = NumpyIndex()
+    if all_embeddings:
+        numpy_idx.build(
+            ids       = all_ids,
+            embeddings= all_embeddings,
+            topics    = all_topics,
+            documents = all_texts,
+        )
+        print(f"[startup] step 6 — NumpyIndex built ({len(all_ids)} docs)")
+    else:
+        print("[startup] step 6 — WARNING: NumpyIndex skipped (no embeddings)")
+
+    id_to_topic = dict(zip(all_ids, all_topics))
 
     # expose indexes to router via app.state (avoids circular imports)
-    app.state.bm25       = bm25
-    app.state.id_to_text = {
-        make_doc_id(p["question"]): format_doc(p["question"], p["answer"])
-        for p in qa_cache["qa_pairs"]
-    }
+    app.state.bm25         = bm25
+    app.state.numpy_index  = numpy_idx
+    app.state.id_to_text   = dict(zip(all_ids, all_texts))
+    app.state.centroids    = topic_centroids
+    app.state.id_to_topic  = id_to_topic
 
     yield # app runs and answers questions for users.
 

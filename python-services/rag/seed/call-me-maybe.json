@@ -1,0 +1,146 @@
+[
+  {
+    "question": "What is function calling in LLMs and what does call-me-maybe ask you to build?",
+    "answer": "Function calling is the ability to translate a natural language prompt into a structured, machine-executable function call with typed arguments. Instead of 'The sum of 40 and 2 is 42', a function-calling system produces {\"name\": \"fn_add_numbers\", \"parameters\": {\"a\": 40.0, \"b\": 2.0}}. Call-me-maybe asks you to build this system using a small 0.6B parameter LLM (Qwen3-0.6B) and constrained decoding — a technique that forces the model to produce 100% valid JSON output by filtering the logits at every generation step. The program reads two input files: function_definitions.json (the available functions with their parameter schemas) and function_calling_tests.json (natural language prompts to translate). For each prompt, the program must output the correct function name and all parameters with the correct types. The core insight the project teaches is that structural guidance via constrained decoding makes small models as reliable as large ones for structured output tasks.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "intro",
+      "function-calling",
+      "constrained-decoding",
+      "overview",
+      "Qwen3"
+    ]
+  },
+  {
+    "question": "What is constrained decoding and why does call-me-maybe require it instead of just prompting the LLM?",
+    "answer": "Constrained decoding intervenes in the LLM's token-by-token generation process by modifying the logits (probability scores over all vocabulary tokens) before each token is selected. Valid tokens at the current JSON state are kept; invalid tokens are masked to negative infinity so they can never be sampled. A 0.6B parameter model prompted naively to produce JSON succeeds only about 30% of the time — it might write prose, use wrong brackets, or mistype keys. With constrained decoding, the structural validity rate is 100% because the model is physically incapable of generating an invalid token. The subject explicitly forbids using external libraries like DSPy, outlines, or transformers — you must implement the state machine and logits masking yourself using only the provided llm_sdk. This teaches how structured generation actually works under the hood rather than relying on a black-box library.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "constrained-decoding",
+      "logits-masking",
+      "JSON",
+      "reliability",
+      "state-machine"
+    ]
+  },
+  {
+    "question": "How does the LLM generation pipeline work in call-me-maybe from prompt to final JSON output?",
+    "answer": "The pipeline: (1) Construct a prompt that includes the function definitions and the natural language request. (2) Encode the prompt to input_ids using sdk.encode(prompt). (3) Call sdk.get_logits_from_input_ids(input_ids) to get probability scores for every vocabulary token as the next token. (4) Determine the current JSON state (e.g., 'expecting opening brace', 'inside function name string', 'after colon expecting value'). (5) For each vocabulary token, simulate appending its string to the current partial JSON and advance the state machine — if any character is invalid at that state, mask that token to -inf. (6) Sample or argmax from the filtered logits to select the next token. (7) Append that token to input_ids and the partial JSON string. (8) Repeat steps 3–7 until the JSON is complete (closing brace reached). This token-by-token loop is the inner loop of constrained decoding and runs once per generated token — typically 10–50 iterations for a simple function call.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "generation-pipeline",
+      "token-by-token",
+      "logits",
+      "encode",
+      "LLM-SDK"
+    ]
+  },
+  {
+    "question": "What JSON states must your state machine cover for the call-me-maybe output schema?",
+    "answer": "The output schema is {\"name\": \"<function_name>\", \"parameters\": {\"<key>\": <value>, ...}}. The state machine must cover: START → expecting '{'; AFTER_OPEN_BRACE → expecting '\"name\"' key; AFTER_NAME_KEY → expecting ':'; AFTER_NAME_COLON → inside the function name string (only valid function names from the definition file); AFTER_NAME_VALUE → expecting ','; AFTER_COMMA_1 → expecting '\"parameters\"' key; AFTER_PARAMS_KEY → expecting ':'; AFTER_PARAMS_COLON → expecting '{'; INSIDE_PARAMS → expecting a parameter key string or '}'; AFTER_PARAM_KEY → expecting ':'; AFTER_PARAM_COLON → inside a parameter value (type determined by schema: string/number/boolean); AFTER_PARAM_VALUE → expecting ',' or '}' (closing parameters); AFTER_PARAMS_CLOSE → expecting '}' (closing outer object); DONE. Each state constrains which tokens are valid — the function name state must restrict to only tokens that are prefixes of actual function names in the definition file.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "JSON-state-machine",
+      "states",
+      "transitions",
+      "schema",
+      "output-format"
+    ]
+  },
+  {
+    "question": "How do you use the vocabulary JSON file to implement token-level constraints in call-me-maybe?",
+    "answer": "The vocabulary JSON maps token IDs to their string representations (e.g., {\"42\": \" the\", \"1337\": \"{\", ...}). Load it once at startup: vocab = json.load(open(sdk.get_path_to_vocabulary_json())). At each generation step, iterate over all token IDs in the vocabulary. For each token, look up its string in the vocab dict. Simulate appending that string character by character to the current partial JSON and advancing the state machine. If every character produces a valid transition AND the final state is valid (or a valid prefix of a valid continuation), allow the token; otherwise mask it to -inf in the logits tensor. Key implementation detail: a token is valid if the partial JSON + token string is a valid PREFIX of some complete valid JSON — not just if the token's characters are individually parseable. Example: the token '42' is valid when building a number value, but invalid if the schema says that parameter must be a string.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "vocabulary-json",
+      "token-mapping",
+      "prefix-matching",
+      "logits",
+      "masking"
+    ]
+  },
+  {
+    "question": "How do multi-character tokens like '\": \"' break a naive state machine and how must you handle them?",
+    "answer": "Tokenizers use subword tokenization (BPE), meaning a single token can represent multiple characters that span JSON structural boundaries. The token '\": \"' advances the JSON state machine from 'inside key string' → 'end quote' → 'colon' → 'space before value' in one step. A naive implementation that only checks the FIRST character of each token will wrongly accept tokens whose first character is valid but whose subsequent characters are invalid, or reject tokens whose first character is part of a valid multi-character sequence. The correct approach: for each candidate token, apply its entire string character by character to the state machine, tracking the state after each character. Only accept the token if every character produces a valid transition — if any character causes an invalid state, mask the entire token to -inf. This character-by-character simulation must be efficient because it runs for every token in the vocabulary at every generation step (vocab size is typically 32k–151k tokens).",
+    "topic": "call-me-maybe",
+    "tags": [
+      "multi-character-token",
+      "BPE",
+      "state-machine",
+      "tokenizer",
+      "subword"
+    ]
+  },
+  {
+    "question": "How do you constrain number-type parameters in call-me-maybe and what is the float vs int pitfall?",
+    "answer": "When the state machine enters a number value state, valid tokens are those that form valid JSON number prefixes: digits 0-9, leading '-', a single '.', and 'e'/'E' for scientific notation. The constraint must be applied progressively: after emitting '-', only digits are valid; after emitting a digit, more digits, '.', 'e', '}', or ',' are valid depending on context. The float vs int pitfall: JSON numbers like '265' are valid integers, but the subject's example output shows {\"a\": 2.0} — suggesting the moulinette checks float equality in Python. To be safe, serialize all number parameters as floats: when building the output JSON, cast the parsed value to float() before json.dumps. This ensures '265' becomes '265.0'. Students who emit raw integer tokens pass the JSON validity check but may fail the type-equality check if the moulinette does isinstance(value, float).",
+    "topic": "call-me-maybe",
+    "tags": [
+      "number-type",
+      "float-vs-int",
+      "JSON-numbers",
+      "moulinette",
+      "type-coercion"
+    ]
+  },
+  {
+    "question": "How do you constrain string-type parameters and handle the empty string edge case?",
+    "answer": "When entering a string value state, the first valid tokens are the opening double-quote. Once inside the string, any printable character token is valid, PLUS the closing double-quote (which transitions to AFTER_PARAM_VALUE state). The empty string edge case: immediately after the opening quote, the closing quote must be a valid token — this represents {\"name\": \"\"}. Students who model 'inside string' as requiring at least one character before the closing quote will hang or error when the model correctly tries to close an empty string. Test with prompts like 'Greet nobody' or 'Reverse an empty string' — both require an empty string parameter value. Also handle escape sequences: tokens containing backslash-n, backslash-t, or backslash-u require the state machine to track string-escape context so backslash tokens inside strings don't accidentally look like JSON structure.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "string-type",
+      "empty-string",
+      "escape-sequences",
+      "state-machine",
+      "edge-case"
+    ]
+  },
+  {
+    "question": "How must call-me-maybe handle missing or malformed input files without crashing?",
+    "answer": "The subject says the program must never crash. Wrap all file operations in try-except blocks that catch both OSError (file not found, permission denied) and json.JSONDecodeError (invalid JSON content). For function_definitions.json missing: print a clear error to stderr ('Error: functions definition file not found: data/input/functions_definition.json') and exit with sys.exit(1). For function_calling_tests.json missing: same pattern. For invalid JSON in either file: report which file failed and the line number from the JSONDecodeError exception. The most commonly missed case: catching json.JSONDecodeError but forgetting open() itself raises OSError before json.loads() is ever called. Pattern: try: with open(path) as f: data = json.load(f) except (OSError, json.JSONDecodeError) as e: print(f'Error reading {path}: {e}', file=sys.stderr); sys.exit(1). Also handle the case where the file contains valid JSON but not the expected schema (missing 'name', 'parameters' keys) with a clear validation error.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "error-handling",
+      "missing-file",
+      "JSON-decode",
+      "graceful-exit",
+      "OSError"
+    ]
+  },
+  {
+    "question": "How does the LLM choose which function to call in call-me-maybe when multiple functions are defined?",
+    "answer": "The function selection happens when the state machine is in the 'inside function name string' state. At this point, only tokens that are valid prefixes of actual function names are allowed — this is a closed-set classification problem. Load all function names from function_definitions.json at startup, build a prefix trie or simple prefix-check dict. During generation in the name-string state, only allow tokens whose string, when appended to the current partial name, is a prefix of at least one valid function name. The LLM's probability distribution over these filtered tokens reflects its semantic understanding of which function matches the prompt. The closing quote is only valid when the current partial name is EXACTLY one of the defined function names. If the prompt is ambiguous (two similar descriptions), the model picks based on its pre-training — the subject forbids heuristics, so you must rely on the model's distribution. The function to call is chosen by the model's highest-probability valid token sequence, not by string matching.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "function-selection",
+      "closed-set",
+      "prefix-trie",
+      "LLM-probability",
+      "name-constraint"
+    ]
+  },
+  {
+    "question": "What are the performance requirements for call-me-maybe and what commonly fails them?",
+    "answer": "Requirements: 100% valid JSON output (every response parseable), 90%+ correct function selection and argument extraction, and all test prompts processed in under 5 minutes on standard hardware. The most common performance failures: (1) Vocabulary iteration is O(vocab_size) per generated token — with 151k tokens and 30 generated tokens per prompt, that is 4.5M state machine iterations per prompt. Without optimization (caching valid token sets per state, using numpy masks), this can take minutes per prompt. Optimize: precompute which tokens are valid at structural states (opening brace, colon positions) once at startup rather than re-checking every generation step. (2) Loading the model or vocabulary file inside the per-prompt loop — load once at startup. (3) Calling sdk.encode() on the full growing sequence each step instead of maintaining an incremental input_ids list.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "performance",
+      "optimization",
+      "token-iteration",
+      "vocabulary",
+      "latency"
+    ]
+  },
+  {
+    "question": "How does constrained decoding handle boolean parameter types in call-me-maybe?",
+    "answer": "Boolean parameters in JSON must be the literal tokens 'true' or 'false' (lowercase, no quotes). The state machine enters BOOL_VALUE state after the colon in a parameter where schema type is 'boolean'. In this state, only tokens that are valid prefixes of 'true' or 'false' are allowed. Since tokenizers may split 'true' into multiple tokens ('tr' + 'ue' or 't' + 'rue'), the constraint works progressively: after 't', only tokens starting with 'r' are valid (part of 'true'); after 'f', only 'a' (part of 'false'). After the complete word 'true' or 'false', the next valid tokens are ',' (another parameter follows) or '}' (closing parameters object). Do NOT allow 'True' or 'False' (Python capitalization) — these are invalid JSON and the moulinette's json.loads() will reject them. Test your boolean constrained decoding with prompts like 'Is 5 greater than 3?' that should map to {\"result\": true}.",
+    "topic": "call-me-maybe",
+    "tags": [
+      "boolean-type",
+      "constrained-decoding",
+      "true-false",
+      "JSON",
+      "state-machine"
+    ]
+  }
+]

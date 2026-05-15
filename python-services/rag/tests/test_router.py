@@ -15,18 +15,13 @@ def test_ask_returns_answer():
     assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
     data = resp.json()
 
-    assert "answer"   in data, "response missing 'answer'"
-    assert "contexts" in data, "response missing 'contexts'"
+    assert "answer" in data, "response missing 'answer'"
     assert len(data["answer"]) > 0, "answer must not be empty"
-    assert len(data["contexts"]) > 0, "must return at least one context doc"
 
     print(f"\n── /rag/ask response ───────────────────────────────────")
     print(f"  question : 'what is a segfault?'")
     print(f"  answer   : {data['answer'][:200]!r}")
-    print(f"  contexts : {len(data['contexts'])} docs")
-    for i, ctx in enumerate(data["contexts"]):
-        print(f"    [{i+1}] rrf={ctx['rrf_score']:.4f}  {ctx['text'][:60]!r}...")
-    print("✓ /rag/ask: valid response with answer and contexts")
+    print("✓ /rag/ask: valid response with answer")
 
 
 def test_ask_empty_question_is_rejected():

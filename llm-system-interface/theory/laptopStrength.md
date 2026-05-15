@@ -1,4 +1,4 @@
- lscpu | egrep 'Model name|Socket|Core|Thread|MHz'
+docker volume rm 42overflow_chroma-data lscpu | egrep 'Model name|Socket|Core|Thread|MHz'
 Model name:                           12th Gen Intel(R) Core(TM) i7-1280P
 Thread(s) per core:                   2
 Core(s) per socket:                   10

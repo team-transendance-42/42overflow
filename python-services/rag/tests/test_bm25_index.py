@@ -77,10 +77,67 @@ def test_results_ordered_by_score():
     print(f"✓ ordering: results sorted by score desc — top: {results[0]['id']} ({results[0]['score']:.3f})")
 
 
+def test_topic_filter_returns_only_matching_topic():
+    idx = BM25Index()
+    docs = [
+        "Q: What is EDF?\nA: Earliest Deadline First scheduling.",
+        "Q: What is a drone?\nA: Autonomous flying vehicle.",
+        "Q: What is BM25?\nA: A ranking function for text retrieval.",
+    ]
+    ids    = ["edf-1", "drone-1", "bm25-1"]
+    topics = ["codexion", "fly-in", "rag-against-machine"]
+    idx.build(docs, ids, topics=topics)
+
+    results = idx.search("scheduling deadline", n=10, topic_filter="codexion")
+    assert len(results) >= 1, "expected at least one codexion result"
+    for r in results:
+        idx_pos = ids.index(r["id"])
+        assert topics[idx_pos] == "codexion", f"got non-codexion result: {r['id']}"
+    print(f"✓ topic filter: only codexion docs returned: {[r['id'] for r in results]}")
+
+
+def test_topic_filter_none_returns_all():
+    idx = BM25Index()
+    docs   = ["Q: What is malloc?\nA: Allocates heap memory.", "Q: What is deadlock?\nA: Circular wait condition."]
+    ids    = ["malloc-1", "deadlock-1"]
+    topics = ["topic-a", "topic-b"]
+    idx.build(docs, ids, topics=topics)
+
+    results = idx.search("memory allocation deadlock", n=10, topic_filter=None)
+    result_ids = {r["id"] for r in results}
+    assert "malloc-1" in result_ids or "deadlock-1" in result_ids
+    print("✓ topic_filter=None: full corpus searched")
+
+
+def test_topic_filter_no_match_returns_empty():
+    idx = BM25Index()
+    idx.build(
+        ["Q: What is EDF?\nA: Scheduling."],
+        ["edf-1"],
+        topics=["codexion"],
+    )
+    results = idx.search("EDF scheduling", n=10, topic_filter="fly-in")
+    assert results == [], f"expected [] when topic has no docs, got {results}"
+    print("✓ topic filter with no matching docs → []")
+
+
+def test_build_without_topics_still_works():
+    """Backward compat: build() without topics param still works."""
+    idx = BM25Index()
+    idx.build(["Q: What is malloc?\nA: Allocates heap memory."], ["malloc-1"])
+    results = idx.search("malloc heap", n=5)
+    assert len(results) == 1
+    print("✓ backward compat: build() without topics param works fine")
+
+
 if __name__ == "__main__":
     test_keyword_scoring()
     test_exact_token_match()
     test_no_match_returns_empty()
     test_unbuilt_index_search_is_safe()
     test_results_ordered_by_score()
+    test_topic_filter_returns_only_matching_topic()
+    test_topic_filter_none_returns_all()
+    test_topic_filter_no_match_returns_empty()
+    test_build_without_topics_still_works()
     print("\nAll BM25 tests passed.")

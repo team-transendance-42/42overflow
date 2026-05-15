@@ -35,6 +35,39 @@ func chatModelName() string {
 	return v
 }
 
+// extractAnswer pulls the "A: ..." portion from "Q: ...\nA: ..." formatted text.
+//
+// Theory: docs are formatted by Python's embedder.format_doc() as
+//   "Q: {question}\nA: {answer}"  or  "Q: ...\nA: ...\ntags: ..."
+// The Q: line helped retrieve the doc but is redundant in the prompt — dropping
+// it saves ~40-60% of context tokens, directly speeding up per-token generation.
+//
+// Falls back to full text if the separator is missing (malformed/legacy docs).
+// Strips the "\ntags: ..." suffix which was added for embedding quality only.
+//
+// Edge cases:
+//   - No "\nA: " → return full text (safe fallback, no crash)
+//   - Empty answer after split → return full text
+//   - Tags suffix → stripped before return
+func extractAnswer(text string) string {
+	const sep = "\nA: "
+	idx := strings.Index(text, sep)
+	if idx == -1 {
+		return text // unknown format — safe fallback
+	}
+	answer := text[idx+len(sep):]
+
+	// Strip tags suffix added for embedding signal, not for LLM consumption.
+	if tagIdx := strings.Index(answer, "\ntags: "); tagIdx != -1 {
+		answer = answer[:tagIdx]
+	}
+	answer = strings.TrimSpace(answer)
+	if answer == "" {
+		return text // empty answer → fallback to full text
+	}
+	return answer
+}
+
 // doJSON sends a JSON request and decodes the response into out (nil to discard).
 func doJSON(ctx context.Context, method, url string, in any, out any) error {
 	b, err := json.Marshal(in)
@@ -66,26 +99,77 @@ func doJSON(ctx context.Context, method, url string, in any, out any) error {
 	return nil
 }
 
+// doJSONWithRetry is like doJSON but retries on network errors and transient
+// HTTP failures using withRetry.
+//
+// Why not reuse doJSON: http.Request.Body is an io.Reader — once read it is
+// exhausted and cannot be replayed. Each retry must construct a fresh request
+// with a new bytes.NewReader over the same marshalled bytes.
+//
+// Theory — why retries fix "connection refused" after python-rag restart:
+//   Go's http.DefaultTransport keeps idle TCP connections in a pool.
+//   After python-rag restarts it gets a new Docker-internal IP. The pooled
+//   connection to the old IP gets a RST and fails immediately. withRetry
+//   catches the network error, waits 1s, and creates a new TCP connection.
+//   Docker's embedded DNS resolver returns the new container IP on the fresh
+//   DNS lookup, so the retry succeeds.
+//
+// Edge cases:
+//   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
+//     a clean error ("community posts not available"). User can retry manually.
+//   - ctx cancelled: withRetry propagates ctx.Done() immediately.
+func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) error {
+	b, err := json.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := withRetry(ctx, func() (*http.Response, error) {
+		// Fresh reader on every attempt — bytes.NewReader is rewindable
+		// because we hold the full slice, not a stream.
+		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(b))
+		if err != nil {
+			return nil, fmt.Errorf("build request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		return http.DefaultClient.Do(req)
+	})
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("http %d from %s", resp.StatusCode, url)
+	}
+	if out == nil {
+		return nil
+	}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("unmarshal response: %w", err)
+	}
+	return nil
+}
+
 // StreamRagAnswer retrieves community contexts from the Python RAG service,
 // builds a grounded prompt, and streams Gemma's answer token by token.
-// Returns: token channel, plain-text context strings (for sources panel), confidence score, error.
-func StreamRagAnswer(ctx context.Context, question string) (<-chan string, []string, float64, error) {
+func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error) {
 	question = strings.TrimSpace(question)
 	if question == "" {
-		return nil, nil, 0, fmt.Errorf("question is required")
+		return nil, fmt.Errorf("question is required")
 	}
 
 	var retrieved models.RagRetrieveResponse
-	if err := doJSON(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
+	if err := doJSONWithRetry(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
 		map[string]any{"question": question}, &retrieved); err != nil {
-		return nil, nil, 0, fmt.Errorf("retrieve contexts: %w", err)
+		return nil, fmt.Errorf("retrieve contexts: %w", err)
 	}
 
-	texts := make([]string, len(retrieved.Contexts))
+	// Build answer-only context blocks.
+	// extractAnswer strips the "Q: ..." prefix (retrieval metadata, redundant here).
 	blocks := make([]string, len(retrieved.Contexts))
 	for i, c := range retrieved.Contexts {
-		texts[i] = c.Text
-		blocks[i] = fmt.Sprintf("[%d] %s", i+1, c.Text)
+		blocks[i] = fmt.Sprintf("[%d] %s", i+1, extractAnswer(c.Text))
 	}
 
 	ctxStr := "(no context retrieved)"
@@ -109,7 +193,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, []str
 		},
 	})
 	if err != nil {
-		return nil, texts, retrieved.Confidence, fmt.Errorf("marshal ollama request: %w", err)
+		return nil, fmt.Errorf("marshal ollama request: %w", err)
 	}
 
 	resp, err := withRetry(ctx, func() (*http.Response, error) {
@@ -121,10 +205,10 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, []str
 		return http.DefaultClient.Do(req)
 	})
 	if err != nil {
-		return nil, texts, retrieved.Confidence, fmt.Errorf("ollama stream: %w", err)
+		return nil, fmt.Errorf("ollama stream: %w", err)
 	}
 
 	ch := make(chan string)
 	go readOllamaToChannel(ctx, resp, ch)
-	return ch, texts, retrieved.Confidence, nil
+	return ch, nil
 }

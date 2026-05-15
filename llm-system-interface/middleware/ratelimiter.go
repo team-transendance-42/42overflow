@@ -150,6 +150,15 @@ func RateLimiter(next http.Handler) http.Handler {
 			return
 		}
 
+		// Health check probes must never consume rate-limit tokens.
+		// Docker hits /healthz every 10s from 127.0.0.1; the per-student
+		// limit (5/min) would eventually deplete that bucket → 429 →
+		// container marked unhealthy even while serving requests fine.
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// --- global cap: check before per-student to protect Gemini API quota ---todo
 		if !globalLimiter.Allow() {
 			http.Error(w, "Server busy, try again shortly", http.StatusTooManyRequests)

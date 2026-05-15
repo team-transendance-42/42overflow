@@ -1,0 +1,122 @@
+[
+  {
+    "question": "What is Fly-In and what is the core optimization problem it asks you to solve?",
+    "answer": "Fly-In is a 42 school project where you must route a fleet of N drones from a single start hub to an end hub through a graph of connected zones, in the fewest possible simulation turns. It is a multi-agent pathfinding problem with capacity constraints: each zone can hold a limited number of drones simultaneously (max_drones, default 1), each connection can carry a limited number of drones per turn (max_link_capacity, default 1), and some zones take 2 turns to enter (restricted zones). The challenge combines pathfinding (finding good routes per drone) with scheduling (coordinating when each drone moves to avoid capacity conflicts) and deadlock prevention (no turn where all drones are blocked). The project is written in pure Python 3.10+ with full type safety (mypy) and no graph libraries — you implement all graph algorithms from scratch.",
+    "topic": "fly-in",
+    "tags": [
+      "intro",
+      "overview",
+      "multi-agent",
+      "pathfinding",
+      "capacity-constraints"
+    ]
+  },
+  {
+    "question": "What is the Fly-In input file format and what are all zone types and their properties?",
+    "answer": "The input file format: first line is 'nb_drones: N'. Then zone definitions using prefixes: 'start_hub: name x y [metadata]', 'end_hub: name x y [metadata]', 'hub: name x y [metadata]'. Then connections: 'connection: name1-name2 [metadata]'. Zone metadata (all optional, in brackets, any order): zone=<type> (normal/blocked/restricted/priority, default normal), color=<value> (display only), max_drones=<int> (capacity, default 1). Connection metadata: max_link_capacity=<int> (default 1). Zone types: normal = 1 turn to enter (default); blocked = inaccessible, any path through it is invalid; restricted = 2 turns to enter, drone commits to transit and cannot stop mid-way; priority = 1 turn but should be preferred in pathfinding (use as tie-breaker). Comments start with '#'. Zone names cannot contain dashes (because dashes are used as connection separators). Coordinates are for display only — pathfinding uses graph topology only.",
+    "topic": "fly-in",
+    "tags": [
+      "input-format",
+      "zone-types",
+      "connection",
+      "metadata",
+      "parser"
+    ]
+  },
+  {
+    "question": "How does the Fly-In simulation work turn by turn and what is the output format?",
+    "answer": "Each turn, every drone may: move to an adjacent zone (if capacity allows), continue a 2-turn transit toward a restricted zone, or stay in place. All drone movements happen simultaneously — drones moving OUT of a zone free their capacity for that same turn, making room for drones moving IN. The output is one line per turn, space-separated drone movements: 'D1-roof1 D2-corridorA'. Format: D<ID>-<zone_name> for a normal move, or D<ID>-<connection_name> for a drone mid-transit to a restricted zone. Drones that don't move are omitted. Drones that reach the end zone are considered delivered and disappear from output. An empty line (blank turn) is valid when all non-delivered drones choose to wait. The simulation ends when all drones have reached the end zone. The score (lower is better) is the total number of turns.",
+    "topic": "fly-in",
+    "tags": [
+      "simulation",
+      "turn-based",
+      "output-format",
+      "simultaneous-movement",
+      "scoring"
+    ]
+  },
+  {
+    "question": "How do you implement pathfinding in Fly-In without networkx and what data structures are required?",
+    "answer": "Implement Dijkstra's algorithm using a min-heap (heapq in Python). Represent the graph as a dict: {zone_name: [(neighbor_name, travel_cost), ...]}. Travel cost is 1 for normal/priority zones, 2 for restricted zones, infinity for blocked (never include in adjacency list). Dijkstra: heap = [(0, start)]; dist = {start: 0}; while heap: cost, node = heapq.heappop(heap); for neighbor, weight in graph[node]: new_cost = cost + weight; if new_cost < dist.get(neighbor, inf): dist[neighbor] = new_cost; heapq.heappush(heap, (new_cost, neighbor)). For priority zones, add a secondary score (negative priority_count) as a tie-breaker in the heap tuple: (cost, -priority_count, node). This ensures paths through priority zones win when costs are equal. Store the predecessor map to reconstruct paths. Run Dijkstra once per drone at the start, then adjust scheduling based on capacity conflicts.",
+    "topic": "fly-in",
+    "tags": [
+      "Dijkstra",
+      "heapq",
+      "graph-representation",
+      "pathfinding",
+      "no-networkx"
+    ]
+  },
+  {
+    "question": "How does 2-turn restricted zone transit work in Fly-In and what is the capacity reservation requirement?",
+    "answer": "When a drone moves toward a restricted zone, it commits to a 2-turn journey: turn N it enters the connection/transit state, turn N+1 it MUST arrive at the restricted zone. The drone cannot stop mid-transit — it occupies the connection for both turns and cannot be redirected. Critical requirement: before sending a drone into restricted transit, you MUST verify that the destination zone will have available capacity on the arrival turn (turn N+1), not just the current turn. This requires tracking future zone occupancy turn-by-turn (a dict: {turn: {zone: count}}). If no capacity slot is available for the arrival turn, the drone must wait at its current zone instead of starting transit. Students who only check current capacity start sending drones into transit even when the destination will be full on arrival, producing an invalid simulation. The output for a mid-transit drone uses the connection name: D3-corridorA-restrictedzone (the connection identifier).",
+    "topic": "fly-in",
+    "tags": [
+      "restricted-zone",
+      "2-turn-transit",
+      "capacity-reservation",
+      "future-occupancy",
+      "committed-movement"
+    ]
+  },
+  {
+    "question": "How must bidirectional connection capacity be enforced in Fly-In?",
+    "answer": "max_link_capacity applies to total simultaneous traversals in BOTH directions combined on the same connection. If max_link_capacity=1 and drone 1 moves from A to B while drone 2 moves from B to A on the same turn, that counts as 2 traversals — the connection is over capacity and the move is invalid. Track per-connection usage as a simple counter per turn: connection_usage[(turn, frozenset({a, b}))] += 1 for each drone traversal. If incrementing would exceed max_link_capacity, block that drone's movement. Students who track directional usage (A→B and B→A separately) effectively double the stated capacity and produce invalid simulations on maps where the evaluator checks this property. The frozenset({a, b}) normalizes the direction so both crossing and same-direction traversals count against the same limit.",
+    "topic": "fly-in",
+    "tags": [
+      "connection-capacity",
+      "bidirectional",
+      "max_link_capacity",
+      "traversal-counting",
+      "edge-case"
+    ]
+  },
+  {
+    "question": "How do you detect duplicate connections in the Fly-In parser?",
+    "answer": "The input may contain 'connection: a-b' and later 'connection: b-a' — these are the same bidirectional connection and must be flagged as a duplicate parsing error. A naive string equality check ('a-b' == 'b-a') returns False and misses the duplicate. Correct approach: normalize each connection as a sorted or frozenset pair before storing. When parsing 'connection: name1-name2': key = frozenset({name1, name2}); if key in seen_connections: raise ParseError(f'Duplicate connection: {name1}-{name2}'); seen_connections.add(key). Also validate: both zone names must be defined before the connection line (no forward references); the connection must not link a zone to itself; and zone names must not contain dashes (because the parser splits on dash to separate zone names). The moulinette explicitly tests reverse-order duplicates, missing zones, and self-connections.",
+    "topic": "fly-in",
+    "tags": [
+      "parser",
+      "duplicate-connection",
+      "frozenset",
+      "bidirectional",
+      "validation"
+    ]
+  },
+  {
+    "question": "How do you detect and handle the deadlock case in Fly-In where all drones are waiting?",
+    "answer": "If a complete turn passes with zero drone movements AND at least one drone has not reached the end zone, the simulation is deadlocked — no drone will ever move because they are all waiting for each other to free capacity. This can happen on maps where the only path requires two drones to swap positions in a single-capacity corridor with no bypass route. The simulation must detect this after each turn: if movements_this_turn == 0 and drones_remaining > 0: raise SimulationError('Deadlock detected: no drone moved this turn'). Print a clear error message and exit rather than looping forever. An empty turn (blank output line) is only valid when at least some drones chose to wait strategically (e.g., waiting for a restricted zone transit to complete on the next turn). The distinction: strategic waiting is planned by your scheduler; deadlock is unplanned and unresolvable.",
+    "topic": "fly-in",
+    "tags": [
+      "deadlock",
+      "infinite-loop",
+      "detection",
+      "empty-turn",
+      "simulation-error"
+    ]
+  },
+  {
+    "question": "What are the performance benchmarks for Fly-In maps and how do you verify your solution?",
+    "answer": "The subject defines benchmark targets: easy maps (2–4 drones, linear or simple fork) should complete in ≤6–8 turns; medium maps (4–6 drones, dead-end traps or loops) in 10–20 turns; hard maps (8–15 drones, maze structures) in ≤45–60 turns. The challenger map (25 drones) has a reference record of 41 turns. Verify correctness by implementing a simulation validator: replay your output turn by turn, tracking each drone's position and each zone's/connection's occupancy, and assert that no capacity is ever exceeded and that every drone movement is to a connected zone. The moulinette runs this validation automatically — if your output produces a capacity violation at any turn, the entire solution is invalid regardless of the turn count. Additionally, verify that the total number of turns matches the number of output lines.",
+    "topic": "fly-in",
+    "tags": [
+      "benchmarks",
+      "verification",
+      "easy-medium-hard",
+      "challenger-map",
+      "validation"
+    ]
+  },
+  {
+    "question": "How must the Fly-In parser handle zone and connection metadata errors?",
+    "answer": "The parser must report specific errors with line numbers and context. Required error cases: (1) Zone type is not one of {normal, blocked, restricted, priority}: 'Parse error line 7: invalid zone type \"foo\" — must be normal/blocked/restricted/priority'. (2) max_drones or max_link_capacity is not a positive integer: 'Parse error line 9: max_drones must be a positive integer, got \"0\"'. (3) Connection references an undefined zone: 'Parse error line 15: connection \"hub-unknownzone\" references undefined zone \"unknownzone\"'. (4) Zone name contains a dash: 'Parse error line 4: zone name \"zone-one\" cannot contain dashes — dashes are reserved for connection syntax'. (5) First line is not 'nb_drones: N': 'Parse error line 1: expected nb_drones declaration'. (6) More than one start_hub or end_hub. All errors must exit with code 1 and a message readable by a non-expert reviewer. Do not print a Python traceback — catch all parsing exceptions and format them as user-readable errors.",
+    "topic": "fly-in",
+    "tags": [
+      "parser",
+      "error-handling",
+      "line-numbers",
+      "validation",
+      "zone-name-dash"
+    ]
+  }
+]

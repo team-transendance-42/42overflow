@@ -22,6 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    restart: unless-stopped
     expose:
       - "5173"
     environment:
@@ -41,6 +42,7 @@ services:
     build:
       context: ./llm-system-interface
       dockerfile: Dockerfile
+    restart: unless-stopped
     expose:
       - "8081"
     env_file:
@@ -59,8 +61,6 @@ services:
         condition: service_healthy
       ollama-init:
         condition: service_completed_successfully
-      chromadb:
-        condition: service_healthy
       python-rag:
         condition: service_healthy
     networks:
@@ -85,6 +85,7 @@ services:
     build:
       context: ./python-services/rag
       dockerfile: Dockerfile
+    restart: unless-stopped
     expose:
       - "8090"
     env_file:
@@ -99,19 +100,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 180s  # embedding 97 docs on CPU takes ~2min; 180s gives comfortable margin
     networks:
       - app-net
 
   python-stt:
     build:
       context: ./python-services/speach-to-text
+    restart: unless-stopped
     command: ["uv", "run", "python", "main.py"]
     volumes:
-      - ./python-services/speach-to-text:/app
-      - whisper-model-cache:/root/.cache/whisper # <--- Persists the model weights
-    ports:
-      - "8091:8091"
+      - whisper-model-cache:/root/.cache/whisper
+    expose:
+      - "8091"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8091/healthz >/dev/null || exit 1"]
       interval: 10s
@@ -152,6 +153,7 @@ services:
 
   caddy:
     image: caddy:2.9-alpine
+    restart: unless-stopped
     ports:
       - "8080:80"
     volumes:

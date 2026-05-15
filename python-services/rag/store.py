@@ -15,16 +15,18 @@ metadatas: dict — extra info (e.g., doc_hash, tags, etc.)
 _DEFAULT_COLLECTION = "qa_pairs"
 
 
-"""
-Create a client connection to ChromaDB using the provided URL from config.
-"""
-def _client() -> chromadb.HttpClient:
+def _make_client() -> chromadb.HttpClient:
     parsed = urlparse(CHROMA_URL)
     return chromadb.HttpClient(
         host=parsed.hostname,
         port=parsed.port,
         settings=Settings(anonymized_telemetry=False),
     )
+
+# Single persistent client — reuses the TCP connection across all calls.
+# Previously _client() was called inside every function, opening a new
+# connection on every ChromaDB operation (~50-100ms overhead each time).
+_client = _make_client()
 
 
 def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
@@ -41,7 +43,7 @@ def ensure_collection(name: str = _DEFAULT_COLLECTION) -> None:
     Ensure the specified ChromaDB collection exists; create it if missing.
     """
     try:
-        _client().get_or_create_collection(name)
+        _client.get_or_create_collection(name)
     except Exception as exc:
         raise _chroma_error("ensure_collection", exc) from exc
 
@@ -53,8 +55,8 @@ Used to check if documents are up to date.
 """
 def get_existing_hashes(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict[str, str]:
     try:
-        col = _client().get_or_create_collection(name)
-        result = col.get(ids=ids, include=["metadatas"]) # include=["field"] returns the id and feild specified
+        col = _client.get_or_create_collection(name)
+        result = col.get(ids=ids, include=["metadatas"])
     except Exception as exc:
         raise _chroma_error("get_existing_hashes", exc) from exc
 
@@ -77,7 +79,7 @@ def upsert(
     name: str = _DEFAULT_COLLECTION,
 ) -> None:
     try:
-        col = _client().get_or_create_collection(name)
+        col = _client.get_or_create_collection(name)
         col.upsert(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
     except Exception as exc:
         raise _chroma_error("upsert", exc) from exc
@@ -86,7 +88,7 @@ def upsert(
 def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
     """Fetch documents, embeddings, and metadatas for the given IDs from ChromaDB."""
     try:
-        col = _client().get_or_create_collection(name)
+        col = _client.get_or_create_collection(name)
         return col.get(ids=ids, include=["embeddings", "documents", "metadatas"])
     except Exception as exc:
         raise _chroma_error("retrieve", exc) from exc
@@ -97,34 +99,47 @@ def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
 # Connects to ChromaDB and retrieves the specified collection. Uses ChromaDB’s HNSW index to find the n most similar vectors (nearest neighbors) to the given embedding in the collection.
 # Returns a list of dictionaries, each containing the id, document, and distance (similarity score) for each neighbor, sorted by similarity (most similar first).
 def query_dense(
-    embedding: list[float],
-    n: int = 20,
-    name: str = _DEFAULT_COLLECTION,
+    embedding:    list[float],
+    n:            int = 20,
+    topic_filter: str | None = None,
+    name:         str = _DEFAULT_COLLECTION,
 ) -> list[dict]:
     """
-    Find the n nearest neighbours to embedding in the collection. (neighbour = most similar vectors (chunks) to the query embedding, based on a distance metric.)
+    Find the n nearest neighbours to embedding in the collection.
 
-    Uses ChromaDB's HNSW index under the hood — approximate nearest
-    neighbour search (O(log n)) rather than brute-force (O(n)).
-    Distance metric is L2(Euclidean) by default for ChromaDB collections; lower
-    distance = more similar.
+    Uses ChromaDB's HNSW index — approximate nearest neighbour search
+    (O(log n)) rather than brute-force (O(n)).
 
-    Returns: [{"id": ..., "document": ..., "distance": ...}, ...]
+    Args:
+        embedding:    query vector (768-dim for nomic-embed-text-v1.5).
+        n:            max results to return.
+        topic_filter: if given, restrict search to docs where metadata
+                      topic == topic_filter. None = search full collection.
+        name:         ChromaDB collection name.
+
+    Returns: [{"id": ..., "document": ..., "distance": ...}]
     sorted by ascending distance (most similar first).
     """
     try:
-        col = _client().get_or_create_collection(name)
+        col   = _client.get_or_create_collection(name)
+        where = {"topic": topic_filter} if topic_filter else None
+
+        safe_n = min(n, col.count())
+        if safe_n == 0:
+            return []
+
         result = col.query(
-            query_embeddings=[embedding], # input vector (embedding) to ChromaDB, which computes automatically distances to all stored vectors and returns the n closest matches, sorted by similarity.
-            n_results=min(n, col.count()),  # guard: can't request more than collection size
+            query_embeddings=[embedding],
+            n_results=safe_n,
+            where=where,
             include=["documents", "distances"],
         )
     except Exception as exc:
         raise _chroma_error("query_dense", exc) from exc
 
-    ids        = result["ids"][0]
-    documents  = result["documents"][0]
-    distances  = result["distances"][0]
+    ids       = result["ids"][0]
+    documents = result["documents"][0]
+    distances = result["distances"][0]
     return [
         {"id": id_, "document": doc, "distance": dist}
         for id_, doc, dist in zip(ids, documents, distances)

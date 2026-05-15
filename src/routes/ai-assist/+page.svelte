@@ -187,7 +187,7 @@
     let loading = $state(false);
     let error = $state('');
     let activeStreamController = $state<AbortController | null>(null); //Each AbortController is created per-request and linked to exactly one fetch via its .signal
-    let llmMode = $state<'gemini' | 'ollama'>('gemini');
+    let llmMode = $state<'gemini' | 'ollama' | 'community'>('gemini');
     let history = $state<{ question: string; blocks: AnswerBlock[] }[]>([]);
     let dictating = $state(false);
     let mediaRecorder = $state<MediaRecorder | null>(null);
@@ -387,13 +387,17 @@
     }
 
 	/**
-	 * reads the raw HTTP stream chunk by chunk, reassembles SSE events, extracts data: lines, and updates answer live as text arrives. Returns the full accumulated string when streaming ends
+	 * reads the raw HTTP stream chunk by chunk, reassembles SSE events, extracts data: lines, and updates answer live as text arrives. Returns the full accumulated string when streaming ends.
+	 * If onMeta is provided, handles 'event: meta' events by passing the parsed JSON to the callback instead of accumulating them as answer text.
 	 */
-    async function parseSSEStream(response: Response): Promise<string> {
+    async function parseSSEStream(
+        response: Response,
+        onMeta?: (meta: Record<string, unknown>) => void
+    ): Promise<string> {
         if (!response.body) throw new Error('No response body');
 
         const reader = response.body.getReader();
-        const decoder = new TextDecoder(); //Built-in object for decoding binary data (Uint8Array) into strings. { stream: true } allows incremental decoding (for streaming)
+        const decoder = new TextDecoder();
         let buffer = '';
         let fullText = '';
 
@@ -401,24 +405,30 @@
             const { value, done } = await reader.read();
             if (done) break;
 
-            buffer += decoder.decode(value, { stream: true }); // Decodes the current chunk (value) into a string, 
-            const events = buffer.split('\n\n'); // SSE event separator: has all except the last
-            buffer = events.pop() || ''; // keeps only the last event
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop() || '';
 
             for (const event of events) {
                 const lines = event.split('\n');
+                const isMeta = lines.some(l => l.trim() === 'event: meta');
                 const dataParts: string[] = [];
 
                 for (const line of lines) {
                     if (line.startsWith('data:')) {
-                        dataParts.push(line.slice(5).replace(/^ /, ''));// rmv single leading space
+                        dataParts.push(line.slice(5).replace(/^ /, ''));
                     }
                 }
 
-                if (dataParts.length) {
-                    let newText = dataParts.join('\n');
-                    fullText += newText;
-                    answer = fullText; // reactive state var, bound to the displayed output
+                if (!dataParts.length) continue;
+
+                if (isMeta && onMeta) {
+                    try {
+                        onMeta(JSON.parse(dataParts.join('')));
+                    } catch { /* malformed meta — ignore */ }
+                } else if (!isMeta) {
+                    fullText += dataParts.join('\n');
+                    answer = fullText;
                 }
             }
         }
@@ -524,14 +534,27 @@
         activeStreamController = controller;
 
         try {
-            const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
-            const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
-            const historySnapshot = history.slice(0, MAX_HISTORY).reverse(); // give last max history of the slice
-            const result = await streamChat(endpoint, prompt, fallbackError, controller.signal, historySnapshot); // actuall API call
+            let result: string;
+
+            if (llmMode === 'community') {
+                const res = await fetch('/api/community', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt }),
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error(await res.text() || 'Community service unavailable');
+                result = await parseSSEStream(res);
+            } else {
+                const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
+                const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
+                const historySnapshot = history.slice(0, MAX_HISTORY).reverse();
+                result = await streamChat(endpoint, prompt, fallbackError, controller.signal, historySnapshot);
+            }
 
             const completedAnswer = result.trim();
             if (completedAnswer) {
-                history = [{ question: prompt, blocks: renderAnswer(completedAnswer) }, ...history]; // prepend to history to show most recent first
+                history = [{ question: prompt, blocks: renderAnswer(completedAnswer) }, ...history];
                 question = '';
             }
         } catch (e) {
@@ -546,6 +569,7 @@
             }
         }
     }
+
 
     async function toggleDictation() { // can use await inside
     if (dictating) {
@@ -639,6 +663,14 @@ async function sendToWhisper(blob: Blob) {
             disabled={loading}
         >
             🦙 Ollama
+        </button>
+        <button
+            class="toggle-button"
+            class:active={llmMode === 'community'}
+            onclick={() => llmMode = 'community'}
+            disabled={loading}
+        >
+            👽 Community
         </button>
     </div>
     <form class="form-input-parent" onsubmit={askQuestion}>

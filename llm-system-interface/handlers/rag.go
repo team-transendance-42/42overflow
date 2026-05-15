@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"llm-system-interface/models"
 	"llm-system-interface/services"
 	"log"
@@ -35,25 +33,12 @@ func RagAskStreaming(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ch, contexts, confidence, err := services.StreamRagAnswer(r.Context(), req.Prompt)
+	ch, err := services.StreamRagAnswer(r.Context(), req.Prompt)
 	if err != nil {
 		log.Printf("RagAskStreaming: StreamRagAnswer error: %v", err)
 		http.Error(w, "Community service error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
-	metaJSON, _ := json.Marshal(map[string]any{
-		"contexts":   contexts,
-		"confidence": confidence,
-	})
-	fmt.Fprintf(w, "event: meta\ndata: %s\n\n", metaJSON)
-	flusher.Flush()
 
 	streamSSE(w, ch)
 }
