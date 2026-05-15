@@ -17,7 +17,7 @@ const user = await db.user.findUnique({
   });
 
   return {
-    user: locals.user,
+    user
   
   };
 };

@@ -14,8 +14,6 @@
 
 
   <h1><strong>Name: </strong> {user?.first_name ?? 'No name set'} {user?.last_name ?? 'No name set'} </h1>
-
-  <h1><strong>Username: </strong> {user?.name ?? 'No name set'}</h1>
  
   {#if user?.name}
     <p class="username"><strong>Username: </strong> {user.name}</p>
