@@ -3,7 +3,7 @@
 
   export let data;
   const user = data.user;
-  const profile = data.profile;
+  //const profile = data.profile;
 
 </script>
 
@@ -17,23 +17,23 @@
 
   <h1><strong>Username: </strong> {user?.name ?? 'No name set'}</h1>
  
-  {#if profile?.username}
-    <p class="username"><strong>Username: </strong> {profile.username}</p>
+  {#if user?.name}
+    <p class="username"><strong>Username: </strong> {user.name}</p>
   {/if}
 
  <p class="email"><strong>Email:</strong> {user?.email}</p>
 
-  {#if profile?.interests}
+  {#if user?.interests}
     <div class="section">
-      <p><strong>Interests</strong>: {profile.interests}</p>
+      <p><strong>Interests</strong>: {user.interests}</p>
     </div>
   {/if}
 
 
-    {#if profile?.followers?.length > 0}
+    {#if user?.followers?.length > 0}
     <div class="interests">
       <span class="label"><strong>Following:</strong></span>
-      {#each profile.followers as f}
+      {#each user.followers as f}
 	    <div class="following-row">
 	    <Avatar src={f.following.image ?? ''} size="36px" />
         <a href="/profile/{f.following.name}" class="following-link">
