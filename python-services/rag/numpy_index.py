@@ -52,17 +52,17 @@ class NumpyIndex:
 
     def __init__(self) -> None:
         # Set by build(); None signals index is not ready.
-        self._matrix:    np.ndarray | None = None  # shape (N, D), float32, L2-normalised
-        self._ids:       list[str]          = []
-        self._topics:    list[str]          = []
-        self._documents: list[str]          = []
+        self._matrix: np.ndarray | None = None  # shape (N, D), float32, L2-normalised
+        self._ids: list[str] = []
+        self._topics: list[str] = []
+        self._documents: list[str] = []
 
     def build(
         self,
-        ids:        list[str],
+        ids: list[str],
         embeddings: list[list[float]],
-        topics:     list[str],
-        documents:  list[str],
+        topics: list[str],
+        documents: list[str],
     ) -> None:
         """
         Normalise and store all embeddings as a float32 matrix.
@@ -91,16 +91,16 @@ class NumpyIndex:
         # A zero embedding has no meaningful direction → similarity ≈ 0 → ranks last.
         norms = np.where(norms == 0.0, 1e-9, norms)
 
-        self._matrix    = matrix / norms   # unit vectors
-        self._ids       = list(ids)
-        self._topics    = list(topics)
+        self._matrix = matrix / norms   # unit vectors
+        self._ids = list(ids)
+        self._topics = list(topics)
         self._documents = list(documents)
 
     def search(
         self,
         query_embedding: list[float],
-        n:               int = 20,
-        topic_filter:    str | None = None,
+        n: int = 20,
+        topic_filter: str | None = None,
     ) -> list[dict]:
         """
         Return up to n docs ranked by cosine similarity (best first).
@@ -148,7 +148,7 @@ class NumpyIndex:
 
         # Clamp n to actual number of valid docs.
         valid_count = int(np.sum(scores > -np.inf))
-        safe_n      = min(n, valid_count)
+        safe_n = min(n, valid_count)
 
         # argpartition: O(N) partial sort to find top-safe_n indices.
         # Full sort only needed for the top-safe_n slice (much faster than
@@ -158,7 +158,7 @@ class NumpyIndex:
 
         return [
             {
-                "id":       self._ids[i],
+                "id": self._ids[i],
                 "document": self._documents[i],
                 # distance = 1 - cosine_similarity; range [0, 2]
                 # 0 = identical direction, 2 = opposite direction

@@ -27,36 +27,41 @@ Edge cases handled:
 """
 from collections import defaultdict
 
-from bm25_index  import BM25Index
-from detector    import detect_topic
-from embedder    import embed_texts
+from bm25_index import BM25Index
+from detector import detect_topic
+from embedder import embed_texts
 from numpy_index import NumpyIndex
 
-_RRF_K        = 60   # standard RRF constant — dampens rank-1 dominance
+_RRF_K = 60   # standard RRF constant — dampens rank-1 dominance
 _MIN_FILTERED = 3    # if fewer results after topic filter, fall back to full corpus
 
 
 async def hybrid_search(
-    question:     str,
-    bm25_index:   BM25Index,
-    numpy_index:  NumpyIndex,
-    id_to_text:   dict[str, str],
-    id_to_topic:  dict[str, str],
-    centroids:    dict[str, list[float]],
-    top_k:        int = 5,
+    question:        str,
+    bm25_index:      BM25Index,
+    numpy_index:     NumpyIndex,
+    id_to_text:      dict[str, str],
+    id_to_topic:     dict[str, str],
+    centroids:       dict[str, list[float]],
+    top_k:           int = 5,
+    topic_intro_ids: dict[str, str] | None = None,
 ) -> list[dict]:
     """
     Retrieve top-k docs using topic-aware hybrid search.
 
     Args:
-        question:     raw user question string.
-        bm25_index:   built BM25Index (from app.state).
-        numpy_index:  built NumpyIndex (from app.state) — replaces ChromaDB HTTP.
-        id_to_text:   {doc_id: formatted_text} (from app.state).
-        id_to_topic:  {doc_id: topic} (from app.state).
-        centroids:    {topic: centroid_vector} (from app.state).
-                      Empty dict → topic detection disabled, full corpus used.
-        top_k:        number of results to return after merging.
+        question:        raw user question string.
+        bm25_index:      built BM25Index (from app.state).
+        numpy_index:     built NumpyIndex (from app.state) — replaces ChromaDB HTTP.
+        id_to_text:      {doc_id: formatted_text} (from app.state).
+        id_to_topic:     {doc_id: topic} (from app.state).
+        centroids:       {topic: centroid_vector} (from app.state).
+                         Empty dict → topic detection disabled, full corpus used.
+        top_k:           number of results to return after merging.
+        topic_intro_ids: {topic: intro_doc_id} — when provided and a topic is
+                         detected, the intro doc is pinned at position 0 if it
+                         is not already in the top-k results.  Defaults to None
+                         (no pinning) for backwards compatibility.
 
     Returns:
         [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
@@ -73,17 +78,17 @@ async def hybrid_search(
 
     # 3a. Filtered retrieval when topic is confidently detected.
     if use_filter:
-        dense_hits  = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
+        dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
         sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
 
         # 3b. Fallback: too few filtered results → search full corpus instead.
         #     Prevents over-filtering when a topic has few docs.
         if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
-            dense_hits  = numpy_index.search(question_embedding, n=20)
+            dense_hits = numpy_index.search(question_embedding, n=20)
             sparse_hits = bm25_index.search(question, n=20)
     else:
         # 4. Full corpus (no confident topic detected or centroids disabled).
-        dense_hits  = numpy_index.search(question_embedding, n=20)
+        dense_hits = numpy_index.search(question_embedding, n=20)
         sparse_hits = bm25_index.search(question, n=20)
 
     # 5. RRF merge: score each doc by rank position in each list.
@@ -103,7 +108,7 @@ async def hybrid_search(
     dense_text: dict[str, str] = {hit["id"]: hit["document"] for hit in dense_hits}
     top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k]
 
-    return [
+    results = [
         {
             "id":        id_,
             "text":      dense_text.get(id_) or id_to_text.get(id_, ""),
@@ -112,3 +117,20 @@ async def hybrid_search(
         }
         for id_ in top_ids
     ]
+
+    # Pin intro doc: when a topic is detected and its intro doc is not already
+    # in the top-k results, insert it at position 0 and drop the last entry.
+    # Ensures vague queries always start with "what is X" context before detail entries.
+    if detected_topic and topic_intro_ids:
+        intro_id = topic_intro_ids.get(detected_topic)
+        result_ids = {r["id"] for r in results}
+        if intro_id and intro_id not in result_ids:
+            intro_text = dense_text.get(intro_id) or id_to_text.get(intro_id, "")
+            results = [{
+                "id":        intro_id,
+                "text":      intro_text,
+                "rrf_score": 0.0,
+                "topic":     detected_topic,
+            }] + results[:-1]
+
+    return results

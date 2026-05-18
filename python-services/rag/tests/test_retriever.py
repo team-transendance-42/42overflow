@@ -9,12 +9,12 @@ These tests verify the full retrieval pipeline end to end:
 """
 import asyncio
 
-from bm25_index  import BM25Index
-from detector    import build_topic_centroids
-from embedder    import embed_texts, format_doc, make_doc_id
+from bm25_index import BM25Index
+from detector import build_topic_centroids
+from embedder import embed_texts, format_doc, make_doc_id
 from numpy_index import NumpyIndex
-from retriever   import hybrid_search
-from seed        import load_seed
+from retriever import hybrid_search
+from seed import load_seed
 
 
 def _build_test_fixtures(with_centroids: bool = False):
@@ -27,12 +27,12 @@ def _build_test_fixtures(with_centroids: bool = False):
 
     Edge case: fastembed loads the model on first call (~2s), cached thereafter.
     """
-    pairs      = load_seed()
-    all_texts  = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
-    all_ids    = [make_doc_id(p["question"]) for p in pairs]
+    pairs = load_seed()
+    all_texts = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
+    all_ids = [make_doc_id(p["question"]) for p in pairs]
     all_topics = [p.get("topic", "unknown") for p in pairs]
 
-    id_to_text  = dict(zip(all_ids, all_texts))
+    id_to_text = dict(zip(all_ids, all_texts))
     id_to_topic = dict(zip(all_ids, all_topics))
 
     bm25 = BM25Index()
@@ -43,10 +43,10 @@ def _build_test_fixtures(with_centroids: bool = False):
 
     numpy_idx = NumpyIndex()
     numpy_idx.build(
-        ids       = all_ids,
-        embeddings= embeddings,
-        topics    = all_topics,
-        documents = all_texts,
+        ids=all_ids,
+        embeddings=embeddings,
+        topics=all_topics,
+        documents=all_texts,
     )
 
     centroids = build_topic_centroids(pairs, embeddings) if with_centroids else {}
@@ -67,10 +67,10 @@ def test_result_shape():
     assert len(results) > 0, "expected at least 1 result"
 
     for r in results:
-        assert "id"        in r, f"missing 'id' key: {r}"
-        assert "text"      in r, f"missing 'text' key: {r}"
+        assert "id" in r, f"missing 'id' key: {r}"
+        assert "text" in r, f"missing 'text' key: {r}"
         assert "rrf_score" in r, f"missing 'rrf_score' key: {r}"
-        assert "topic"     in r, f"missing 'topic' key: {r}"
+        assert "topic" in r, f"missing 'topic' key: {r}"
         assert r["text"].startswith("Q:"), f"text should start with 'Q:': {r['text'][:40]}"
         assert r["rrf_score"] > 0, f"rrf_score must be positive: {r['rrf_score']}"
 
@@ -88,7 +88,7 @@ def test_results_sorted_by_rrf_score():
 
     assert scores == sorted(scores, reverse=True), \
         f"results not sorted by rrf_score: {scores}"
-    print(f"✓ ordering: scores descending {[round(s,4) for s in scores]}")
+    print(f"✓ ordering: scores descending {[round(s, 4) for s in scores]}")
 
 
 def test_relevant_doc_in_top_results():
@@ -96,7 +96,8 @@ def test_relevant_doc_in_top_results():
     bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures()
 
     results = asyncio.run(hybrid_search(
-        "EDF scheduling deadline coder dongle", bm25, numpy_idx, id_to_text, id_to_topic, centroids, top_k=3
+        "EDF scheduling deadline coder dongle",
+        bm25, numpy_idx, id_to_text, id_to_topic, centroids, top_k=3,
     ))
     texts = [r["text"].lower() for r in results]
 
@@ -152,6 +153,77 @@ def test_fallback_when_no_topic_detected():
     print(f"✓ fallback: topics returned: {[id_to_topic.get(r['id']) for r in results]}")
 
 
+def _build_topic_intro_ids() -> dict[str, str]:
+    """Build {topic: intro_doc_id} from seed — mirrors what main.py will do."""
+    pairs = load_seed()
+    return {
+        p["topic"]: make_doc_id(p["question"])
+        for p in pairs
+        if "intro" in p.get("tags", [])
+    }
+
+
+def test_intro_pinned_when_not_in_top_results():
+    """Intro doc at position 0 when topic detected and intro not naturally in top-k."""
+    bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures(
+        with_centroids=True
+    )
+    topic_intro_ids = _build_topic_intro_ids()
+
+    # Highly specific query unlikely to retrieve the codexion intro overview doc.
+    results = asyncio.run(hybrid_search(
+        "EDF deadline heap extract min priority recompile dongle coder burnout",
+        bm25, numpy_idx, id_to_text, id_to_topic, centroids,
+        topic_intro_ids=topic_intro_ids,
+        top_k=4,
+    ))
+
+    codexion_intro_id = topic_intro_ids["codexion"]
+    assert results[0]["id"] == codexion_intro_id, (
+        f"intro doc should be pinned at position 0, "
+        f"got: {results[0].get('text', '')[:80]!r}"
+    )
+    print("✓ intro pinning: first result is intro doc")
+
+
+def test_intro_not_duplicated_when_already_retrieved():
+    """When intro naturally ranks in top-k, it appears exactly once."""
+    bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures(
+        with_centroids=True
+    )
+    topic_intro_ids = _build_topic_intro_ids()
+
+    results = asyncio.run(hybrid_search(
+        "what is codexion dining philosophers overview intro",
+        bm25, numpy_idx, id_to_text, id_to_topic, centroids,
+        topic_intro_ids=topic_intro_ids,
+        top_k=4,
+    ))
+
+    ids = [r["id"] for r in results]
+    assert len(ids) == len(set(ids)), (
+        f"intro doc must not appear twice, got ids: {ids}"
+    )
+    print(f"✓ no duplicate: {len(ids)} unique results")
+
+
+def test_no_pinning_when_no_topic_detected():
+    """Without centroids (no topic detection), intro pinning is skipped — no crash."""
+    bm25, numpy_idx, id_to_text, id_to_topic, _ = _build_test_fixtures(with_centroids=False)
+    topic_intro_ids = _build_topic_intro_ids()
+
+    results = asyncio.run(hybrid_search(
+        "EDF deadline heap extract min",
+        bm25, numpy_idx, id_to_text, id_to_topic,
+        {},  # empty centroids → no topic detection → no pinning
+        topic_intro_ids=topic_intro_ids,
+        top_k=4,
+    ))
+
+    assert len(results) > 0, "should still return results when pinning is skipped"
+    print(f"✓ no-topic fallback: {len(results)} results, no crash")
+
+
 if __name__ == "__main__":
     test_result_shape()
     test_results_sorted_by_rrf_score()
@@ -159,4 +231,7 @@ if __name__ == "__main__":
     test_dense_only_fallback()
     test_topic_aware_retrieval_codexion()
     test_fallback_when_no_topic_detected()
+    test_intro_pinned_when_not_in_top_results()
+    test_intro_not_duplicated_when_already_retrieved()
+    test_no_pinning_when_no_topic_detected()
     print("\nAll retriever tests passed.")

@@ -1,10 +1,13 @@
-from   urllib.parse import urlparse
+from urllib.parse import urlparse
 import chromadb
 from chromadb.config import Settings
-from   config import CHROMA_URL
+from config import CHROMA_URL
 
 '''
-ChromaDB is a special database designed for storing and searching vectors (embeddings), handles high-dimensional data. The functs here are focused on managing a collection of question-answer pairs, where each pair is represented as a document with an associated embedding and metadata.
+ChromaDB is a special database designed for storing and searching vectors
+(embeddings), handles high-dimensional data. The functs here are focused on
+managing a collection of question-answer pairs, where each pair is represented
+as a document with an associated embedding and metadata.
 each collection(table) stores fields:
 id: str — unique identifier for the document
 document: str — the main text/content
@@ -22,6 +25,7 @@ def _make_client() -> chromadb.HttpClient:
         port=parsed.port,
         settings=Settings(anonymized_telemetry=False),
     )
+
 
 # Single persistent client — reuses the TCP connection across all calls.
 # Previously _client() was called inside every function, opening a new
@@ -48,11 +52,28 @@ def ensure_collection(name: str = _DEFAULT_COLLECTION) -> None:
         raise _chroma_error("ensure_collection", exc) from exc
 
 
-# doc_hash is a unique ID for the content of a document, created using a hash function, and stored as metadata in ChromaDB for quick comparison and version control.
+# doc_hash is a unique ID for the content of a document, created using a
+# hash function, and stored as metadata in ChromaDB for quick comparison
+# and version control.
 """
 Get the doc_hash metadata for a list of document IDs from ChromaDB.
 Used to check if documents are up to date.
 """
+
+
+def get_embeddings(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict[str, list[float]]:
+    """Fetch stored embeddings from ChromaDB for the given IDs. Returns id → embedding."""
+    try:
+        col = _client.get_or_create_collection(name)
+        result = col.get(ids=ids, include=["embeddings"])
+    except Exception as exc:
+        raise _chroma_error("get_embeddings", exc) from exc
+    return {
+        doc_id: emb
+        for doc_id, emb in zip(result["ids"], result["embeddings"])
+    }
+
+
 def get_existing_hashes(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict[str, str]:
     try:
         col = _client.get_or_create_collection(name)
@@ -68,9 +89,12 @@ def get_existing_hashes(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict
 
 
 """
-Insert or update (upsert) documents, embeddings, and metadata in the ChromaDB collection.
-Keeps the vector database in sync with the latest data. Wrapper of ChromaDB's upsert method with error handling.
+Insert or update (upsert) documents, embeddings, and metadata in the ChromaDB
+collection. Keeps the vector database in sync with the latest data. Wrapper of
+ChromaDB's upsert method with error handling.
 """
+
+
 def upsert(
     ids: list[str],
     documents: list[str],

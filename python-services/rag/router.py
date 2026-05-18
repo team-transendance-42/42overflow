@@ -1,4 +1,4 @@
-from fastapi  import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from generator import generate
@@ -17,7 +17,7 @@ class AskResponse(BaseModel):
 
 
 class RetrieveResponse(BaseModel):
-    contexts:   list[dict]
+    contexts: list[dict]
     confidence: float
 
 
@@ -29,19 +29,22 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
     Used by the Go streaming Community endpoint.
     503 if BM25 index isn't ready. 502 if embedding service is unreachable.
     """
-    bm25_index  = request.app.state.bm25
+    bm25_index = request.app.state.bm25
     numpy_index = request.app.state.numpy_index
-    id_to_text  = request.app.state.id_to_text
+    id_to_text = request.app.state.id_to_text
     id_to_topic = request.app.state.id_to_topic
-    centroids   = request.app.state.centroids
+    centroids = request.app.state.centroids
+    topic_intro_ids = getattr(request.app.state, "topic_intro_ids", {})
 
     if bm25_index is None:
         raise HTTPException(status_code=503, detail="RAG index not ready — try again shortly")
 
     try:
         contexts = await hybrid_search(
-            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids,
+            body.question, bm25_index, numpy_index,
+            id_to_text, id_to_topic, centroids,
             top_k=4,
+            topic_intro_ids=topic_intro_ids,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
@@ -57,19 +60,22 @@ async def ask(body: AskRequest, request: Request) -> AskResponse:
     Returns the answer and the retrieved context docs.
     503 if the BM25 index isn't ready. 502 if Ollama is unreachable.
     """
-    bm25_index  = request.app.state.bm25
+    bm25_index = request.app.state.bm25
     numpy_index = request.app.state.numpy_index
-    id_to_text  = request.app.state.id_to_text
+    id_to_text = request.app.state.id_to_text
     id_to_topic = request.app.state.id_to_topic
-    centroids   = request.app.state.centroids
+    centroids = request.app.state.centroids
+    topic_intro_ids = getattr(request.app.state, "topic_intro_ids", {})
 
     if bm25_index is None:
         raise HTTPException(status_code=503, detail="RAG index not ready — try again shortly")
 
     try:
         contexts = await hybrid_search(
-            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids,
+            body.question, bm25_index, numpy_index,
+            id_to_text, id_to_topic, centroids,
             top_k=4,
+            topic_intro_ids=topic_intro_ids,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))

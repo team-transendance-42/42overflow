@@ -5,14 +5,11 @@ Requires: ChromaDB running (docker compose up -d)
 Uses collection 'qa_pairs_test' for write tests — safe to run anytime.
 test_query_dense also requires Ollama running and 'qa_pairs' synced.
 """
-import asyncio
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from embedder import embed_texts, format_doc, make_doc_id
-from seed     import load_seed
-from store    import ensure_collection, get_existing_hashes, query_dense, upsert
+from store import ensure_collection, get_existing_hashes, query_dense, upsert
 
 _TEST = "qa_pairs_test"
 
@@ -21,7 +18,8 @@ def test_upsert_and_retrieve():
     ensure_collection(_TEST)
     upsert(
         ids=["id-1", "id-2"],
-        documents=["Q: What is free()?\nA: Releases heap memory.", "Q: What is malloc()?\nA: Allocates heap memory."],
+        documents=["Q: What is free()?\nA: Releases heap memory.",
+                   "Q: What is malloc()?\nA: Allocates heap memory."],
         embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
         metadatas=[{"doc_hash": "hash-a", "topic": "c"}, {"doc_hash": "hash-b", "topic": "c"}],
         name=_TEST,
@@ -104,15 +102,15 @@ def test_query_dense():
 
     # grab one stored doc directly via ChromaDB's built-in collection API
     parsed = urlparse(CHROMA_URL)
-    col    = chromadb.HttpClient(host=parsed.hostname, port=parsed.port) \
-                     .get_or_create_collection("qa_pairs")
+    col = chromadb.HttpClient(host=parsed.hostname, port=parsed.port) \
+        .get_or_create_collection("qa_pairs")
 
     raw = col.get(limit=1, include=["embeddings", "documents"])
     assert raw["ids"], "qa_pairs collection is empty — run docker compose up -d first"
 
-    doc_id    = raw["ids"][0]
+    doc_id = raw["ids"][0]
     embedding = raw["embeddings"][0]
-    document  = raw["documents"][0]
+    document = raw["documents"][0]
 
     print("\n── query_dense input ───────────────────────────────────")
     print(f"  doc_id    : {doc_id}")
@@ -126,12 +124,12 @@ def test_query_dense():
     print("\n── query_dense output (top 5) ──────────────────────────")
     for i, r in enumerate(results):
         marker = "  ← expected" if r["id"] == doc_id else ""
-        print(f"  [{i+1}] distance={r['distance']:.6f}  id={r['id'][:16]}...{marker}")
+        print(f"  [{i + 1}] distance={r['distance']:.6f}  id={r['id'][:16]}...{marker}")
         print(f"       {r['document'][:70]!r}{'...' if len(r['document']) > 70 else ''}")
 
     # ── COMPARISON ───────────────────────────────────────────────────
     top_id = results[0]["id"]
-    match  = top_id == doc_id
+    match = top_id == doc_id
     print("\n── comparison ──────────────────────────────────────────")
     print(f"  expected top-1 id : {doc_id}")
     print(f"  got      top-1 id : {top_id}")

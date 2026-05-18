@@ -9,7 +9,6 @@ Theory:
 Run: uv run pytest tests/test_numpy_index.py -v
 No external services needed — pure numpy, no ChromaDB, no fastembed.
 """
-import math
 import pytest
 import numpy as np
 
@@ -20,7 +19,7 @@ from numpy_index import NumpyIndex
 
 def _unit(v: list[float]) -> list[float]:
     """Return L2-normalised version of v (for constructing exact test vectors)."""
-    arr  = np.array(v, dtype=np.float64)
+    arr = np.array(v, dtype=np.float64)
     norm = np.linalg.norm(arr)
     return (arr / norm).tolist()
 
@@ -34,10 +33,10 @@ def test_build_and_search_basic():
     """
     idx = NumpyIndex()
     idx.build(
-        ids       = ["a", "b", "c"],
-        embeddings= [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]],
-        topics    = ["t1", "t2", "t1"],
-        documents = ["doc A", "doc B", "doc C"],
+        ids=["a", "b", "c"],
+        embeddings=[[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]],
+        topics=["t1", "t2", "t1"],
+        documents=["doc A", "doc B", "doc C"],
     )
     results = idx.search([1.0, 0.0], n=3)
 
@@ -50,10 +49,10 @@ def test_returns_document_field():
     """search() must include 'document' so retriever can resolve text."""
     idx = NumpyIndex()
     idx.build(
-        ids       = ["x"],
-        embeddings= [[1.0, 0.0]],
-        topics    = ["topic"],
-        documents = ["hello world"],
+        ids=["x"],
+        embeddings=[[1.0, 0.0]],
+        topics=["topic"],
+        documents=["hello world"],
     )
     results = idx.search([1.0, 0.0], n=1)
     assert results[0]["document"] == "hello world"
@@ -67,10 +66,10 @@ def test_distance_field_range():
     """
     idx = NumpyIndex()
     idx.build(
-        ids       = ["same", "opp"],
-        embeddings= [[1.0, 0.0], [-1.0, 0.0]],
-        topics    = ["t", "t"],
-        documents = ["same", "opposite"],
+        ids=["same", "opp"],
+        embeddings=[[1.0, 0.0], [-1.0, 0.0]],
+        topics=["t", "t"],
+        documents=["same", "opposite"],
     )
     results = idx.search([1.0, 0.0], n=2)
     # sorted ascending by distance
@@ -86,10 +85,10 @@ def test_topk_clamping():
     """
     idx = NumpyIndex()
     idx.build(
-        ids       = ["a", "b"],
-        embeddings= [[1.0, 0.0], [0.0, 1.0]],
-        topics    = ["t", "t"],
-        documents = ["A", "B"],
+        ids=["a", "b"],
+        embeddings=[[1.0, 0.0], [0.0, 1.0]],
+        topics=["t", "t"],
+        documents=["A", "B"],
     )
     results = idx.search([1.0, 0.0], n=100)
     assert len(results) == 2, f"expected 2 results (clamped), got {len(results)}"
@@ -112,10 +111,10 @@ def test_topic_filter_restricts_results():
     """
     idx = NumpyIndex()
     idx.build(
-        ids       = ["a", "b", "c"],
-        embeddings= [[1.0, 0.0], [0.9, 0.1], [0.0, 1.0]],
-        topics    = ["t1", "t2", "t1"],
-        documents = ["A", "B", "C"],
+        ids=["a", "b", "c"],
+        embeddings=[[1.0, 0.0], [0.9, 0.1], [0.0, 1.0]],
+        topics=["t1", "t2", "t1"],
+        documents=["A", "B", "C"],
     )
     results = idx.search([1.0, 0.0], n=3, topic_filter="t1")
     ids_returned = {r["id"] for r in results}
@@ -131,10 +130,10 @@ def test_topic_filter_no_match_returns_empty():
     """
     idx = NumpyIndex()
     idx.build(
-        ids       = ["a"],
-        embeddings= [[1.0, 0.0]],
-        topics    = ["t1"],
-        documents = ["A"],
+        ids=["a"],
+        embeddings=[[1.0, 0.0]],
+        topics=["t1"],
+        documents=["A"],
     )
     results = idx.search([1.0, 0.0], n=5, topic_filter="nonexistent")
     assert results == []
@@ -147,10 +146,10 @@ def test_zero_query_returns_empty():
     """
     idx = NumpyIndex()
     idx.build(
-        ids       = ["a"],
-        embeddings= [[1.0, 0.0]],
-        topics    = ["t1"],
-        documents = ["A"],
+        ids=["a"],
+        embeddings=[[1.0, 0.0]],
+        topics=["t1"],
+        documents=["A"],
     )
     results = idx.search([0.0, 0.0], n=5)
     assert results == []
@@ -163,17 +162,17 @@ def test_results_sorted_ascending_distance():
     idx = NumpyIndex()
     # doc angles: 0°, 45°, 90° from query [1, 0]
     idx.build(
-        ids       = ["90deg", "45deg", "0deg"],
-        embeddings= [
+        ids=["90deg", "45deg", "0deg"],
+        embeddings=[
             [0.0, 1.0],          # 90° → similarity=0, distance=1
             [1.0, 1.0],          # 45° → similarity≈0.707, distance≈0.293
             [1.0, 0.0],          # 0°  → similarity=1, distance=0
         ],
-        topics    = ["t", "t", "t"],
-        documents = ["C", "B", "A"],
+        topics=["t", "t", "t"],
+        documents=["C", "B", "A"],
     )
     results = idx.search([1.0, 0.0], n=3)
-    assert results[0]["id"] == "0deg",  f"closest should be 0deg, got {results[0]['id']}"
+    assert results[0]["id"] == "0deg", f"closest should be 0deg, got {results[0]['id']}"
     assert results[1]["id"] == "45deg", f"second should be 45deg, got {results[1]['id']}"
     assert results[2]["id"] == "90deg", f"farthest should be 90deg, got {results[2]['id']}"
 
@@ -183,17 +182,17 @@ def test_deterministic():
     idx = NumpyIndex()
     import random
     random.seed(99)
-    dim  = 768
+    dim = 768
     vecs = [[random.gauss(0, 1) for _ in range(dim)] for _ in range(20)]
     idx.build(
-        ids       = [str(i) for i in range(20)],
-        embeddings= vecs,
-        topics    = ["t"] * 20,
-        documents = [f"doc {i}" for i in range(20)],
+        ids=[str(i) for i in range(20)],
+        embeddings=vecs,
+        topics=["t"] * 20,
+        documents=[f"doc {i}" for i in range(20)],
     )
-    q       = [random.gauss(0, 1) for _ in range(dim)]
-    first   = [r["id"] for r in idx.search(q, n=5)]
-    second  = [r["id"] for r in idx.search(q, n=5)]
+    q = [random.gauss(0, 1) for _ in range(dim)]
+    first = [r["id"] for r in idx.search(q, n=5)]
+    second = [r["id"] for r in idx.search(q, n=5)]
     assert first == second, "search must be deterministic"
 
 
@@ -205,19 +204,20 @@ def test_search_speed_200_docs():
     Regression guard: if we accidentally regress to Python loops this fails.
     Numpy target: ~0.05ms per search → 1000 calls ≈ 50ms.
     """
-    import time, random
+    import time
+    import random
     random.seed(7)
-    dim  = 768
-    n    = 200
+    dim = 768
+    n = 200
     vecs = [[random.gauss(0, 1) for _ in range(dim)] for _ in range(n)]
-    q    = [random.gauss(0, 1) for _ in range(dim)]
+    q = [random.gauss(0, 1) for _ in range(dim)]
 
     idx = NumpyIndex()
     idx.build(
-        ids       = [str(i) for i in range(n)],
-        embeddings= vecs,
-        topics    = ["t"] * n,
-        documents = [f"doc {i}" for i in range(n)],
+        ids=[str(i) for i in range(n)],
+        embeddings=vecs,
+        topics=["t"] * n,
+        documents=[f"doc {i}" for i in range(n)],
     )
 
     start = time.perf_counter()

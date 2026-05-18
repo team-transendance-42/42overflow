@@ -18,8 +18,8 @@ def test_ask_returns_answer():
     assert "answer" in data, "response missing 'answer'"
     assert len(data["answer"]) > 0, "answer must not be empty"
 
-    print(f"\n── /rag/ask response ───────────────────────────────────")
-    print(f"  question : 'what is a segfault?'")
+    print("\n── /rag/ask response ───────────────────────────────────")
+    print("  question : 'what is a segfault?'")
     print(f"  answer   : {data['answer'][:200]!r}")
     print("✓ /rag/ask: valid response with answer")
 

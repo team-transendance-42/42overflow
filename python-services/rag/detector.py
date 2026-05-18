@@ -27,7 +27,7 @@ Edge cases:
 import numpy as np
 
 _CONFIDENCE_THRESHOLD = 0.70   # minimum similarity score to trust detection
-_MARGIN_THRESHOLD     = 0.08   # best must beat second-best by at least this much
+_MARGIN_THRESHOLD = 0.08   # best must beat second-best by at least this much
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -62,7 +62,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 def build_topic_centroids(
-    pairs:      list[dict],
+    pairs: list[dict],
     embeddings: list[list[float]],
 ) -> dict[str, list[float]]:
     """
@@ -98,8 +98,8 @@ def build_topic_centroids(
     # Compute centroid: stack into (N_docs, D) matrix, take mean over axis=0
     centroids: dict[str, list[float]] = {}
     for topic, vecs in topic_vecs.items():
-        matrix   = np.stack(vecs)          # shape: (n_docs, dim)
-        centroid = np.mean(matrix, axis=0) # shape: (dim,)
+        matrix = np.stack(vecs)          # shape: (n_docs, dim)
+        centroid = np.mean(matrix, axis=0)  # shape: (dim,)
         centroids[topic] = centroid.tolist()
 
     return centroids
@@ -107,7 +107,7 @@ def build_topic_centroids(
 
 def detect_topic(
     question_embedding: list[float],
-    centroids:          dict[str, list[float]],
+    centroids: dict[str, list[float]],
 ) -> tuple[str | None, float]:
     """
     Detect which topic a question belongs to using centroid similarity.
@@ -135,7 +135,7 @@ def detect_topic(
     if not centroids:
         return None, 0.0
 
-    topics  = list(centroids.keys())
+    topics = list(centroids.keys())
 
     # Stack centroids: shape (T, D)
     C = np.stack([np.array(v, dtype=np.float32) for v in centroids.values()])
@@ -152,21 +152,21 @@ def detect_topic(
     # Normalize centroid rows; avoid division by zero for zero centroids
     c_norms = np.linalg.norm(C, axis=1, keepdims=True)
     c_norms = np.where(c_norms == 0.0, 1.0, c_norms)  # safe divide
-    C_unit  = C / c_norms
+    C_unit = C / c_norms
 
     # All cosine similarities in one matrix-vector multiply
     scores = C_unit @ q_unit  # shape: (T,)
 
-    best_idx    = int(np.argmax(scores))
-    best_topic  = topics[best_idx]
-    best_score  = float(scores[best_idx])
+    best_idx = int(np.argmax(scores))
+    best_topic = topics[best_idx]
+    best_score = float(scores[best_idx])
 
     # Second-best: set best to -inf, find new argmax
     second_score = 0.0
     if len(topics) > 1:
-        scores_copy            = scores.copy()
-        scores_copy[best_idx]  = -np.inf
-        second_score           = float(scores_copy[np.argmax(scores_copy)])
+        scores_copy = scores.copy()
+        scores_copy[best_idx] = -np.inf
+        second_score = float(scores_copy[np.argmax(scores_copy)])
 
     margin = best_score - second_score
 

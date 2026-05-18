@@ -25,15 +25,15 @@ class BM25Index:
     """
 
     def __init__(self) -> None:
-        self._bm25:   BM25Plus | None = None
-        self._ids:    list[str]       = []
-        self._topics: list[str]       = []   # parallel to _ids; "" if no topics stored
+        self._bm25: BM25Plus | None = None
+        self._ids: list[str] = []
+        self._topics: list[str] = []   # parallel to _ids; "" if no topics stored
 
     def build(
         self,
         documents: list[str],
-        ids:       list[str],
-        topics:    list[str] | None = None,
+        ids: list[str],
+        topics: list[str] | None = None,
     ) -> None:
         """
         Tokenize documents and build the BM25+ index.
@@ -46,15 +46,15 @@ class BM25Index:
         """
         if not documents:
             raise ValueError("Cannot build BM25 index from an empty document list")
-        tokenized    = [_tokenize(doc) for doc in documents]
-        self._bm25   = BM25Plus(tokenized)
-        self._ids    = list(ids)
+        tokenized = [_tokenize(doc) for doc in documents]
+        self._bm25 = BM25Plus(tokenized)
+        self._ids = list(ids)
         self._topics = list(topics) if topics else [""] * len(ids)
 
     def search(
         self,
-        query:        str,
-        n:            int = 20,
+        query: str,
+        n: int = 20,
         topic_filter: str | None = None,
     ) -> list[dict]:
         """

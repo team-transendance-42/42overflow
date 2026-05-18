@@ -28,6 +28,11 @@ from config import LLM_MODEL, OLLAMA_URL
 # Reused across requests — avoids opening a new TCP connection per call.
 _http = httpx.AsyncClient(timeout=300.0)
 
+# Maximum characters kept per context block in the prompt.
+# Theory: shorter context = fewer tokens = faster per-token generation.
+# ~300 chars ≈ 75-100 tokens — enough to convey an answer, not enough to bloat.
+MAX_CONTEXT_CHARS = 300
+
 
 def _extract_answer(text: str) -> str:
     """
@@ -61,34 +66,68 @@ def _extract_answer(text: str) -> str:
     return answer if answer else text  # empty answer → fallback to full text
 
 
+def _truncate(text: str, max_chars: int = MAX_CONTEXT_CHARS) -> str:
+    """
+    Truncate text to max_chars characters, appending '…' when cut.
+
+    Theory: limits context tokens per retrieved block so the LLM prompt stays
+    short and generation latency stays low (attention is quadratic in sequence
+    length on CPU). The ellipsis signals to the LLM that the snippet is partial.
+
+    Pros:
+      - Predictable token budget per context block
+      - Ellipsis gives the LLM a hint that more detail exists
+
+    Edge cases:
+      - text ≤ max_chars → returned unchanged, no ellipsis added
+      - max_chars=0 → returns '…' (degenerate but won't crash)
+    """
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "…"
+
+
 def build_prompt(question: str, contexts: list[dict]) -> str:
     """
     Assemble the RAG prompt from retrieved context docs.
 
-    contexts is a list of dicts from hybrid_search:
-      [{"id": ..., "text": "Q: ...\nA: ...", "rrf_score": ...}, ...]
+    Instructs the LLM to explain as a tutor, not to extract sentences.
+    Each context block is reduced to its answer-only snippet so the
+    retrieved question prefix does not occupy tokens unnecessarily.
+    Long snippets are truncated to MAX_CONTEXT_CHARS to keep the prompt
+    short and generation fast on CPU.
 
-    Each block is reduced to its answer-only snippet (≤ MAX_CONTEXT_CHARS chars).
-    Numbering context blocks lets the model cite sources and makes it easy to
-    trace which retrieved doc drove the answer.
+    Pros:
+      - Tutor framing → model synthesises and explains, not copy-pastes
+      - Answer-only + truncation → ~50-70% fewer context tokens
+      - Numbered blocks → easy to trace which doc drove the answer
 
-    Pros of answer-only truncated format:
-      - ~40-60% fewer context tokens vs full Q&A
-      - Faster per-token generation on CPU (linear attention cost)
+    Cons:
+      - Truncation may drop tail of very long answers (rare in 42 FAQ docs)
+
+    Edge cases:
+      - Empty contexts → fallback message, structure stays intact
+      - Malformed doc (no 'A: ') → _extract_answer falls back to full text
     """
     if not contexts:
         context_str = "(no context retrieved)"
     else:
         blocks = [
-            f"[{i+1}] {_extract_answer(c['text'])}"
+            f"[{i + 1}] {_truncate(_extract_answer(c['text']))}"
             for i, c in enumerate(contexts)
         ]
         context_str = "\n\n".join(blocks)
 
     return (
-        "You are a helpful assistant for 42 school students.\n"
-        "Answer using ONLY the context provided below.\n"
-        "If the context does not contain enough information, say so briefly.\n\n"
+        "You are a tutor for 42 school students.\n"
+        "Using the context below as your source, explain the concept clearly\n"
+        "and completely — as if the student asked you in person.\n"
+        "Cover what it is, why it matters, and the key details.\n"
+        "Synthesise naturally; do not copy sentences verbatim from the context.\n"
+        "If the context does not contain enough to answer, say: "
+        "\"I don't have enough context to answer this fully.\"\n"
+        "Never say things like \"The community hasn't covered this\" or "
+        "\"be the first to post\" — you are a tutor, not a forum.\n\n"
         f"=== CONTEXT ===\n{context_str}\n\n"
         f"=== QUESTION ===\n{question}\n\n"
         "=== ANSWER ==="
@@ -116,4 +155,19 @@ async def generate(question: str, contexts: list[dict]) -> str:
     )
     response.raise_for_status()
 
-    return response.json()["message"]["content"].strip()
+    answer = response.json()["message"]["content"].strip()
+
+    # Small models sometimes ignore prompt instructions and emit forum-style
+    # "no answer yet" placeholders learned from pretraining data.
+    # Detect and replace rather than forward confusing output to the user.
+    _HALLUCINATION_MARKERS = [
+        "community hasn't covered",
+        "be the first to post",
+        "no one has answered",
+        "this question has no answers",
+    ]
+    if any(m in answer.lower() for m in _HALLUCINATION_MARKERS):
+        ctx_note = "with the available context" if contexts else "— no relevant context was found"
+        return f"I don't have enough information to answer this fully {ctx_note}."
+
+    return answer

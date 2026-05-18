@@ -12,7 +12,7 @@ DOCS = [
     "Q: What is malloc()?\nA: Allocates heap memory.",
     "Q: What causes a segfault?\nA: Dereferencing a null pointer.",
 ]
-IDS   = ["free-1", "malloc-2", "seg-3"]
+IDS = ["free-1", "malloc-2", "seg-3"]
 QUERY = "heap memory allocation"
 
 SEP = "─" * 60
@@ -29,7 +29,8 @@ def show_bm25_internals():
     print(SEP)
     for id_, doc in zip(IDS, DOCS):
         tokens = _tokenize(doc)
-        print(f"  {id_:10s}  {tokens}") # :10s: format as a string (s), right-pad with spaces to a width of 10 characters
+        # :10s: format as a string (s), right-pad with spaces to a width of 10 characters
+        print(f"  {id_:10s}  {tokens}")
 
     # ── STEP 2: corpus stats ─────────────────────────────────────────
     print(f"\n{SEP}")
@@ -45,15 +46,21 @@ def show_bm25_internals():
     print(f"\n{SEP}")
     print("STEP 3 — IDF for each query token")
     print(SEP)
-    print(f"  query: {QUERY!r}") # !r: format using repr(esent), which adds quotes around the string and escapes special characters, making it clear that it's a string literal in the output
+    # !r: format using repr(esent), which adds quotes and escapes special
+    # characters, making it clear that it's a string literal in the output
+    print(f"  query: {QUERY!r}")
     query_tokens = _tokenize(QUERY)
     print(f"  tokens: {query_tokens}\n")
-    print(f"  {'token':20s}  {'in docs':30s}  {'IDF':>8s}") # > here means right-align the text in a field of width 8 characters, s means it's a string; default is left align
-    print(f"  {'─'*20}  {'─'*30}  {'─'*8}")
+    # > right-align in a field of width 8 characters, s = string; default is left align
+    print(f"  {'token':20s}  {'in docs':30s}  {'IDF':>8s}")
+    print(f"  {'─' * 20}  {'─' * 30}  {'─' * 8}")
     for token in query_tokens:
-        idf = bm25.idf.get(token, 0.0) # if missing assingn 0.0, which means the token is not in the vocabulary at all (never appeared in any document), so it contributes nothing to the score.
+        # if missing assingn 0.0, which means the token is not in the vocabulary
+        # at all (never appeared in any document), so it contributes nothing to
+        # the score.
+        idf = bm25.idf.get(token, 0.0)
         in_docs = [id_ for id_, freq in zip(IDS, bm25.doc_freqs) if freq.get(token, 0) > 0]
-        in_str  = ", ".join(in_docs) if in_docs else "(none — not in vocabulary)"
+        in_str = ", ".join(in_docs) if in_docs else "(none — not in vocabulary)"
         print(f"  {token:20s}  {in_str:30s}  {idf:8.4f}")
     print()
     print("  IDF intuition: higher = rarer across docs = more signal.")
@@ -70,16 +77,16 @@ def show_bm25_internals():
         total = 0.0
         for token in query_tokens:
             idf = bm25.idf.get(token, 0.0)
-            tf  = doc_freq.get(token, 0)
+            tf = doc_freq.get(token, 0)
             if idf == 0.0:
                 print(f"    {token:20s}  tf={tf}  idf=0.0000  → not in vocab, skip")
                 continue
             # BM25+ formula:
             # score += IDF × (delta + tf×(k1+1) / (tf + k1×(1 - b + b×dl/avgdl)))
-            norm     = bm25.k1 * (1 - bm25.b + bm25.b * doc_len / bm25.avgdl)
+            norm = bm25.k1 * (1 - bm25.b + bm25.b * doc_len / bm25.avgdl)
             tf_score = bm25.delta + tf * (bm25.k1 + 1) / (tf + norm)
-            contrib  = idf * tf_score
-            total   += contrib
+            contrib = idf * tf_score
+            total += contrib
             print(f"    {token:20s}  tf={tf}  idf={idf:.4f}  "
                   f"tf_score={tf_score:.4f}  contrib={contrib:+.4f}")
         print(f"    {'TOTAL':20s}  {total:.4f}\n")
@@ -92,7 +99,7 @@ def show_bm25_internals():
     if not results:
         print("  (no results — all scores were 0)")
     for rank, r in enumerate(results):
-        print(f"  #{rank+1}  score={r['score']:.4f}  {r['id']}")
+        print(f"  #{rank + 1}  score={r['score']:.4f}  {r['id']}")
 
     print(f"\n{SEP}\n")
 

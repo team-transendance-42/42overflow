@@ -3,12 +3,12 @@ Run: uv run python -m tests.test_seed
 -m for module
 """
 
-import json
 import pytest
 from collections import Counter
 from unittest.mock import patch
 
-# VALID_TOPICS = {"c", "python", "networking", "maze", "drone", "agentsmith", "rag"} # todo if we want to?
+# VALID_TOPICS = {"c", "python", "networking", "maze", "drone",
+# "agentsmith", "rag"} # todo if we want to?
 REQUIRED_FIELDS = {"question", "answer", "topic", "tags"}
 
 
@@ -25,7 +25,8 @@ def test_seed():
         assert pair["question"].strip(), f"Pair {i} empty question"
         assert pair["answer"].strip(), f"Pair {i} empty answer"
         # assert pair["topic"] in VALID_TOPICS, f"Pair {i} invalid topic: {pair['topic']}"
-        assert isinstance(pair["tags"], list) and pair["tags"], f"Pair {i} tags must be non-empty list"
+        assert isinstance(
+            pair["tags"], list) and pair["tags"], f"Pair {i} tags must be non-empty list"
 
     dist = Counter(p["topic"] for p in pairs)
     print(f"✓ seed: {len(pairs)} pairs loaded, all fields valid")

@@ -65,7 +65,8 @@ def test_results_ordered_by_score():
     idx.build(
         [
             "Q: What is a pointer?\nA: An address in memory.",
-            "Q: What is a null pointer?\nA: A pointer that points to address zero, null pointer dereference crashes.",
+            "Q: What is a null pointer?\nA: A pointer that points to address zero,"
+            " null pointer dereference crashes.",
         ],
         ["ptr-1", "null-ptr-2"],
     )
@@ -74,7 +75,10 @@ def test_results_ordered_by_score():
     if len(results) > 1:
         assert results[0]["score"] >= results[1]["score"], \
             "results must be sorted by descending score"
-    print(f"✓ ordering: results sorted by score desc — top: {results[0]['id']} ({results[0]['score']:.3f})")
+    print(
+        f"✓ ordering: results sorted by score desc — top: {
+            results[0]['id']} ({
+            results[0]['score']:.3f})")
 
 
 def test_topic_filter_returns_only_matching_topic():
@@ -84,7 +88,7 @@ def test_topic_filter_returns_only_matching_topic():
         "Q: What is a drone?\nA: Autonomous flying vehicle.",
         "Q: What is BM25?\nA: A ranking function for text retrieval.",
     ]
-    ids    = ["edf-1", "drone-1", "bm25-1"]
+    ids = ["edf-1", "drone-1", "bm25-1"]
     topics = ["codexion", "fly-in", "rag-against-machine"]
     idx.build(docs, ids, topics=topics)
 
@@ -98,8 +102,9 @@ def test_topic_filter_returns_only_matching_topic():
 
 def test_topic_filter_none_returns_all():
     idx = BM25Index()
-    docs   = ["Q: What is malloc?\nA: Allocates heap memory.", "Q: What is deadlock?\nA: Circular wait condition."]
-    ids    = ["malloc-1", "deadlock-1"]
+    docs = ["Q: What is malloc?\nA: Allocates heap memory.",
+            "Q: What is deadlock?\nA: Circular wait condition."]
+    ids = ["malloc-1", "deadlock-1"]
     topics = ["topic-a", "topic-b"]
     idx.build(docs, ids, topics=topics)
 

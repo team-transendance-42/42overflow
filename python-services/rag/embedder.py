@@ -1,5 +1,5 @@
 """
-Text embedding using fastembed (nomic-embed-text-v1.5, 768-dim).
+Text embedding using fastembed (model controlled by EMBED_MODEL env var).
 
 LRU cache on single-text embedding:
   At query time, embed_texts is called with one question. The same questions
@@ -44,12 +44,17 @@ from functools import lru_cache
 
 from fastembed import TextEmbedding
 
+from config import EMBED_MODEL
+
 # Loaded once at module import — stays in RAM, reused on every request.
 # fastembed downloads the model to ~/.cache/fastembed/ on first use;
 # the Dockerfile pre-downloads it at build time so container startup is instant.
-_model = TextEmbedding("nomic-ai/nomic-embed-text-v1.5")
+# Model is controlled by EMBED_MODEL env var (see config.py):
+#   BAAI/bge-small-en-v1.5        — 384-dim, ~100 MB RAM (default, memory-constrained)
+#   nomic-ai/nomic-embed-text-v1.5 — 768-dim, ~2 GB RAM  (school computers)
+_model = TextEmbedding(EMBED_MODEL)
 
-# LRU cache size: 512 slots × 768-dim × 4 bytes ≈ 1.5MB.
+# LRU cache size: 512 slots × dim × 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
 # 512 is generous for a 42-school context — covers the most common questions.
 _CACHE_SIZE = 512
 

@@ -24,18 +24,18 @@ async def run() -> None:
 
     # 2. last entry
     last = pairs[-1]
-    print(f"\n[last entry]")
+    print("\n[last entry]")
     print(f"  topic:      {last.get('topic', '')}")
-    print(f"  difficulty: {last.get('difficulty', '')}") # we dont have this field
+    print(f"  difficulty: {last.get('difficulty', '')}")  # we dont have this field
     print(f"  Q: {last['question']}")
     print(f"  A: {last['answer'][:120]}{'...' if len(last['answer']) > 120 else ''}")
 
     # 3. embed
-    text    = format_doc(last["question"], last["answer"])
-    doc_id  = make_doc_id(last["question"])
+    text = format_doc(last["question"], last["answer"])
+    doc_id = make_doc_id(last["question"])
     doc_hash = make_doc_hash(last["question"], last["answer"])
 
-    print(f"\n[embed] sending to Ollama...")
+    print("\n[embed] sending to Ollama...")
     embeddings = await embed_texts([text])
     vec = embeddings[0]
     print(f"  embedding dim: {len(vec)}")
@@ -48,9 +48,9 @@ async def run() -> None:
         documents=[text],
         embeddings=embeddings,
         metadatas=[{
-            "topic":      last.get("topic", ""),
+            "topic": last.get("topic", ""),
             "difficulty": last.get("difficulty", ""),
-            "doc_hash":   doc_hash,
+            "doc_hash": doc_hash,
         }],
     )
     print(f"\n[store] upserted 1 doc  id={doc_id[:16]}...")
