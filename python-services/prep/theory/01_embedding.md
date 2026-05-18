@@ -1,4 +1,41 @@
-A vector is just a list of numbers with a fixed length (its "dimension").
+
+  What is embedding?
+
+  An embedding model reads text and outputs a fixed-length list of
+  numbers — a vector. Semantically similar text gets numerically similar
+   vectors.
+
+  "what is a pointer?"      → [0.12, -0.34, 0.78, ...]  768 numbers
+  "how does a pointer work?" → [0.11, -0.33, 0.79, ...]  close → similar
+   meaning
+  "what is pasta?"           → [-0.45, 0.87, 0.02, ...]  far away →
+  different meaning
+
+  This is called "dense" because every dimension has a value (vs BM25
+  which is "sparse" — mostly zeros, only non-zero for words that
+  appear).
+
+  Who creates the vectors in your stack?
+
+  Only one thing: fastembed with model nomic-ai/nomic-embed-text-v1.5 in
+   your embedder.py:50.
+
+  text
+    ↓
+  fastembed (nomic-embed-text-v1.5)   ← THE ONLY THING THAT CREATES
+  VECTORS
+    ↓
+  vector [float, float, float ...]
+    ↓                    ↓
+  NumpyIndex (RAM)   ChromaDB (disk)
+    stores it           stores it
+    searches it         searched it (before NumpyIndex replaced it)
+
+  NumpyIndex and ChromaDB are storage + search only. Neither creates
+  embeddings. ChromaDB can call an embedding function internally but you
+   never configured that — you always hand it pre-made vectors from
+  fastembed.
+===============================================A vector is just a list of numbers with a fixed length (its "dimension").
 Every number is called a "component" or "dimension".
 
 In geometry: a 2D vector [3, 4] is an arrow pointing to x=3, y=4.

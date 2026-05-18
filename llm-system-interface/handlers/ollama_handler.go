@@ -6,6 +6,7 @@ import (
 	"llm-system-interface/services"
 	"log"
 	"net/http"
+	"time"
 )
 
 // This is the "Line". A capacity of 1 means only 1 student at a time.
@@ -20,7 +21,15 @@ func GenerateOllamaText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 1. GET IN LINE
-	ollamaQueue <- struct{}{}
+	// ollamaQueue <- struct{}{}
+	select {
+	case ollamaQueue <- struct{}{}:
+	case <-r.Context().Done():
+		return
+	case <-time.After(30 * time.Second):
+		http.Error(w, "Ollama is busy, try again shortly", http.StatusServiceUnavailable)
+		return
+	}
 	defer func() { 
         <-ollamaQueue 
         log.Println("Ollama slot released for next student.")

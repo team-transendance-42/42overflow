@@ -40,7 +40,8 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
 
     try:
         contexts = await hybrid_search(
-            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids
+            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids,
+            top_k=4,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
@@ -67,7 +68,8 @@ async def ask(body: AskRequest, request: Request) -> AskResponse:
 
     try:
         contexts = await hybrid_search(
-            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids
+            body.question, bm25_index, numpy_index, id_to_text, id_to_topic, centroids,
+            top_k=4,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc))

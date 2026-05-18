@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"llm-system-interface/models"
 	"net/http"
 	"os"
@@ -68,37 +69,6 @@ func extractAnswer(text string) string {
 	return answer
 }
 
-// doJSON sends a JSON request and decodes the response into out (nil to discard).
-func doJSON(ctx context.Context, method, url string, in any, out any) error {
-	b, err := json.Marshal(in)
-	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(b))
-	if err != nil {
-		return fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("http %d from %s", resp.StatusCode, url)
-	}
-	if out == nil {
-		return nil
-	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("unmarshal response: %w", err)
-	}
-	return nil
-}
-
 // doJSONWithRetry is like doJSON but retries on network errors and transient
 // HTTP failures using withRetry.
 //
@@ -151,12 +121,33 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 	return nil
 }
 
+// buildRAGPrompt builds the grounded prompt sent to Ollama.
+// Key constraints:
+//   - "ONLY from posts" stops the model using its own training data.
+//   - "do NOT include that sentence" prevents Gemma from appending the
+//     fallback phrase at the end of real answers (observed with Gemma 4B).
+func buildRAGPrompt(ctxStr, question string) string {
+	return "Answer ONLY from the community posts below. No outside knowledge.\n" +
+		"If the posts contain no relevant answer, respond with ONLY this sentence: " +
+		"\"The community hasn't covered this yet \xe2\x80\x94 be the first to post it!\"\n" +
+		"If you give an answer, do NOT include that sentence.\n\n" +
+		"Posts:\n---\n" + ctxStr + "\n\n" +
+		"Question: " + question
+}
+
 // StreamRagAnswer retrieves community contexts from the Python RAG service,
 // builds a grounded prompt, and streams Gemma's answer token by token.
 func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error) {
 	question = strings.TrimSpace(question)
 	if question == "" {
 		return nil, fmt.Errorf("question is required")
+	}
+
+	if cached, ok := ragCacheGet(question); ok {
+		ch := make(chan string, 1)
+		ch <- cached
+		close(ch)
+		return ch, nil
 	}
 
 	var retrieved models.RagRetrieveResponse
@@ -177,17 +168,12 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		ctxStr = strings.Join(blocks, "\n\n")
 	}
 
-	prompt := "You are a peer assistant for School 42.\n" +
-		"Answer ONLY from the community posts below.\n" +
-		"Do not use any knowledge outside these posts.\n" +
-		"If the posts do not contain enough to answer, reply with exactly:\n" +
-		"\"The community hasn't covered this yet \xe2\x80\x94 be the first to post it!\"\n\n" +
-		"Community posts:\n---\n" + ctxStr + "\n\n" +
-		"Question: " + question
+	prompt := buildRAGPrompt(ctxStr, question)
 
 	body, err := json.Marshal(map[string]any{
-		"model":  chatModelName(),
-		"stream": true,
+		"model":      chatModelName(),
+		"stream":     true,
+		"keep_alive": -1,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},
@@ -207,8 +193,24 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	if err != nil {
 		return nil, fmt.Errorf("ollama stream: %w", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("ollama HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
 
-	ch := make(chan string)
-	go readOllamaToChannel(ctx, resp, ch)
-	return ch, nil
+	rawCh := make(chan string)
+	go readOllamaToChannel(ctx, resp, rawCh)
+
+	outCh := make(chan string)
+	go func() {
+		defer close(outCh)
+		var sb strings.Builder
+		for chunk := range rawCh {
+			sb.WriteString(chunk)
+			outCh <- chunk
+		}
+		ragCacheSet(question, sb.String())
+	}()
+	return outCh, nil
 }

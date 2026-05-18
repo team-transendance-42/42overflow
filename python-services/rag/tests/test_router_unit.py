@@ -84,3 +84,21 @@ def test_ask_502_when_generate_raises():
         resp = _make_client(bm25=object()).post("/rag/ask", json={"question": "segfault"})
 
     assert resp.status_code == 502
+
+
+def test_retrieve_passes_top_k_4_to_hybrid_search():
+    with patch("router.hybrid_search", new=AsyncMock(return_value=[])) as mock_search:
+        _make_client(bm25=object()).post("/rag/retrieve", json={"question": "malloc"})
+
+    call_kwargs = mock_search.call_args.kwargs
+    assert call_kwargs.get("top_k") == 4, f"expected top_k=4, got {call_kwargs}"
+
+
+def test_ask_passes_top_k_4_to_hybrid_search():
+    mock_hits = [{"id": "x", "text": "Q: foo\nA: bar", "rrf_score": 0.03}]
+    with patch("router.hybrid_search", new=AsyncMock(return_value=mock_hits)) as mock_search, \
+         patch("router.generate", new=AsyncMock(return_value="an answer")):
+        _make_client(bm25=object()).post("/rag/ask", json={"question": "malloc"})
+
+    call_kwargs = mock_search.call_args.kwargs
+    assert call_kwargs.get("top_k") == 4, f"expected top_k=4, got {call_kwargs}"

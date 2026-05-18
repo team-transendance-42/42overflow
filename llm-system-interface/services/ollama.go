@@ -125,6 +125,11 @@ func StreamOllama(ctx context.Context, req models.TextRequest) (<-chan string, e
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("ollama HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
 
 	ch := make(chan string)
 	go readOllamaToChannel(ctx, resp, ch)

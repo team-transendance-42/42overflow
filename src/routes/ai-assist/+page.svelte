@@ -471,7 +471,7 @@
         const res = await fetch(endpoint, { // endpoint is the url
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages, prompt}),
+            body: JSON.stringify({ messages }),
             signal
         });
 

@@ -85,62 +85,54 @@ def upsert(
         raise _chroma_error("upsert", exc) from exc
 
 
-def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
-    """Fetch documents, embeddings, and metadatas for the given IDs from ChromaDB."""
-    try:
-        col = _client.get_or_create_collection(name)
-        return col.get(ids=ids, include=["embeddings", "documents", "metadatas"])
-    except Exception as exc:
-        raise _chroma_error("retrieve", exc) from exc
+# NOT USED in production — only called from tests/flow_seed_embed_store.py.
+# NumpyIndex replaced both functions below for all query-time retrieval.
+# Kept commented so tests still document what ChromaDB used to provide.
+
+# def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
+#     """Fetch documents, embeddings, and metadatas for the given IDs from ChromaDB."""
+#     try:
+#         col = _client.get_or_create_collection(name)
+#         return col.get(ids=ids, include=["embeddings", "documents", "metadatas"])
+#     except Exception as exc:
+#         raise _chroma_error("retrieve", exc) from exc
 
 
-# performs a vector similarity search in a ChromaDB collection(table)
-# Takes an embedding (a list of floats representing a vector), a number n, and a collection name.
-# Connects to ChromaDB and retrieves the specified collection. Uses ChromaDB’s HNSW index to find the n most similar vectors (nearest neighbors) to the given embedding in the collection.
-# Returns a list of dictionaries, each containing the id, document, and distance (similarity score) for each neighbor, sorted by similarity (most similar first).
-def query_dense(
-    embedding:    list[float],
-    n:            int = 20,
-    topic_filter: str | None = None,
-    name:         str = _DEFAULT_COLLECTION,
-) -> list[dict]:
-    """
-    Find the n nearest neighbours to embedding in the collection.
+# NOT USED in production — replaced by NumpyIndex.search().
+# ChromaDB HNSW search cost: ~50-150ms network roundtrip per call.
+# NumpyIndex cosine similarity cost: ~0.05ms in-process matrix multiply.
+# Kept commented to document the ChromaDB-based approach for reference.
 
-    Uses ChromaDB's HNSW index — approximate nearest neighbour search
-    (O(log n)) rather than brute-force (O(n)).
-
-    Args:
-        embedding:    query vector (768-dim for nomic-embed-text-v1.5).
-        n:            max results to return.
-        topic_filter: if given, restrict search to docs where metadata
-                      topic == topic_filter. None = search full collection.
-        name:         ChromaDB collection name.
-
-    Returns: [{"id": ..., "document": ..., "distance": ...}]
-    sorted by ascending distance (most similar first).
-    """
-    try:
-        col   = _client.get_or_create_collection(name)
-        where = {"topic": topic_filter} if topic_filter else None
-
-        safe_n = min(n, col.count())
-        if safe_n == 0:
-            return []
-
-        result = col.query(
-            query_embeddings=[embedding],
-            n_results=safe_n,
-            where=where,
-            include=["documents", "distances"],
-        )
-    except Exception as exc:
-        raise _chroma_error("query_dense", exc) from exc
-
-    ids       = result["ids"][0]
-    documents = result["documents"][0]
-    distances = result["distances"][0]
-    return [
-        {"id": id_, "document": doc, "distance": dist}
-        for id_, doc, dist in zip(ids, documents, distances)
-    ]
+# def query_dense(
+#     embedding:    list[float],
+#     n:            int = 20,
+#     topic_filter: str | None = None,
+#     name:         str = _DEFAULT_COLLECTION,
+# ) -> list[dict]:
+#     """
+#     Find the n nearest neighbours to embedding in the collection.
+#     Uses ChromaDB’s HNSW index (approximate, O(log n)).
+#     topic_filter restricts to docs where metadata topic == topic_filter.
+#     Returns: [{"id": ..., "document": ..., "distance": ...}] sorted by distance.
+#     """
+#     try:
+#         col   = _client.get_or_create_collection(name)
+#         where = {"topic": topic_filter} if topic_filter else None
+#         safe_n = min(n, col.count())
+#         if safe_n == 0:
+#             return []
+#         result = col.query(
+#             query_embeddings=[embedding],
+#             n_results=safe_n,
+#             where=where,
+#             include=["documents", "distances"],
+#         )
+#     except Exception as exc:
+#         raise _chroma_error("query_dense", exc) from exc
+#     ids       = result["ids"][0]
+#     documents = result["documents"][0]
+#     distances = result["distances"][0]
+#     return [
+#         {"id": id_, "document": doc, "distance": dist}
+#         for id_, doc, dist in zip(ids, documents, distances)
+#     ]
