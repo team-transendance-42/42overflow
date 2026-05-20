@@ -13,31 +13,39 @@
   let error = '';
   let success = false;
   let loading = false;
+  let avatarRemoved = false;
 
   let fileInput: HTMLInputElement;
 
   function handleFileChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) previewUrl = URL.createObjectURL(file);
+    if (file) {
+      previewUrl = URL.createObjectURL(file);
+      avatarRemoved = false;
+    }
   }
 
   function removeAvatar() {
-  previewUrl = '';
-  if (fileInput) fileInput.value = ''; // reset the input
-}
-async function handleUpdate() {
-  error = '';
-  success = false;
-  loading = true;
-
-  const formData = new FormData();
-  formData.append('interests', interests);
-  formData.append('username', username);
-  formData.append('firstname', firstname);
-  formData.append('lastname', lastname);
-  if (fileInput?.files?.[0]) {
-    formData.append('avatarimage', fileInput.files[0]);
+    previewUrl = '';
+    if (fileInput) fileInput.value = '';
+    avatarRemoved = true;
   }
+
+  async function handleUpdate() {
+    error = '';
+    success = false;
+    loading = true;
+
+    const formData = new FormData();
+    formData.append('interests', interests);
+    formData.append('username', username);
+    formData.append('firstname', firstname);
+    formData.append('lastname', lastname);
+    if (fileInput?.files?.[0]) {
+      formData.append('avatarimage', fileInput.files[0]);
+    } else if (avatarRemoved) {
+      formData.append('removeAvatar', 'true');
+    }
 
   const res = await fetch('?/update', {
     method: 'POST',

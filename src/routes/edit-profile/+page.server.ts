@@ -1,5 +1,4 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { auth } from '$lib/server/auth';
 import { db } from '$lib/server/db';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -21,7 +20,7 @@ export const actions: Actions = {
 
     const data = await request.formData();
     const avatarFile = data.get('avatarimage') as File;
-
+	const removeAvatar = data.get('removeAvatar') === 'true';
     let imageUrl: string | null = null;
 
     if (avatarFile && avatarFile.size > 0) 
@@ -49,7 +48,7 @@ export const actions: Actions = {
 		name?: string;
 		first_name?: string;
 		last_name?: string;
-		image?: string;
+		image?: string | null;
 	} = {};
 
 	if (interests) updateData.interests = interests;
@@ -57,6 +56,7 @@ export const actions: Actions = {
 	if (firstname) updateData.first_name = firstname;
 	if (lastname) updateData.last_name = lastname;
 	if (imageUrl) updateData.image = imageUrl;
+	else if (removeAvatar) updateData.image = null;
 
 	if (Object.keys(updateData).length > 0) {
 		await db.user.update({
