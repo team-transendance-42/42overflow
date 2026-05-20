@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation'; 
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
+  import Button from '$lib/components/Button.svelte';
 
   let projectname = "";
   let body = "";
@@ -58,7 +59,7 @@
     rows={5}
   />
 
-  <button on:click={submitQuestion} disabled={submitting}>Submit</button>
+  <Button label="Submit" type="button" onClick={submitQuestion}/>
 
 </div>
 
