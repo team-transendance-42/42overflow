@@ -1,10 +1,10 @@
 <script lang="ts">
   export let label = "Button";
-  export const variant: "button" | "submit" | "reset" = "button";
+  export let type: "button" | "submit" | "reset" = "button";
   export let onClick = () => {};
 </script>
 
-<button type={variant} on:click={onClick}>
+<button type={type} on:click={onClick}>
   {label}
 </button>
 

@@ -70,7 +70,7 @@
 
 </script>
 
-<form method="POST" action="?/update" use:enhance enctype="multipart/form-data">
+<form method="POST" action="?/update" enctype="multipart/form-data" on:submit|preventDefault={handleUpdate}>
 <div class="profile-page">
   <h1><strong>PROFILE PAGE</strong></h1>
 
