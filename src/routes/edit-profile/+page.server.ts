@@ -5,17 +5,12 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals }) => 
+{
   if (!locals.user) throw redirect(303, '/login');
-
-  // also load user-specific fields
-//   const profile = await db.user.findUnique({
-//     where: { id: locals.user.id }
-//   });
 
   return {
     user: locals.user,
-    // profile
   };
 };
 
@@ -28,7 +23,8 @@ export const actions: Actions = {
 
     let imageUrl: string | null = null;
 
-    if (avatarFile && avatarFile.size > 0) {
+    if (avatarFile && avatarFile.size > 0) 
+{
       const uploadsDir = join('static', 'uploads');
       mkdirSync(uploadsDir, { recursive: true });
       const ext = avatarFile.name.split('.').pop();
@@ -38,7 +34,8 @@ export const actions: Actions = {
       imageUrl = `/uploads/${filename}`;
     }
 
-    await db.user.update({
+    await db.user.update(
+	{
       where: { id: locals.user.id },
       data: {
         //login: data.get('intraprofile') as string || undefined,

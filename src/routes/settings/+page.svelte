@@ -13,8 +13,6 @@
 <div class="settings-page">
   <h1><strong>SETTINGS</strong></h1>
 
-
-  <p> Preferences</p>
   
 <div class="editprofile">
    		<a href="edit-profile">Edit Profile </a>
