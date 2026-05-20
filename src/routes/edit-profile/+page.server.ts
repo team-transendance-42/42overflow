@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { Actions, PageServerLoad } from './$types';
+import { error } from 'console';
 
 export const load: PageServerLoad = async ({ locals }) => 
 {
@@ -24,47 +25,39 @@ export const actions: Actions = {
     let imageUrl: string | null = null;
 
     if (avatarFile && avatarFile.size > 0) 
-{
+	{
+	const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+	if (!allowedTypes.includes(avatarFile.type)) {
+    	throw error(400, 'Invalid image type');
+  	}
       const uploadsDir = join('static', 'uploads');
       mkdirSync(uploadsDir, { recursive: true });
-      const ext = avatarFile.name.split('.').pop();
+      const ext = avatarFile.type.split('/')[1];
       const filename = `${locals.user.id}.${ext}`;
       const buffer = Buffer.from(await avatarFile.arrayBuffer());
       writeFileSync(join(uploadsDir, filename), buffer);
       imageUrl = `/uploads/${filename}`;
     }
 
-    await db.user.update(
-	{
-      where: { id: locals.user.id },
-      data: {
-        //login: data.get('intraprofile') as string || undefined,
-        interests: data.get('interests') as string || undefined,
-        name: data.get('username') as string || undefined,
-      },
-    });
-
-	const firstname = data.get('firstname');
-	const lastname = data.get('lastname');
+	const interests = data.get('interests') as string;
+	const username = data.get('username') as string;
+	const firstname = data.get('firstname') as string;
+	const lastname = data.get('lastname') as string;
 
 	const updateData: {
+		interests?: string;
+		name?: string;
 		first_name?: string;
 		last_name?: string;
 		image?: string;
 	} = {};
 
-	// Create an update object only with the fields that are provided
-	if (typeof firstname === 'string' && firstname !== undefined) {
-		updateData.first_name = firstname;
-	}
-	if (typeof lastname === 'string' && lastname !== undefined) {
-		updateData.last_name = lastname;
-	}
-	if (imageUrl) {
-		updateData.image = imageUrl;
-	}
+	if (interests) updateData.interests = interests;
+	if (username) updateData.name = username;
+	if (firstname) updateData.first_name = firstname;
+	if (lastname) updateData.last_name = lastname;
+	if (imageUrl) updateData.image = imageUrl;
 
-	// Only perform the update if there are fields to update
 	if (Object.keys(updateData).length > 0) {
 		await db.user.update({
 			where: { id: locals.user.id },
