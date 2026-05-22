@@ -13,7 +13,10 @@
 </script>
 
 <div class="subjects-container">
-  <h1>Subjects</h1>
+  <div class="subjects-header">
+    <h1>Subjects</h1>
+    <a class="create-subject-link" href="/subjects/create">Create your own subject</a>
+  </div>
   
   {#if data.subjects.length > 0}
     <div class="subject-grid">
@@ -45,6 +48,31 @@
 <style>
   .subjects-container {
     padding: 1rem;
+  }
+
+  .subjects-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .subjects-header h1 {
+    margin: 0;
+  }
+
+  .create-subject-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    text-decoration: none;
+    color: #000000;
+    font-weight: 600;
+  }
+
+  .create-subject-link:hover {
+    text-decoration: underline;
   }
 
   .subject-grid {
