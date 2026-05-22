@@ -1,0 +1,177 @@
+<script lang="ts">
+	import { goto } from "$app/navigation";
+
+	export let subject: {
+		id: number;
+		name: string;
+		slug: string;
+		description: string;
+		created_at: Date;
+		memberCount: number;
+		postCount: number;
+		isMember: boolean;
+	};
+	export let isLoggedIn = false;
+	let isMember = subject.isMember;
+
+	const formatDate = (date: Date) => {
+		return new Date(date).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	};
+
+	async function subscribe(event: MouseEvent) {
+    event.preventDefault();
+
+    const res = await fetch(`/api/subjects/${encodeURIComponent(subject.slug)}/subscriptions`, {
+      method: 'POST'
+    });
+
+    if (!res.ok) {
+      console.error('Subscribe failed');
+      return;
+    }
+	isMember = true;
+	window.location.reload();
+  }
+
+  async function unsubscribe(event: MouseEvent) {
+    event.preventDefault();
+
+    const res = await fetch(`/api/subjects/${encodeURIComponent(subject.slug)}/subscriptions`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) {
+      console.error('Unsubscribe failed');
+      return;
+	}
+	isMember = false;
+	window.location.reload();
+  }
+</script>
+
+<div class="subject-box">
+	<a class="card-link" href={`/s/${subject.slug}`} aria-label={'Open subject ' + subject.name}></a>
+	<div class="name-header">
+		<h2>{subject.name}</h2>
+		<p class="slug">/s/{subject.slug}</p>
+	</div>
+	{#if subject.description}
+		<p class="description">{subject.description}</p>
+	{/if}
+
+	<div class="metadata">
+		<div class="meta-item">
+			<span class="label">Members:</span>
+			<span class="value">{subject.memberCount}</span>
+		</div>
+		<div class="meta-item">
+			<span class="label">Posts:</span>
+			<span class="value">{subject.postCount}</span>
+		</div>
+		<div class="meta-item">
+			<span class="label">Created:</span>
+			<span class="value">{formatDate(subject.created_at)}</span>
+		</div>
+	</div>
+
+	<!-- Optionally show a "View" link if the user is logged in -->
+	{#if !isLoggedIn}
+		<a class="action subscribe" href="/login">Subscribe</a>
+	{:else if isMember}
+		<button class="action unsubscribe" on:click={unsubscribe}>Unsubscribe</button>
+	{:else}
+		<button class="action subscribe" on:click={subscribe}>Subscribe</button>
+	{/if}
+</div>
+
+<style>
+	.subject-box {
+		position: relative;
+		border: 1px solid var(--color-neutral-400);
+		border-radius: var(--radius-md);
+		padding: 0.9rem;
+		background: var(--color-neutral-100);
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		max-width: 600px;
+	}
+	.card-link {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+	}
+	.name-header {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.name-header h2 {
+		margin: 0;
+	}
+
+	.name-header .slug {
+		margin: 0;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 1.25rem;
+	}
+
+	.slug {
+		margin: 0;
+		color: #666;
+		font-size: 0.9rem;
+	}
+
+	.description {
+		margin: 0;
+		color: #555;
+		font-size: 0.95rem;
+		line-height: 1.4;
+	}
+
+	.metadata {
+		display: flex;
+		gap: 1.5rem;
+		font-size: 0.9rem;
+		padding-top: 0.5rem;
+	}
+
+	.meta-item {
+		display: flex;
+		flex-direction: row;
+		gap: 0.25rem;
+	}
+
+	.label {
+		color: #999;
+		font-weight: 500;
+	}
+
+	.value {
+		color: #333;
+		font-weight: 600;
+	}
+
+	.action {
+		position: relative;
+		z-index: 3;
+		display: inline-flex;
+		width: fit-content;
+		align-self: flex-start;
+	}
+	.action.subscribe {
+		background-color: green;
+	}
+
+	.action.unsubscribe {
+		background-color: red;
+	}
+</style>

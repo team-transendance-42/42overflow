@@ -46,6 +46,27 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   });
 
   if (!subject || subject.deleted_at) throw error(404, 'Subject not found');
+  const membership = await prisma.subjectMember.findUnique({
+    where: {
+      userId_subjectId: {
+        userId: locals.user.id,
+        subjectId: subject.id
+      }
+    },
+    select: { role: true }
+  });
+
+  if (!membership) throw error(404, 'Subscription not found');
+
+  if (membership.role === SubjectRole.OWNER) {
+    const ownerCount = await prisma.subjectMember.count({
+      where: { subjectId: subject.id, role: SubjectRole.OWNER }
+    });
+
+    if (ownerCount <= 1) {
+      throw error(400, 'Cannot unsubscribe: subject must have at least one owner');
+    }
+  }
 
   await prisma.subjectMember.delete({
     where: {
@@ -56,5 +77,5 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
     }
   });
 
-  return json({ ok: true }, { status: 200 });
+  return json({ ok: true }, { status: 200 }); 
 };

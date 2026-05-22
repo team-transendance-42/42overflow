@@ -1,172 +1,85 @@
 <script lang="ts">
-  let name = '';
-  let description = '';
-  let message = '';
-  let error = '';
-  let slug = '';
+  import SubjectBox from '$lib/components/SubjectBox.svelte';
+  import { page } from '$app/stores';
+  import type { PageData } from './$types';
 
-  async function handleSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    message = '';
-    error = '';
+  export let data: PageData;
 
-    const res = await fetch('/api/subjects/create', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, description })
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      error = text || 'Failed to create subject';
-      return;
-    }
-
-    const subject = await res.json();
-    message = `Created subject: ${subject.name}`;
-    name = '';
-    description = '';
+  function hrefFor(pageNum: number) {
+    const params = new URLSearchParams($page.url.searchParams as any);
+    params.set('page', String(pageNum));
+    return `${$page.url.pathname}?${params.toString()}`;
   }
-
-  async function handleArchive(e: SubmitEvent) {
-	e.preventDefault();
-	message = '';
-	error = '';
-
-	const res = await fetch('/api/subjects/archive', {
-	  method: 'POST',
-	  headers: { 'content-type': 'application/json' },
-	  body: JSON.stringify({ slug })
-	});
-
-	if (!res.ok) {
-	  const text = await res.text();
-	  error = text || 'Failed to archive subject';
-	  return;
-	}
-
-	const subject = await res.json();
-	message = `Archived subject: ${subject.name}`;
-	name = '';
-	description = '';
-  }
-
-  async function handleSubscribe(e: SubmitEvent) {
-	e.preventDefault();
-	message = '';
-	error = '';
-
-	const res = await fetch(`/api/subjects/${encodeURIComponent(slug)}/subscriptions`, {
-		method: 'POST'
-	});
-
-	if (!res.ok) {
-		error = (await res.text()) || 'Failed to subscribe';
-		return;
-	}
-
-	message = 'Subscribed';
-}
-
-async function handleUnsubscribe(e: SubmitEvent) {
-  e.preventDefault();
-  message = '';
-  error = '';
-
-  const res = await fetch(`/api/subjects/${encodeURIComponent(slug)}/subscriptions`, {
-    method: 'DELETE'
-  });
-
-  if (!res.ok) {
-    error = (await res.text()) || 'Failed to unsubscribe';
-    return;
-  }
-
-  message = 'Unsubscribed';
-}
-
 </script>
 
-<div>
-<h1>Create a subject</h1>
+<div class="subjects-container">
+  <h1>Subjects</h1>
+  
+  {#if data.subjects.length > 0}
+    <div class="subject-grid">
+      {#each data.subjects as subject (subject.id)}
+        <SubjectBox subject={subject} isLoggedIn={data.isLoggedIn} />
+      {/each}
+    </div>
 
-<form on:submit={handleSubmit}>
-  <label>
-    Name
-    <input bind:value={name} required />
-  </label>
+    <div class="pagination" aria-label="Pagination">
+      {#if data.currentPage > 1}
+        <a class="btn" href={hrefFor(data.currentPage - 1)}>Prev</a>
+      {:else}
+        <button class="btn" disabled aria-disabled="true">Prev</button>
+      {/if}
 
-  <label>
-    Description
-    <textarea bind:value={description} rows="3"></textarea>
-  </label>
+      <span class="page-info"> - Page {data.currentPage} - </span>
 
-  <button type="submit">Create</button>
-</form>
-</div>
-
-
-{#if message}<p class="success">{message}</p>{/if}
-{#if error}<p class="error">{error}</p>{/if}
-
-<div>
-<h1>Archive a subject</h1>
-
-<form on:submit={handleArchive}>
-  <label>
-    Slug
-    <input bind:value={slug} required />
-  </label>
-
-  <button type="submit">Archive</button>
-</form>
-</div>
-
-<div>
-<h1>Subscribe to a subject</h1>
-
-<form on:submit={handleSubscribe}>
-  <label>
-    Slug
-    <input bind:value={slug} required />
-  </label>
-
-  <button type="submit">Subscribe</button>
-</form>
-</div>
-
-<div>
-<h1>Unsubscribe from a subject</h1>
-
-<form on:submit={handleUnsubscribe}>
-  <label>
-    Slug
-    <input bind:value={slug} required />
-  </label>
-
-  <button type="submit">Unsubscribe</button>
-</form>
+      {#if data.currentPage < data.totalPages}
+        <a class="btn" href={hrefFor(data.currentPage + 1)}>Next</a>
+      {:else}
+        <button class="btn" disabled aria-disabled="true">Next</button>
+      {/if}
+    </div>
+  {:else}
+    <p>No subjects found.</p>
+  {/if}
 </div>
 
 <style>
-  form {
-	display: flex;
+  .subjects-container {
+    padding: 1rem;
+  }
+
+  .subject-grid {
+    display: grid;
 	flex-direction: column;
-	gap: 1rem;
-	max-width: 400px;
+    /* grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); */
+    gap: 1.5rem;
+    margin-top: 2rem;
   }
 
-  label {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
+  .pagination {
+    margin-top: 2rem;
+    text-align: center;
   }
 
-  .success {
-	color: green;
+  .btn {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    margin: 0 0.5rem;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
   }
 
-  .error {
-	color: red;
+  .btn[disabled], .btn[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: default;
+  }
+
+  .page-info {
+    margin: 0 0.5rem;
+    font-weight: 600;
   }
 </style>
