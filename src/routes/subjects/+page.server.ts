@@ -10,13 +10,14 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
     throw new Error('Failed to fetch subjects');
   }
 
-  const { data: subjects, total, page: currentPage, totalPages, isLoggedIn } = await res.json();
+  const { data: subjects, total, page: currentPage, totalPages, isLoggedIn, isOwner } = await res.json();
 
   return {
     subjects,
     total,
     currentPage,
     totalPages,
-	isLoggedIn
+	isLoggedIn,
+	isOwner
   };
 };

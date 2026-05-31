@@ -21,7 +21,7 @@
   {#if data.subjects.length > 0}
     <div class="subject-grid">
       {#each data.subjects as subject (subject.id)}
-        <SubjectBox subject={subject} isLoggedIn={data.isLoggedIn} />
+        <SubjectBox subject={subject} isLoggedIn={data.isLoggedIn} isOwner={subject.isOwner} />
       {/each}
     </div>
 

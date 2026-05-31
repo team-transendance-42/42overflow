@@ -1,3 +1,4 @@
+import { SubjectRole } from "@prisma/client";
 import {json, error} from "@sveltejs/kit";
 import {prisma} from '$lib/server/prisma';
 import type {RequestHandler} from "@sveltejs/kit";
@@ -31,7 +32,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				},
 				memberships: locals.user ? {
 					where: { userId: locals.user.id },
-					select: { id: true },
+					select: { id: true, role: true },
 					take: 1
 				} : false
 			}
@@ -47,7 +48,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		created_at: subject.created_at,
 		memberCount: subject._count.memberships,
 		postCount: subject._count.posts,
-		isMember: isLoggedIn ? subject.memberships.length > 0 : false
+		isMember: isLoggedIn ? subject.memberships.length > 0 : false,
+		isOwner: isLoggedIn ? subject.memberships.some(m => m.role === SubjectRole.OWNER) : false
 	}));
 
 	return json({

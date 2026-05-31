@@ -10,8 +10,10 @@
 		memberCount: number;
 		postCount: number;
 		isMember: boolean;
+		isOwner: boolean;
 	};
 	export let isLoggedIn = false;
+	export let isOwner = false;
 	let isMember = subject.isMember;
 
 	const formatDate = (date: Date) => {
@@ -78,17 +80,28 @@
 		</div>
 	</div>
 
-	<!-- Optionally show a "View" link if the user is logged in -->
-	{#if !isLoggedIn}
-		<a class="action subscribe" href="/login">Subscribe</a>
-	{:else if isMember}
-		<button class="action unsubscribe" on:click={unsubscribe}>Unsubscribe</button>
-	{:else}
-		<button class="action subscribe" on:click={subscribe}>Subscribe</button>
-	{/if}
+	<div class="actions">
+		{#if !isLoggedIn}
+			<a class="action subscribe" href="/login">Subscribe</a>
+		{:else if isMember}
+			<button class="action unsubscribe" on:click={unsubscribe}>Unsubscribe</button>
+		{:else}
+			<button class="action subscribe" on:click={subscribe}>Subscribe</button>
+		{/if}
+
+		{#if isOwner}
+			<a class="action edit" href={`/s/${subject.slug}/edit`}>Edit description</a>
+		{/if}
+	</div>
 </div>
 
 <style>
+	.actions {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+		margin-top: 0.5rem;
+	}
 	.subject-box {
 		position: relative;
 		border: 1px solid var(--color-neutral-400);
