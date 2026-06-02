@@ -66,19 +66,21 @@
 <div style="margin-left: {depth * 20}px;">
 	<div class=postbox>
 		<!-- View Profile Button -->
-		<button
-			class="bg-sky-500 hover:bg-sky-700"
-			onclick={openProfile}
-			aria-label="View {comment.user.name}'s profile'"
-		>
-			<p class="author">
-				{#if comment.deleted_at}
-					[Deleted User]
-				{:else}
+		{#if comment.deleted_at == null}
+			<button
+				class="bg-sky-500 hover:bg-sky-700"
+				onclick={openProfile}
+				aria-label="View {comment.user.name}'s profile'"
+			>
+				<p class="author">
 					Posted by: {comment.user.name}
-				{/if}
+				</p>
+			</button>
+		{:else}
+			<p class="author">
+				Posted by: [anonymous]
 			</p>
-		</button>
+		{/if}
 
 		<!-- Comment Content -->
 		<p>{comment.content}</p>
@@ -94,17 +96,17 @@
 		{/if}
 
 		<!-- Reply to Comment -->
-		{#if isOwn}
+		{#if comment.deleted_at == null}
 			<CreateComment {postId} {parentId} />
 		{/if}
 
 		<!-- Edit Comment -->
-		{#if isOwn}
+		{#if isOwn && comment.deleted_at == null}
 			<EditComment {postId} {comment} />
 		{/if}
 
 		<!-- Delete Comment -->
-		{#if isOwn}
+		{#if isOwn && comment.deleted_at == null}
 			<button
 				class="bg-red-500 hover:bg-red-700"
 				onclick={deleteComment}
