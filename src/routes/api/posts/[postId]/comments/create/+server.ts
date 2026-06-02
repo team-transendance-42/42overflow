@@ -2,6 +2,7 @@ import { json, error, type RequestEvent } from '@sveltejs/kit';
 import { uploadProductImage } from '$lib/fileUpload.ts';
 import { CommentSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
+import { createNotification } from '$lib/server/notifications';
 import { z } from 'zod';
 
 export const POST = async ({ locals, request, params }: RequestEvent) => {
@@ -54,6 +55,36 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 				image: imageUrl,
 			}
 		});
+
+        // Create notification for post author if the commenter is not the post author
+        let post = await db.post.findUnique({
+            where: { id: postId },
+            include: { user: true }
+        });
+
+        if (post && post.userId !== locals.user.id) {
+            await createNotification({
+                userId: post.userId,
+                content: `You have a new comment on your post: ${post.title}`,
+                link: `/posts/${postId}`
+            });
+        }
+
+        // Create notification for parent comment author if it's a reply and the commenter is not the parent comment author
+        if (data.parentId) {
+            const parentComment = await db.comment.findUnique({
+                where: { id: data.parentId },
+                include: { user: true }
+            });
+
+            if (parentComment && parentComment.userId !== locals.user.id) {
+                await createNotification({
+                    userId: parentComment.userId,
+                    content: `You have a new reply to your comment on post: ${post?.title || 'a post'}`,
+                    link: `/posts/${postId}`
+                });
+            }
+        }
 
         return json({ comment }, { status: 201 });
     } catch (error) {
