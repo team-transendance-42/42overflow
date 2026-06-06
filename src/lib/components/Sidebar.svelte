@@ -10,6 +10,7 @@
 style="width: {width};">
   <slot />
   <div class="top-links">
+	<a href="/subjects">Subjects</a>
     <a href="/questions">Questions</a>
     <a href="/post-question">Post Question</a>
     <a href="/ai-assist">AI Assist</a>
