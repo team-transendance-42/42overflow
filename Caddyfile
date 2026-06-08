@@ -17,8 +17,8 @@
         }
     }
 
-    # Route API traffic to the Go LLM service.
-    @api path /api/*
+    # Route LLM API traffic to the Go LLM service (the SvelteKit app owns the rest of /api/*).
+    @api path /api/ai-assist /api/ollama /api/community
     reverse_proxy @api llm-server:8081 {
         # Overwrite forwarded headers so upstream sees real client metadata.
         header_up X-Forwarded-For {http.request.remote}

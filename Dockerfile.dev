@@ -18,8 +18,11 @@ RUN npm ci --no-audit --prefer-offline
 # Copy source
 COPY . .
 
+# Generate Prisma client now that schema.prisma is present
+RUN npx prisma generate
+
 ENV NODE_ENV=development
 EXPOSE 5173
 
-# Vite needs --host so it's reachable from host machine
-CMD ["sh", "-c", "npx prisma generate && npx prisma db push && npm run dev -- --host"]
+# Vite needs --host so it's reachable from host machine; db push needs a live DB so it stays at runtime
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run dev -- --host"]
