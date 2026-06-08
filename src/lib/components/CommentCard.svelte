@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
     import CommentCard from './CommentCard.svelte';
 	import CreateComment from './CreateComment.svelte';
+	import EditComment from './EditComment.svelte';
 
 	interface Props {
 		comment: any;
@@ -18,6 +19,7 @@
 	let isLiked = $derived.by(() =>
 		Boolean(page.data.user?.id && comment.likes?.some((l: { userId: string }) => l.userId === page.data.user.id))
 	);
+	let isOwn = $derived.by(() => page.data.user?.id === comment.userId);
 
 	async function deleteComment() {
 		if (!confirm('Are you sure you want to delete this comment?')) {
@@ -64,19 +66,21 @@
 <div style="margin-left: {depth * 20}px;">
 	<div class=postbox>
 		<!-- View Profile Button -->
-		<button
-			class="bg-sky-500 hover:bg-sky-700"
-			onclick={openProfile}
-			aria-label="View {comment.user.name}'s profile'"
-		>
-			<p class="author">
-				{#if comment.deleted_at}
-					[Deleted User]
-				{:else}
+		{#if comment.deleted_at == null}
+			<button
+				class="bg-sky-500 hover:bg-sky-700"
+				onclick={openProfile}
+				aria-label="View {comment.user.name}'s profile'"
+			>
+				<p class="author">
 					Posted by: {comment.user.name}
-				{/if}
+				</p>
+			</button>
+		{:else}
+			<p class="author">
+				Posted by: [anonymous]
 			</p>
-		</button>
+		{/if}
 
 		<!-- Comment Content -->
 		<p>{comment.content}</p>
@@ -92,28 +96,39 @@
 		{/if}
 
 		<!-- Reply to Comment -->
-		<CreateComment {postId} {parentId} />
+		{#if comment.deleted_at == null}
+			<CreateComment {postId} {parentId} />
+		{/if}
+
+		<!-- Edit Comment -->
+		{#if isOwn && comment.deleted_at == null}
+			<EditComment {postId} {comment} />
+		{/if}
 
 		<!-- Delete Comment -->
-		<button
-			class="bg-red-500 hover:bg-red-700"
-			onclick={deleteComment}
-			aria-label="Delete comment"
-		>
-			Delete
-		</button>
+		{#if isOwn && comment.deleted_at == null}
+			<button
+				class="bg-red-500 hover:bg-red-700"
+				onclick={deleteComment}
+				aria-label="Delete comment"
+			>
+				Delete
+			</button>
+		{/if}
 
 		<!-- Show Likes -->
 		<p>{comment.likes.length ? `${comment.likes.length} Likes` : '0 Likes'}</p>
 
 		<!-- Like Button -->
-		<button
-			class="bg-blue-500 hover:bg-blue-700"
-			onclick={likeComment}
-			aria-label="Like comment"
-		>
-			{isLiked ? 'Unlike' : 'Like'}
-		</button>
+		{#if !isOwn}
+			<button
+				class="bg-blue-500 hover:bg-blue-700"
+				onclick={likeComment}
+				aria-label="Like comment"
+			>
+				{isLiked ? 'Unlike' : 'Like'}
+			</button>
+		{/if}
 	</div>
 
 	<!-- Render nested children/replies -->

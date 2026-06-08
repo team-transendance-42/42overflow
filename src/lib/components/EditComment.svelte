@@ -9,11 +9,13 @@
     interface Props {
         postId: number;
         parentId?: number;
+        comment: any;
     }
 
-    let { postId, parentId }: Props = $props();
+    let { postId, parentId, comment }: Props = $props();
     let derivedPostId = $derived(postId);
     let derivedParentId = $derived(parentId ?? undefined);
+    let removeImage = $state(false);
 
     type CommentFormInput = CommentInput & {
         image?: File;
@@ -25,13 +27,16 @@
         content: '',
     });
 
+    let previewUrl = $state<string>('');
+
     $effect(() => {
         formData.postId = derivedPostId;
         formData.parentId = derivedParentId;
+        formData.content = comment.content;
+        previewUrl = (comment.image ?? '');
     });
 
     let errors = $state({} as Record<string, string[]>);
-    let previewUrl = $state<string>('');
     let isSubmitting = $state(false);
 
     function handleImageSelect(event: Event) {
@@ -56,7 +61,8 @@
 
     // Real-time validation on single input field
     function handleInput<K extends keyof CommentInput>(field: K, value: CommentInput[K]) {
-        formData = { ...formData, [field]: value } as CommentFormInput;
+        // update the reactive $state object in-place instead of replacing it
+        (formData as any)[field] = value;
         try {
             CommentSchema.pick({ [field]: true } as any).parse({ [field]: value } as any);
             const key = field as string;
@@ -93,9 +99,11 @@
 
             if (image) {
                 formDataToSend.append('image', image);
+            } else if (removeImage) {
+                formDataToSend.append('removeImage', 'true');
             }
 
-            const response = await fetch(`/api/posts/${formData.postId}/comments/create`, {
+            const response = await fetch(`/api/posts/${formData.postId}/comments/${comment.id}/edit`, {
                 method: 'POST',
                 body: formDataToSend
             });
@@ -112,7 +120,7 @@
                     element?.focus();
                     return;
                 }
-                alert('An error occurred while creating the comment. Please try again.');
+                alert('An error occurred while editing the comment. Please try again.');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -127,12 +135,11 @@
         formData = {
             postId: derivedPostId,
             parentId: derivedParentId,
-            content: '',
+            content: comment.content,
         };
         errors = {};
         previewUrl = '';
     }
-
 </script>
 
 <div>
@@ -141,14 +148,14 @@
             Reply
         {/if}
         {#if !derivedParentId}
-            Create New Comment
+            Edit
         {/if}
     </button>
 </div>
 
 <Modal bind:showModal>
 	{#snippet header()}
-		<h2>Create New Comment</h2>
+		<h2>Edit Comment</h2>
 	{/snippet}
 
     <form onsubmit={handleSubmit}>
@@ -178,9 +185,21 @@
                 onchange={handleImageSelect}
             />
             {#if previewUrl}
-                <div>
-                    <img src={previewUrl} alt="Preview" class="w-100"/>
-                </div>
+                <p class="preview-label">
+                    {formData.image ? 'New image preview:' : 'Current image:'}
+                </p>
+                <img src={previewUrl} alt="Product preview" class="mw-100" />
+
+                <!-- Option to remove current image -->
+                {#if comment.image}
+                    <button
+                        type="button"
+                        class="btn btn-md btn-secondary btn-codam mt-4"
+                        onclick={() => { previewUrl = ''; removeImage = true; }}
+                    >
+                        Remove current image
+                    </button>
+                {/if}
             {/if}
             {#if errors.image}
                 <p class="error">{errors.image[0]}</p>
@@ -191,7 +210,7 @@
         {#if isSubmitting}
             <button type="button" disabled>Submitting...</button>
         {:else}
-            <button type="submit">Create Comment</button>
+            <button type="submit">Edit Comment</button>
         {/if}
     </form>
 </Modal>
