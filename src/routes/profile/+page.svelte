@@ -5,49 +5,6 @@
   const user = data.user;
   //const profile = data.profile;
 
-  let firstname = data.user?.name?.split(' ')[0] ?? '';
-  let lastname = data.user?.name?.split(' ')[1] ?? '';
-  let email = data.user?.email ?? '';
-  let interests = data.profile?.interests ?? '';
-  let intraprofile = data.profile?.login ?? '';
-  let campus = data.profile?.campus ?? '';
-  let previewUrl = data.user?.image ?? '';
-  let error = '';
-  let success = false;
-  let loading = false;
-
-  let fileInput: HTMLInputElement;
-
-  function handleFileChange(e: Event) {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) previewUrl = URL.createObjectURL(file);
-
-  }
-
-  function removeAvatar() {
-  previewUrl = '';
-  if (fileInput) fileInput.value = ''; // reset the input
-}
-
-  async function handleUpdate() {
-    error = '';
-    success = false;
-    loading = true;
-
-    const { error: err } = await authClient.updateUser({
-      name: `${firstname} ${lastname}`.trim(),
-      image: previewUrl || '',
-    });
-
-    loading = false;
-
-    if (err) {
-      error = err.message ?? 'Could not update profile';
-      return;
-    }
-
-    success = true;
-  }
 </script>
 
 <div class="profile-page">
