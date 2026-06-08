@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type { Actions, PageServerLoad } from './$types';
 import type { Role } from '@prisma/client';
 
@@ -25,7 +25,7 @@ async function requireAdmin(actorId: string | undefined) {
 		throw error(403, 'Forbidden');
 	}
 
-	const actor = await prisma.user.findUnique({
+	const actor = await db.user.findUnique({
 		where: { id: actorId },
 		select: { role: true }
 	});
@@ -40,7 +40,7 @@ async function requireStaff(actorId: string | undefined) {
 		throw error(403, 'Forbidden');
 	}
 	
-	const actor = await prisma.user.findUnique({
+	const actor = await db.user.findUnique({
 		where: { id: actorId },
 		select: { role: true }
 	});
@@ -57,7 +57,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	const isAdmin = role === 'ADMIN';
 
-	const user = await prisma.user.findUnique({
+	const user = await db.user.findUnique({
 		where: { id: params.id },
 		select: isAdmin ? {
 			id: true,
@@ -87,7 +87,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, 'User not found');
 	}
 
-	const posts = await prisma.post.findMany({
+	const posts = await db.post.findMany({
 		where: { userId: user.id },
 		select: {
 			id: true,
@@ -142,7 +142,7 @@ export const actions: Actions = {
 			return fail(400, { message: 'Email is required' });
 		}
 
-		const targetUser = await prisma.user.findUnique({
+		const targetUser = await db.user.findUnique({
 			where: { id: params.id },
 			select: { role: true }
 		});
@@ -152,13 +152,13 @@ export const actions: Actions = {
 		}
 
 		if (targetUser.role === 'ADMIN' && normalizedRole !== 'ADMIN') {
-			const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+			const adminCount = await db.user.count({ where: { role: 'ADMIN' } });
 			if (adminCount <= 1) {
 				return fail(400, { message: 'Cannot demote the last admin' });
 			}
 		}
 
-		const existingEmail = await prisma.user.findFirst({
+		const existingEmail = await db.user.findFirst({
 			where: {
 				email: normalizedEmail,
 				NOT: { id: params.id }
@@ -170,7 +170,7 @@ export const actions: Actions = {
 			return fail(400, { message: 'Email is already in use' });
 		}
 
-		const existingUsername = await prisma.user.findFirst({
+		const existingUsername = await db.user.findFirst({
 			where: {
 				name: username.trim(),
 				NOT: { id: params.id }
@@ -182,10 +182,10 @@ export const actions: Actions = {
 			return fail(400, { message: 'Username is already in use' });
 		}
 
-		await prisma.user.update({
+		await db.user.update({
 			where: { id: params.id },
 			data: {
-				name: username || null,
+				name: username,
 				email: normalizedEmail,
 				image: image.trim() || null,
 				role: normalizedRole,
@@ -202,7 +202,7 @@ export const actions: Actions = {
 	deleteUser: async ({ locals, params }) => {
 		await requireAdmin(locals.user?.id);
 
-		const targetUser = await prisma.user.findUnique({
+		const targetUser = await db.user.findUnique({
 			where: { id: params.id },
 			select: { role: true }
 		});
@@ -212,13 +212,13 @@ export const actions: Actions = {
 		}
 
 		if (targetUser.role === 'ADMIN') {
-			const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+			const adminCount = await db.user.count({ where: { role: 'ADMIN' } });
 			if (adminCount <= 1) {
 				return fail(400, { message: 'Cannot delete the last admin' });
 			}
 		}
 
-		await prisma.follow.deleteMany({
+		await db.follow.deleteMany({
 			where: {
 				OR: [
 					{ followerId: params.id },
@@ -227,7 +227,7 @@ export const actions: Actions = {
 			}
 		});
 
-		await prisma.user.update({
+		await db.user.update({
 			where: { id: params.id },
 			data: { deleted_at: new Date(),
 				name: "deleted_user#" + params.id,
