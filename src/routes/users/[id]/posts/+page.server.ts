@@ -1,13 +1,13 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 
 async function requireStaff(actorId: string | undefined) {
 	if (!actorId) {
 		throw error(403, 'Forbidden');
 	}
 
-	const actor = await prisma.user.findUnique({
+	const actor = await db.user.findUnique({
 		where: { id: actorId },
 		select: { role: true }
 	});
@@ -20,14 +20,14 @@ async function requireStaff(actorId: string | undefined) {
 export const load: PageServerLoad = async ({ locals, params }) => {
 	await requireStaff(locals.user?.id);
 	
-	const user = await prisma.user.findUnique({
+	const user = await db.user.findUnique({
 		where: { id: params.id },
 		select: {
 			id: true,
 		}
 	});
 
-	const posts = await prisma.post.findMany({ 
+	const posts = await db.post.findMany({ 
 		where: { 
 			userId: params.id,
 			deleted_at: null
@@ -45,7 +45,7 @@ export const actions = {
 		const formData = await request.formData();
 		const postId = formData.get('postId') as string;
 
-		await prisma.post.update({
+		await db.post.update({
 			where: { id: Number(postId) },
 			data: { deleted_at: new Date(),
 				content: '[deleted by staff]',
