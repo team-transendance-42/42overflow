@@ -7,6 +7,12 @@ npx prisma generate
 npx prisma migrate deploy
 npx prisma studio
 
+TO DO:
+script to persist 
+refresh for name with welcome
+add posts to each user's profile for when they are followed
+add mandatory subject
+VIEW POSTS NEEDS TO refresh
 
 ==============================================================================================================
 

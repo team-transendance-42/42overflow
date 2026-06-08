@@ -1,21 +1,24 @@
-import { fail, redirect } from '@sveltejs/kit';
-import { auth } from '$lib/server/auth';
+import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import type { Actions, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.user) throw redirect(303, '/login');
-  
-  // also load profile-specific fields
-  const profile = await db.profile.findUnique({
-    where: { userId: locals.user.id }
+
+const user = await db.user.findUnique({
+    where: { id: locals.user.id },
+    include: {
+      followers: {
+        include: {
+          following: true,
+        }
+      }
+    }
   });
 
-  return { 
-    user: locals.user,
-    profile 
+  return {
+    user
+  
   };
 };
 

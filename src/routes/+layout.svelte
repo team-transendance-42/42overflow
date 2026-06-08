@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '../app.css';
 	import '$lib/styles/tokens.css';
 	import { page } from '$app/state';
 	import { locales, localizeHref } from '$lib/paraglide/runtime';
@@ -7,16 +8,24 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	let { children } = $props();
-	
+	import { onMount } from 'svelte';
+	let { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+	onMount(() => {
+		const interval = setInterval(() => {
+			fetch('/api/ping', { method: 'POST' });
+		}, 2 * 60 * 1000); // every 2 minutes
+
+		return () => clearInterval(interval);
+	});
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<Header />
+<Header user={data.user} />
 
 <div class="content">
-	<Sidebar />
+	<Sidebar userRole={data.userRole} />
 
 	<main>
 		{@render children()}
@@ -41,7 +50,6 @@
   background-color: var(--color-neutral-500);
   color: var(--color-neutral-900);
   font-family: var(--font-family-base);
-   
   }
 
   .content {
