@@ -1,5 +1,5 @@
 import {json, error} from "@sveltejs/kit";
-import {prisma} from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type {RequestHandler} from "@sveltejs/kit";
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -13,7 +13,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		throw error(400, "Slug is required and must be a string");
 	}
 
-	const owner = await prisma.subjectMember.findFirst({
+	const owner = await db.subjectMember.findFirst({
 		where: {
 				userId: locals.user.id,
 				subject: { slug }
@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		throw error(403, "Forbidden");
 	}
 
-	const subject = await prisma.subject.update({
+	const subject = await db.subject.update({
 		where: { slug: slug},
 		data: { deleted_at: new Date() }
 	});

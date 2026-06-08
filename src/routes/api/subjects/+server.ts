@@ -1,6 +1,6 @@
 import { SubjectRole } from "@prisma/client";
 import {json, error} from "@sveltejs/kit";
-import {prisma} from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type {RequestHandler} from "@sveltejs/kit";
 import { url } from "inspector";
 import { boolean, date } from "better-auth";
@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const skip = (page - 1) * limit;
 
 	const [subjects, total] = await Promise.all([
-		prisma.subject.findMany({
+		db.subject.findMany({
 			where: { deleted_at: null },
 			orderBy: { created_at: 'desc' },
 			skip,
@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				} : false
 			}
 		}),
-		prisma.subject.count({ where: { deleted_at: null } })
+		db.subject.count({ where: { deleted_at: null } })
 	]);
 
 	const data = subjects.map(subject => ({

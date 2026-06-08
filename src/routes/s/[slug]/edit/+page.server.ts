@@ -1,4 +1,4 @@
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { SubjectRole } from '@prisma/client';
@@ -6,7 +6,7 @@ import { SubjectRole } from '@prisma/client';
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { slug } = params;
 
-	const subject = await prisma.subject.findUnique({
+	const subject = await db.subject.findUnique({
 		where: {
 			slug,
 		},

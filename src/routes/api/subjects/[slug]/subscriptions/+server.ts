@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import { SubjectRole } from '@prisma/client';
 
 export const POST: RequestHandler = async ({ params, locals }) => {
@@ -9,14 +9,14 @@ export const POST: RequestHandler = async ({ params, locals }) => {
   if (!locals.user) throw error(401, 'Unauthorized');
   if (!slug) throw error(400, 'Slug is required');
 
-  const subject = await prisma.subject.findUnique({
+  const subject = await db.subject.findUnique({
     where: { slug },
     select: { id: true, deleted_at: true }
   });
 
   if (!subject || subject.deleted_at) throw error(404, 'Subject not found');
 
-  const membership = await prisma.subjectMember.upsert({
+  const membership = await db.subjectMember.upsert({
     where: {
       userId_subjectId: {
         userId: locals.user.id,
@@ -40,13 +40,13 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   if (!locals.user) throw error(401, 'Unauthorized');
   if (!slug) throw error(400, 'Slug is required');
 
-  const subject = await prisma.subject.findUnique({
+  const subject = await db.subject.findUnique({
     where: { slug },
     select: { id: true, deleted_at: true }
   });
 
   if (!subject || subject.deleted_at) throw error(404, 'Subject not found');
-  const membership = await prisma.subjectMember.findUnique({
+  const membership = await db.subjectMember.findUnique({
     where: {
       userId_subjectId: {
         userId: locals.user.id,
@@ -59,7 +59,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   if (!membership) throw error(404, 'Subscription not found');
 
   if (membership.role === SubjectRole.OWNER) {
-    const ownerCount = await prisma.subjectMember.count({
+    const ownerCount = await db.subjectMember.count({
       where: { subjectId: subject.id, role: SubjectRole.OWNER }
     });
 
@@ -68,7 +68,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
     }
   }
 
-  await prisma.subjectMember.delete({
+  await db.subjectMember.delete({
     where: {
       userId_subjectId: {
         userId: locals.user.id,

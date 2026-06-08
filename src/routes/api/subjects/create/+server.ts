@@ -1,5 +1,5 @@
 import { json, error } from "@sveltejs/kit";
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type { RequestHandler } from "@sveltejs/kit";
 import { SubjectRole } from "@prisma/client";
 
@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const slug = slugify(name);
 
-	const subject = await prisma.subject.create({
+	const subject = await db.subject.create({
 		data: {
 			name,
 			slug,

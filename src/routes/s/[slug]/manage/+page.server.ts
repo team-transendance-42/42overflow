@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { SubjectRole } from '@prisma/client';
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import { getSubjectRole } from '$lib/server/subject-access';
 import type { PageServerLoad } from './$types';
 
@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		throw error(403, 'Forbidden');
 	}
 
-	const subject = await prisma.subject.findUnique({
+	const subject = await db.subject.findUnique({
 		where: { slug },
 		select: {
 			id: true,

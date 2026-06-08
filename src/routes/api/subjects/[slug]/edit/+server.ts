@@ -1,5 +1,5 @@
 import { json, error } from "@sveltejs/kit";
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type { RequestHandler } from "@sveltejs/kit";
 import { SubjectRole } from "@prisma/client";
 export const PATCH: RequestHandler = async ({ request, locals, params }) => {
@@ -19,7 +19,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		throw error(400, "Slug is required");
 	}
 
-	const subject = await prisma.subject.findUnique({
+	const subject = await db.subject.findUnique({
 		where: {
 			slug: slug,
 		},
@@ -40,7 +40,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		throw error(403, "Forbidden");
 	}
 
-	const updatedSubject = await prisma.subject.update({
+	const updatedSubject = await db.subject.update({
 		where: {
 			slug: slug,
 		},

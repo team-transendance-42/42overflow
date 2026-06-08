@@ -1,8 +1,8 @@
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import { type SubjectRole } from '@prisma/client';
 
 export async function getSubjectRole(slug: string, userId: string): Promise<SubjectRole | null> {
-	const membership = await prisma.subjectMember.findFirst({
+	const membership = await db.subjectMember.findFirst({
 		where: {
 			userId,
 			subject: {

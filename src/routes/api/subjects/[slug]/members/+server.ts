@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json, error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import { SubjectRole } from '@prisma/client';
 import { getSubjectRole } from '$lib/server/subject-access';
 
@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		throw error(403, 'Forbidden');
 	}
 
-	const subject = await prisma.subject.findUnique({
+	const subject = await db.subject.findUnique({
 		where: { slug },
 		select: { id: true, deleted_at: true }
 	});
@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		throw error(404, 'Subject not found');
 	}
 
-	const members = await prisma.subjectMember.findMany({
+	const members = await db.subjectMember.findMany({
 		where: { subjectId: subject.id },
 		orderBy: [{ role: 'asc' }, { joined_at: 'asc' }],
 		select: {
@@ -71,7 +71,7 @@ export const PATCH: RequestHandler = async ({ params, locals, request }) => {
 		throw error(400, 'You cannot change your own role');
 	}
 
-	const subject = await prisma.subject.findUnique({
+	const subject = await db.subject.findUnique({
 		where: { slug },
 		select: { id: true, deleted_at: true }
 	});
@@ -80,7 +80,7 @@ export const PATCH: RequestHandler = async ({ params, locals, request }) => {
 		throw error(404, 'Subject not found');
 	}
 
-	const targetMembership = await prisma.subjectMember.findUnique({
+	const targetMembership = await db.subjectMember.findUnique({
 		where: {
 			userId_subjectId: {
 				userId: targetUserId,
@@ -98,7 +98,7 @@ export const PATCH: RequestHandler = async ({ params, locals, request }) => {
 	// 	throw error(400, 'Owner role cannot be changed here');
 	// }
 
-	const updated = await prisma.subjectMember.update({
+	const updated = await db.subjectMember.update({
 		where: {
 			userId_subjectId: {
 				userId: targetUserId,
