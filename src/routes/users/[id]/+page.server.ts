@@ -35,19 +35,51 @@ async function requireAdmin(actorId: string | undefined) {
 	}
 }
 
+async function requireStaff(actorId: string | undefined) {
+	if (!actorId) {
+		throw error(403, 'Forbidden');
+	}
+	
+	const actor = await prisma.user.findUnique({
+		where: { id: actorId },
+		select: { role: true }
+	});
+
+	if (actor?.role !== 'ADMIN' && actor?.role !== 'MODERATOR') {
+		throw error(403, 'Forbidden');
+	}
+
+	return actor.role;
+}
+
 export const load: PageServerLoad = async ({ locals, params }) => {
-	await requireAdmin(locals.user?.id);
+	const role = await requireStaff(locals.user?.id);
+
+	const isAdmin = role === 'ADMIN';
 
 	const user = await prisma.user.findUnique({
 		where: { id: params.id },
-		select: {
+		select: isAdmin ? {
 			id: true,
 			name: true,
+			first_name: true,
+			last_name: true,
 			email: true,
 			image: true,
 			role: true,
 			createdAt: true,
 			updatedAt: true,
+			biography: true,
+			interests: true
+		} : {
+			id: true,
+			name: true,
+			image: true,
+			role: true,
+			createdAt: true,
+			updatedAt: true,
+			biography: true,
+			interests: true
 		}
 	});
 
@@ -66,13 +98,10 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		orderBy: { created_at: 'desc' }
 	});
 
-	const { firstName, lastName } = splitName(user.name);
-
 	return {
 		user,
 		posts,
-		firstName,
-		lastName
+		role
 	};
 };
 
@@ -81,18 +110,24 @@ export const actions: Actions = {
 		await requireAdmin(locals.user?.id);
 
 		const formData = await request.formData();
+		const username = formData.get('username');
 		const firstName = formData.get('firstName');
 		const lastName = formData.get('lastName');
 		const email = formData.get('email');
 		const image = formData.get('image');
 		const role = formData.get('role');
+		const biography = formData.get('biography');
+		const interests = formData.get('interests');
 
 		if (
+			typeof username !== 'string' ||
 			typeof firstName !== 'string' ||
 			typeof lastName !== 'string' ||
 			typeof email !== 'string' ||
 			typeof image !== 'string' ||
-			typeof role !== 'string'
+			typeof role !== 'string' ||
+			typeof biography !== 'string' ||
+			typeof interests !== 'string'
 		) {
 			return fail(400, { message: 'Invalid form data' });
 		}
@@ -135,96 +170,33 @@ export const actions: Actions = {
 			return fail(400, { message: 'Email is already in use' });
 		}
 
-		const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+		const existingUsername = await prisma.user.findFirst({
+			where: {
+				name: username.trim(),
+				NOT: { id: params.id }
+			},
+			select: { id: true }
+		});
+
+		if (existingUsername) {
+			return fail(400, { message: 'Username is already in use' });
+		}
 
 		await prisma.user.update({
 			where: { id: params.id },
 			data: {
-				name: fullName || null,
+				name: username || null,
 				email: normalizedEmail,
 				image: image.trim() || null,
-				role: normalizedRole
+				role: normalizedRole,
+				biography: biography || null,
+				interests: interests || null,
+				first_name: firstName.trim() || null,
+				last_name: lastName.trim() || null
 			}
 		});
 
 		return { success: true, message: 'User details updated' };
-	},
-
-	updateProfile: async ({ request, locals, params }) => {
-		await requireAdmin(locals.user?.id);
-
-		const formData = await request.formData();
-		const login = formData.get('login');
-		const biography = formData.get('biography');
-		const campusIdRaw = formData.get('campusId');
-
-		if (
-			typeof login !== 'string' ||
-			typeof biography !== 'string' ||
-			typeof campusIdRaw !== 'string'
-		) {
-			return fail(400, { message: 'Invalid form data' });
-		}
-
-		const userExists = await prisma.user.findUnique({
-			where: { id: params.id },
-			select: { id: true }
-		});
-
-		if (!userExists) {
-			throw error(404, 'User not found');
-		}
-
-		const normalizedLogin = login.trim();
-		if (normalizedLogin) {
-			const loginInUse = await prisma.user.findFirst({
-				where: {
-					name: normalizedLogin,
-					NOT: { id: params.id }
-				},
-				select: { id: true }
-			});
-
-			if (loginInUse) {
-				return fail(400, { message: 'Intra profile is already in use' });
-			}
-		}
-
-		let campusId: number | null = null;
-		if (campusIdRaw.trim()) {
-			const parsed = Number(campusIdRaw);
-			if (!Number.isInteger(parsed)) {
-				return fail(400, { message: 'Invalid campus' });
-			}
-
-			const campusExists = await prisma.campus.findUnique({
-				where: { id: parsed },
-				select: { id: true }
-			});
-
-			if (!campusExists) {
-				return fail(400, { message: 'Selected campus does not exist' });
-			}
-
-			campusId = parsed;
-		}
-
-		await prisma.user.upsert({
-			where: { id: params.id },
-			update: {
-				name: normalizedLogin || null,
-				biography: biography.trim() || null,
-				campusId
-			},
-			create: {
-				id: params.id,
-				name: normalizedLogin || null,
-				biography: biography.trim() || null,
-				campusId
-			}
-		});
-
-		return { success: true, message: 'Profile details updated' };
 	},
 
 	deleteUser: async ({ locals, params }) => {
@@ -246,8 +218,27 @@ export const actions: Actions = {
 			}
 		}
 
-		await prisma.user.delete({
-			where: { id: params.id }
+		await prisma.follow.deleteMany({
+			where: {
+				OR: [
+					{ followerId: params.id },
+					{ followingId: params.id }
+				]
+			}
+		});
+
+		await prisma.user.update({
+			where: { id: params.id },
+			data: { deleted_at: new Date(),
+				name: "deleted_user#" + params.id,
+				email: "deleted_user#" + params.id,
+				image: null,
+				role: 'USER',
+				biography: null,
+				interests: null,
+				first_name: null,
+				last_name: null
+			}
 		});
 
 		return { success: true, message: 'User deleted' };

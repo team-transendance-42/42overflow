@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
   });
 
   const profile = await db.user.findUnique({
-    where: { name: params.name },
+    where: { name: params.name},
   });
 
   if (!profile) throw error(404, 'User not found');

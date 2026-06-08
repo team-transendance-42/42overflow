@@ -1,24 +1,19 @@
 <script lang="ts">
-	type Campus = {
-		id: number;
-		name: string;
-	};
 
 	type UserRole = 'USER' | 'MODERATOR' | 'ADMIN';
 
 	type UserDetails = {
 		id: string;
-		name: string | null;
+		name: string;
+		first_name: string | null;
+		last_name: string | null;
 		email: string;
 		image: string | null;
 		role: UserRole;
 		createdAt: string | Date;
 		updatedAt: string | Date;
-		profile: {
-			login: string | null;
-			biography: string | null;
-			campusId: number | null;
-		} | null;
+		biography: string | null;
+		interests: string | null;
 	};
 
 	type UserPost = {
@@ -39,10 +34,8 @@
 	}: {
 		data: {
 			user: UserDetails;
-			campuses: Campus[];
 			posts: UserPost[];
-			firstName: string;
-			lastName: string;
+			role: UserRole;
 		};
 		form: FormState | null;
 	} = $props();
@@ -62,26 +55,40 @@
 
 <div class="edit-user-page">
 	<a href="/users" class="back-link">Back to users</a>
-	<h1>Edit user</h1>
+		<nav class="tabs">
+ 			 <a
+				href={`/users/${data.user.id}`}
+				class="tab"
+				class:active={true}
+				>Profile</a
+			>
+			<a href={`/users/${data.user.id}/posts`} class="tab" class:active={false}>Posts</a>
+			<a href={`/users/${data.user.id}/comments`} class="tab" class:active={false}>Comments</a>
+		</nav>
 
 	{#if form?.message}
 		<p class:success={form.success} class:error={!form.success}>{form.message}</p>
 	{/if}
-
+	
+	{#if data.role === 'ADMIN'}
 	<section class="card">
-		<h2>Core details</h2>
-		<form method="POST" action="?/updateUserCore" class="form-grid">
+		<form method="POST" action="?/updateUserCore" class="form-grid">			
 			<label>
 				First name
-				<input name="firstName" value={data.firstName} />
+				<input name="firstName" value={data.user.first_name ?? ''} />
 			</label>
 
 			<label>
 				Last name
-				<input name="lastName" value={data.lastName} />
+				<input name="lastName" value={data.user.last_name ?? ''} />
 			</label>
 
-			<label class="full-width">
+			<label>
+				Username
+				<input name="username" value={data.user.name} required />
+			</label>
+
+			<label>
 				Email
 				<input name="email" type="email" value={data.user.email} required />
 			</label>
@@ -89,6 +96,16 @@
 			<label class="full-width">
 				Image URL
 				<input name="image" value={data.user.image ?? ''} />
+			</label>
+
+			<label class="full-width">
+				Biography
+				<textarea name="biography" rows="5">{data.user.biography ?? ''}</textarea>
+			</label>
+
+			<label class="full-width">
+				Interests
+				<input name="interests" value={data.user.interests ?? ''} />
 			</label>
 
 			<label>
@@ -104,63 +121,54 @@
 				<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
 				<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
 			</div>
-
-			<button type="submit" class="full-width">Save core details</button>
-		</form>
-	</section>
-
-	<section class="card">
-		<h2>Profile details</h2>
-		<form method="POST" action="?/updateProfile" class="form-grid">
-			<label>
-				Intra profile
-				<input name="login" value={data.user.profile?.login ?? ''} />
-			</label>
-
-			<label>
-				Campus
-				<select name="campusId" value={data.user.profile?.campusId?.toString() ?? ''}>
-					<option value="">None</option>
-					{#each data.campuses as campus}
-						<option value={campus.id}>{campus.name}</option>
-					{/each}
-				</select>
-			</label>
-
-			<label class="full-width">
-				Biography
-				<textarea name="biography" rows="5">{data.user.profile?.biography ?? ''}</textarea>
-			</label>
-
-			<button type="submit" class="full-width">Save profile details</button>
 			
+			<button type="submit" class="full-width">Save core details</button>
+
 		</form>
 	</section>
-		
+
 	<form method="POST" action="?/deleteUser" onsubmit={confirmDelete}>
 		<button type="submit" class="full-width" style="background-color: red;">Delete account</button>
 	</form>
+	{/if}
 
+	{#if data.role === 'MODERATOR'}
 	<section class="card">
-		<h2>User posts (read-only)</h2>
-		{#if data.posts.length === 0}
-			<p>This user has no posts.</p>
-		{:else}
-			<ul class="posts-list">
-				{#each data.posts as post}
-					<li>
-						<span>{post.title}</span>
-						<small>
-							#{post.id} • {formatDate(post.created_at)}{post.deleted_at ? ' • deleted' : ''}
-						</small>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<img src={data.user.image} alt={data.user.name} class="avatar" />
+		<label>
+			Username
+			<input value={data.user.name} disabled />
+		</label>
+		<label>
+			Biography
+			<textarea rows="5" disabled>{data.user.biography ?? ''}</textarea>
+		</label>
+		<label>
+			Interests
+			<input value={data.user.interests ?? ''} disabled />
+		</label>
+		<label>
+			Role
+			<input value={data.user.role} disabled />
+		</label>
+		<div class="timestamps">
+			<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
+			<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
+		</div>
 	</section>
+	{/if}
 </div>
 
 <style>
+
+	.avatar {
+		width: 42px;
+		height: 42px;
+		border-radius: 999px;
+		object-fit: cover;
+		border: 1px solid var(--color-neutral-400);
+	}
+
 	.edit-user-page {
 		width: 100%;
 		max-width: 900px;
@@ -260,5 +268,29 @@
 			flex-direction: column;
 			gap: 0.2rem;
 		}
+	}
+
+	.tabs {
+		display: flex;
+		gap: 0.5rem;
+		border-bottom: 1px solid var(--color-neutral-300);
+		margin-bottom: 1rem;
+  	}
+
+  	.tab {
+		padding: 0.5rem 0.9rem;
+		text-decoration: none;
+		color: var(--color-text-primary);
+		background: transparent;
+		border: 1px solid transparent;
+		border-bottom: 1px solid transparent;
+		border-radius: 6px 6px 0 0;
+		font-weight: 600;
+  	}
+
+	.tab.active {
+		background: var(--color-neutral-100);
+		border-color: var(--color-neutral-300);
+		border-bottom-color: transparent;
 	}
 </style>

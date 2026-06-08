@@ -18,6 +18,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	const users = await prisma.user.findMany({
+		where: { deleted_at: null },
 		select: isAdmin ? {
 			id: true,
 			name: true,

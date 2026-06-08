@@ -17,17 +17,21 @@ enum Role {
 
 model User {
   id            String  @id @default(cuid())
-  email         String  @unique
+  email         String	@unique
   emailVerified Boolean @default(false)
 
-  name       String? @unique // Username
+  name       String		@unique // Username
   first_name String?
   last_name  String?
 
   image     String?
   biography String?
   interests String?
+  image     String?
+  biography String?
+  interests String?
 
+  last_seen DateTime?
   last_seen DateTime?
 
   anonymize_at DateTime?
@@ -35,7 +39,16 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   role         Role      @default(USER)
+  anonymize_at DateTime?
+  deleted_at   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  role         Role      @default(USER)
 
+  followers Follow[]  @relation("Follower")
+  following Follow[]  @relation("Following")
+  posts     Post[]
+  comments  Comment[]
   followers Follow[]  @relation("Follower")
   following Follow[]  @relation("Following")
   posts     Post[]
@@ -60,6 +73,17 @@ model Session {
 }
 
 model Account {
+  id           String    @id @default(cuid())
+  userId       String
+  accountId    String
+  providerId   String
+  accessToken  String?
+  refreshToken String?
+  idToken      String?
+  expiresAt    DateTime?
+  password     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   id           String    @id @default(cuid())
   userId       String
   accountId    String
@@ -161,6 +185,9 @@ model Comment {
   parentId Int?
   postId   Int
   userId   String
+  parentId Int?
+  postId   Int
+  userId   String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
@@ -172,3 +199,4 @@ model Comment {
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }
+
