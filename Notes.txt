@@ -7,6 +7,12 @@ npx prisma generate
 npx prisma migrate deploy
 npx prisma studio
 
+TO DO:
+script to persist 
+refresh for name with welcome
+add posts to each user's profile for when they are followed
+add mandatory subject
+VIEW POSTS NEEDS TO refresh
 
 ==============================================================================================================
 
@@ -103,124 +109,24 @@ model Comment {
 }
 
 
-OLD SETTINGS Code  
-
-<script lang="ts">
-  import { authClient } from '$lib/auth-client';
-  import { goto } from '$app/navigation';
-
-  async function handleLogout() {
-    await authClient.signOut();
-    goto('/login');
-  }
-
-  import Avatar from '$lib/components/Avatar.svelte';
-</script>
 
 
+NOTES 
 
-<div class="settings-page">
-  <h1>SETTINGS</h1>
-
-
-<Avatar />
-
-  <p> Preferences</p>
-  
-<div class="editprofile">
-   		<a href="edit-profile">Edit Profile </a>
-	</div>
-
-</div>
-
-
-<button on:click={handleLogout}>Log out</button>
-
-<style>
-  .settings-page {
-    width: 100%;
-    max-width: 800px;
-    padding: 0rem;
-    text-align: left;
-  }
-</style>
-
------------------------------------------
-
-{#if src && !broken}
-    <img {src} {alt} on:error={() => broken = true} />
-  {:else}
-   <span>👤</span> <!-- placeholder icon -->
-  {/if}
-
-
-
-  --------------
-
-
-
------------------------------------------------------------
-
-
-    async function handleUpdate() {
-    error = '';
-    success = false;
-    loading = true;
-
-    const { error: err } = await authClient.updateUser({
-      name: `${firstname} ${lastname}`.trim(),
-      image: previewUrl || '',
+await db.profile.upsert({
+      where: { userId: locals.user.id },
+      update: {
+        login: data.get('intraprofile') as string || undefined,
+    	interests: data.get('interests') as string || undefined,
+      },
+      create: {
+        userId: locals.user.id,
+        login: data.get('intraprofile') as string || undefined,
+		
+      },
     });
 
-    if (err) {
-	  loading = false;
-      error = err.message ?? 'Could not update profile';
-      return;
-    }
-
-  const formData = new FormData();
-  formData.append('intraprofile', intraprofile);
-  formData.append('interests', interests);
-  formData.append('quote', quote);
-
-  await fetch('?/update', {
-    method: 'POST',
-    body: formData,
-  });
-
-  loading = false;
-  success = true;
-}
-
-
-async function handleUpdate() {
-  error = '';
-  success = false;
-  loading = true;
-
-  // step 1 — upload file + profile fields to server first
-  const formData = new FormData();
-  formData.append('intraprofile', intraprofile);
-  formData.append('interests', interests);
-  formData.append('username', username);
-  if (fileInput?.files?.[0]) {
-    formData.append('avatarimage', fileInput.files[0]);
+    return { success: true };
   }
+};
 
-  const res = await fetch('?/update', {
-    method: 'POST',
-    body: formData,
-  });
-
-
-
-  loading = false;
-
-  if (err) {
-    error = err.message ?? 'Could not update profile';
-    return;
-  }
-
-  if (savedImageUrl) previewUrl = savedImageUrl;
-  success = true;
-}

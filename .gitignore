@@ -12,15 +12,24 @@ node_modules
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
 # Env
 .env
-.env.*
+#.env.* need the .env.example
 !.env.example
 !.env.test
 
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
 # Paraglide
 src/lib/paraglide
 project.inlang/cache/
+
+# Images
+/uploads/images

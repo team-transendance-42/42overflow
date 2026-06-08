@@ -1,0 +1,1 @@
+Caddy act as a smart entry point, routing API and frontend traffic to the right containers, compressing responses, and caching static files for efficiency. It’s essential for a clean, production-like local setup.

@@ -2,12 +2,12 @@
   export let src: string = '';
   export let size: string = '50px';
   export let alt: string = 'Avatar';
-  export let outlined: boolean = false;
-
   let broken = false;
+
 </script>
 
 <div class="avatar" style="width: {size}; height: {size};">
+
 {#if src && !broken}
   <img {src} {alt} on:error={() => broken = true} />
 {:else}
@@ -22,13 +22,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--color-neutral-300);
     flex-shrink: 0;
 
   }
+
   .avatar img {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-</style>
+
+</style>  
