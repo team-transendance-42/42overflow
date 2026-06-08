@@ -6,6 +6,17 @@ export const auth = betterAuth({
   database: prismaAdapter(db, {
     provider: 'postgresql',
   }),
+  user: {
+	additionalFields: {
+    	first_name: { type: "string", required: false, fieldName: "first_name" },
+    	last_name: { type: "string", required: false, fieldName: "last_name" },
+		biography: { type: "string", required: false, fieldName: "biography" },
+		interests: { type: "string", required: false, fieldName: "interests" },
+		last_seen: { type: "date", required: false, fieldName: "last_seen" },
+		anonymize_at: { type: "date", required: false, fieldName: "anonymize_at" },
+		deleted_at: { type: "date", required: false, fieldName: "deleted_at" },
+  	},
+  },
   emailAndPassword: {
     enabled: true,
   },

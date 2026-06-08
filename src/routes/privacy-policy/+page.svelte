@@ -56,13 +56,11 @@ At 42overflow, we value your privacy. </h2>
 <style>
 h1 {
   font-size: var(--font-size-h1);
-  font-family: var(--font-family-base);
   margin-bottom: var(--space-md);
 }
 
 h2 {
   font-size: var(--font-size-h2);
-  font-family: var(--font-family-base);
   margin-bottom: var(--space-sm);
 }
 

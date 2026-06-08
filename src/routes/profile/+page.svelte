@@ -1,10 +1,9 @@
 <script lang="ts">
-  import Button from '$lib/components/Button.svelte';
-  import Input from '$lib/components/Input.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
-  import { authClient } from '$lib/auth-client';
 
   export let data;
+  const user = data.user;
+  //const profile = data.profile;
 
   let firstname = data.user?.name?.split(' ')[0] ?? '';
   let lastname = data.user?.name?.split(' ')[1] ?? '';
@@ -51,79 +50,80 @@
   }
 </script>
 
-<form method="POST" action="?/update" use:enhance enctype="multipart/form-data">
 <div class="profile-page">
-  <h1><strong>PROFILE PAGE</strong></h1>
-
-  {#if error}
-    <p class="error">{error}</p>
-  {/if}
-  {#if success}
-    <p class="success">Profile updated!</p>
-  {/if}
-
-  <div class="avatar-wrapper">
-    <Avatar src={previewUrl} size="80px" />
-    <label class="upload-btn">
-      <strong>Upload avatar</strong>
-      <input type="file" name="avatarimage" accept="image/*" bind:this={fileInput} on:change={handleFileChange} />
-    </label>
-    {#if previewUrl}
-      <button type="button" class="remove-btn" on:click={removeAvatar}>
-        <strong>Remove avatar</strong>
-      </button>
-    {/if}
+  <div class="avatar-section">
+    <Avatar src={user?.image ?? ''} size="80px" />
   </div>
 
-  <div class="name-row">
-    <Input label="First Name" name="firstname" placeholder="First" bind:value={firstname} />
-    <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
-  </div>
 
-  <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
-  <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
-  <Input label="Campus" name="campus" placeholder="Campus" bind:value={campus} />
-  <Input label="Intra Profile" name="intraprofile" placeholder="Intra profile" bind:value={intraprofile} />
+  <h1><strong>Name: </strong> {user?.first_name ?? 'No name set'} {user?.last_name ?? 'No name set'} </h1>
+ 
+  {#if user?.name}
+    <p class="username"><strong>Username: </strong> {user.name}</p>
+  {/if}
 
-  <Button label={loading ? 'Saving...' : 'Update'} type="button" onClick={handleUpdate} />
+ <p class="email"><strong>Email:</strong> {user?.email}</p>
+
+  {#if user?.interests}
+    <div class="section">
+      <p><strong>Interests</strong>: {user.interests}</p>
+    </div>
+  {/if}
+
+
+    {#if user?.followers?.length > 0}
+    <div class="interests">
+      <span class="label"><strong>Following:</strong></span>
+      {#each user.followers as f}
+	    <div class="following-row">
+	    <Avatar src={f.following.image ?? ''} size="36px" />
+        <a href="/profile/{f.following.name}" class="following-link">
+          {f.following.name}
+        </a>
+		</div>
+      {/each}
+	</div>
+  {/if}
+
+
 </div>
-</form>
 
 <style>
-  .avatar-wrapper { margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
-  .profile-page { width: 100%; max-width: 490px; padding: 0; text-align: left; }
-  .name-row { display: flex; gap: 1rem; }
-  .name-row :global(.input-wrapper) { flex: 1; }
-  .error { color: red; font-size: 0.875rem; }
-  .success { color: green; font-size: 0.875rem; }
 
-  .upload-btn {
-  cursor: pointer;
-  font-size: 0.875rem;
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
-  display: inline-block;
-}
+  .profile-page { 
+	width: 100%; 
+	max-width: 490px; 
+	padding: 0; 
+	text-align: 
+	left; }
 
-.upload-btn input {
-  display: none;
-}
+  .avatar-section { 
+	margin: 1rem 0;  }
 
-.remove-btn  {
-  cursor: pointer;
-  font-size: 0.875rem;
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
-  display: flex;
-}
 
-.remove-btn input {
-  display: none;
-}
+  .interests { 
+	margin: 0.75rem 0; }
 
-.file-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
+  .label { 
+	font-size: 0.75rem; 
+	color: var(--color-text-secondary); 
+	text-transform: uppercase; 
+	letter-spacing: 0.05em; }
+  
 
+  .following-row {	
+	display: flex;
+  	align-items: center;
+  	gap: 0.5rem;
+	margin: 0.4rem 0;
+ }
+
+  .following-link:hover {
+    text-decoration: underline;}
+
+  .following-link {
+  	color: var(--color-primary-dark-400);
+ }
+
+  
 </style>

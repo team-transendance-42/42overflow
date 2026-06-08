@@ -1,17 +1,17 @@
-<script>
+<script lang="ts">
   export let label = "Button";
-  export let type = "button";
+  export let type: "button" | "submit" | "reset" = "button";
   export let onClick = () => {};
 </script>
 
-<button {type} on:click={onClick}>
+<button type={type} on:click={onClick}>
   {label}
 </button>
 
 <style>
   button {
-    background-color: black;
-    color: white;
+    background-color: var(--color-neutral-900);
+    color: var(--color-neutral-200);
     padding: 0.6rem 1.2rem;
     border: none;
     border-radius: 6px;
