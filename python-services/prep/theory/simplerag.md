@@ -16,7 +16,7 @@ Ollama for chat and embeddings
 ChromaDB for vector storage
 PostgreSQL only for the main app data, not for the RAG test itself
 
-The repo already defaults to gemma3:4b for chat and nomic-embed-text for embeddings in llm-system-interface/.env. One detail: the init container pulls the chat model, but you may still need to pull the embedding model once.
+The repo already defaults to gemma4:4b for chat and nomic-embed-text for embeddings in llm-system-interface/.env. One detail: the init container pulls the chat model, but you may still need to pull the embedding model once.
 =========================
 
 docker compose up -d ollama chromadb python-rag llm-server

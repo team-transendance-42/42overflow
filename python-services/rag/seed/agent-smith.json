@@ -1,0 +1,137 @@
+[
+  {
+    "question": "What is Agent Smith and what agentic framework must you build?",
+    "answer": "Agent Smith is a 42 school project where you build an AI coding agent that autonomously solves programming challenges. The agent implements a Thought → Code → Observation loop: it reasons about the task (Thought), writes Python code (Code), executes it in a sandbox (Observation), then uses the result to reason about the next step. The target tasks are MBPP (Mostly Basic Python Problems — 500 coding challenges with test cases) and optionally SWE-bench (real GitHub issues requiring code edits to an existing repository). The agent uses an LLM (Claude, GPT-4, or any free-tier API) via an HTTP client, executes generated code in a restricted sandbox (with import allowlisting and filesystem access controls), uses MCP (Model Context Protocol) tools to read/write files, and must respect hard token budget limits. The project teaches agentic AI architecture: planning, tool use, error recovery, and resource management.",
+    "topic": "agent-smith",
+    "tags": [
+      "intro",
+      "overview",
+      "agentic-framework",
+      "MBPP",
+      "thought-code-observation"
+    ]
+  },
+  {
+    "question": "How does the Thought → Code → Observation loop work in Agent Smith?",
+    "answer": "The loop: (1) Thought: the agent receives the task description and sends a prompt to the LLM asking it to reason about what code to write. The LLM produces a reasoning block followed by a Python code block. (2) Code: extract the Python code from the LLM response (between ```python and ``` markers, or between <invoke> tags for XML-style tool calls, etc.). (3) Execution: run the extracted code in the sandbox using exec() with restricted globals. Capture stdout, stderr, and any exception. (4) Observation: append the execution result to the conversation history as a new message: 'Observation: [output or error]'. (5) Repeat: the LLM sees the growing conversation history (including all previous thoughts, code, and observations) and writes the next step. The loop terminates when: the code passes all test cases, the maximum iteration limit is reached, or the token budget is exhausted. Each iteration produces a StepMetrics record tracking tokens used, time elapsed, and whether the step succeeded.",
+    "topic": "agent-smith",
+    "tags": [
+      "thought-code-observation",
+      "loop",
+      "iteration",
+      "sandbox-execution",
+      "StepMetrics"
+    ]
+  },
+  {
+    "question": "How must the Agent Smith sandbox restrict imports and why is __import__ override necessary?",
+    "answer": "The sandbox must prevent the agent's generated code from accessing the filesystem outside allowed_directories, executing system commands, or importing dangerous modules. AST-level blocking (rewriting the import AST node) is insufficient because generated code can call __import__('os') directly — a function call, not an import statement. The complete solution: inject a custom __import__ into the exec() globals dict that checks the module name against an allowlist before delegating to the real __import__: allowed = {'math', 'json', 're', 'collections', 'itertools', 'functools', 'typing', 'dataclasses'}; def safe_import(name, *args, **kwargs): if name not in allowed: raise ImportError(f'Module {name} is not allowed'); return real_import(name, *args, **kwargs). Also remove importlib from the namespace: exec(code, {'__import__': safe_import, '__builtins__': safe_builtins}) where safe_builtins is a copy of builtins with __import__ and __loader__ replaced. Test the sandbox by attempting __import__('os'), __import__('importlib').import_module('subprocess'), and exec('import sys') inside it — all must raise ImportError.",
+    "topic": "agent-smith",
+    "tags": [
+      "sandbox",
+      "import-restriction",
+      "__import__",
+      "allowlist",
+      "exec",
+      "security"
+    ]
+  },
+  {
+    "question": "How do cumulative token limits work in Agent Smith and how must you enforce them?",
+    "answer": "The MBPP token budget is 6000 cumulative input tokens and 1500 cumulative output tokens across ALL iterations for a single task. These are per-task totals, not per-step limits. Enforce them by maintaining running totals in the agent loop: total_input_tokens += step_input_tokens; total_output_tokens += step_output_tokens. Before each LLM call, estimate the token count of the prompt (use sdk.encode or tiktoken) and check: if total_input_tokens + estimated_prompt_tokens > 6000: abort('Token budget exceeded'). The most common mistake is checking if current_step_tokens > limit instead of if cumulative > limit — an agent using 700 tokens per step looks fine individually but fails at step 9 (6300 cumulative). A 1500-token system prompt alone leaves only 450 tokens per step average — keep the system prompt under 400 tokens for MBPP. When the budget is exhausted, write SolutionOutput(success=False, error='Token budget exceeded') to disk and exit cleanly.",
+    "topic": "agent-smith",
+    "tags": [
+      "token-limits",
+      "cumulative",
+      "MBPP",
+      "budget-enforcement",
+      "StepMetrics"
+    ]
+  },
+  {
+    "question": "How does stop sequence configuration prevent LLM hallucination of tool outputs in Agent Smith?",
+    "answer": "Without stop sequences, after the LLM writes 'result = read_file(\"solution.py\")' it continues generating — fabricating the file contents: 'Output: def solve(n): return n * 2'. The agent loop receives this invented output as real tool output and the agent reasons on false data, producing a solution based on hallucinated file contents. Fix: configure stop_sequences in the LLM API call to tokens that mark where the generated code block ends and the Observation should begin: ['<end_code>', 'Observation:', '```\nObservation']. The exact stop sequences depend on your prompt format — they must match the boundary tokens your system prompt teaches the model to use. When the model hits a stop sequence, the generation ends; the agent loop then actually executes the code and appends the real output as the next Observation. Test: prompt the agent to read a file with known content; verify the Observation contains the real file content, not something the LLM invented.",
+    "topic": "agent-smith",
+    "tags": [
+      "stop-sequences",
+      "hallucination",
+      "tool-output",
+      "fabricated-observation",
+      "LLM-API"
+    ]
+  },
+  {
+    "question": "How do MCP tools work in Agent Smith and how do you bridge async to sync inside exec()?",
+    "answer": "MCP (Model Context Protocol) tools are async Python functions: async def read_file(filepath: str) -> str. The sandbox runs exec() synchronously. When the agent's generated code calls read_file('/testbed/solution.py'), it needs to get the result synchronously even though read_file is async. The bridge: create sync wrapper functions that run the async tool in a separate thread: import concurrent.futures; executor = concurrent.futures.ThreadPoolExecutor(); def read_file_sync(filepath): return executor.submit(asyncio.run, mcp.read_file(filepath)).result(). Inject these sync wrappers into the exec() globals. Never use asyncio.run() in the main event loop (raises RuntimeError if a loop is already running). Never use nest_asyncio in production — it patches the global event loop and causes subtle ordering bugs. The ThreadPoolExecutor approach creates a fresh event loop in a worker thread, avoiding all nesting issues.",
+    "topic": "agent-smith",
+    "tags": [
+      "MCP",
+      "async-to-sync",
+      "asyncio",
+      "exec",
+      "ThreadPoolExecutor",
+      "bridge"
+    ]
+  },
+  {
+    "question": "How must Agent Smith handle filesystem path validation to prevent symlink traversal?",
+    "answer": "The sandbox restricts file operations to allowed_directories (typically ['/testbed']). Naive path checking: if not filepath.startswith('/testbed'): raise PermissionError fails for symlinks. An attacker (or careless generated code) can do: os.symlink('/etc/passwd', '/testbed/passwd'); read_file('/testbed/passwd') — the path starts with /testbed but resolves to /etc/passwd. The fix: always resolve symlinks before checking: canonical = os.path.realpath(os.path.abspath(filepath)); if not any(canonical.startswith(d) for d in allowed_directories): raise PermissionError. os.path.realpath() resolves ALL symlink hops and returns the canonical absolute path. os.path.abspath() is not sufficient — it resolves '..' but not symlinks. Apply this to every file operation: read_file, write_file, edit_file, list_directory. The moulinette security test specifically uses symlinks to test path restrictions.",
+    "topic": "agent-smith",
+    "tags": [
+      "security",
+      "symlink",
+      "path-restriction",
+      "realpath",
+      "allowed-directories"
+    ]
+  },
+  {
+    "question": "How does the edit_file tool work in Agent Smith and what are its two silent failure modes?",
+    "answer": "edit_file does an exact string replacement: old_str is found in the file and replaced with new_str. Silent failure mode 1: line-ending mismatch. The file uses CRLF (\\r\\n) but old_str contains only LF (\\n). The string search finds no match, the function returns 'success' (or nothing), and the agent believes the edit happened when it didn't. The next get_patch() shows no diff — the agent is confused. Fix: normalize line endings in both the file content and old_str to LF before comparison. Silent failure mode 2: old_str appears multiple times. Which occurrence gets replaced? If you replace the first silently, the agent may have intended the third. Must document the behavior and ideally return the line number. If old_str appears zero times, return an explicit error: {'error': 'old_str not found in file', 'file': filepath} — never silently succeed. The agent must check the return value and retry with a corrected old_str if the edit failed.",
+    "topic": "agent-smith",
+    "tags": [
+      "edit_file",
+      "exact-string-match",
+      "CRLF",
+      "silent-failure",
+      "multiple-occurrences"
+    ]
+  },
+  {
+    "question": "How do you implement context truncation in Agent Smith as the conversation history grows?",
+    "answer": "Each iteration appends ~300–800 tokens of Thought + Code + Observation to the conversation history. By iteration 6–7, the total prompt exceeds the model's effective context. Two strategies: (1) Rolling truncation: keep the system prompt and the original task description always; keep only the last N=3 Thought/Code/Observation triples; drop older ones. Never drop the most recent Observation — the model needs it to understand the current state. (2) Summary compression: before dropping an old Observation, replace it with a one-line summary: 'Step 2: read solution.py, found function solve at line 42. Code had off-by-one error.' Store summaries separately and inject them as a compressed history block. The system prompt token cost is fixed — measure it once with sdk.encode(system_prompt) and subtract from the budget before starting. For MBPP, design the system prompt to be under 400 tokens to maximize available space for task context and history.",
+    "topic": "agent-smith",
+    "tags": [
+      "context-truncation",
+      "conversation-history",
+      "token-budget",
+      "rolling-window",
+      "system-prompt"
+    ]
+  },
+  {
+    "question": "How do you implement the Agent Smith MBPP test verification to know when the task is solved?",
+    "answer": "Each MBPP task includes test cases as Python assert statements or function calls with expected outputs. Parse the test cases from the task description using regex or string splitting to extract assert statements. After the agent's exec() runs the generated code in the sandbox, run the test cases against the generated function: inject the generated code into a fresh namespace, then exec each test case, catching AssertionError. If all tests pass: task is solved, StepMetrics(success=True), write SolutionOutput and stop the loop. If any test raises AssertionError: the agent gets an Observation showing which test failed and the actual vs expected output, then iterates. Important: run tests with a timeout (use concurrent.futures with a 5-second timeout) to prevent infinite loops in generated code. Also catch RecursionError and MemoryError from generated code — these should be treated as test failures with a clear error message, not as crashes of the agent framework.",
+    "topic": "agent-smith",
+    "tags": [
+      "MBPP",
+      "test-verification",
+      "assert",
+      "sandbox",
+      "timeout",
+      "RecursionError"
+    ]
+  },
+  {
+    "question": "How does context management work in Agent Smith when switching between multiple API providers?",
+    "answer": "When an API key returns HTTP 429 (rate limited) or HTTP 5xx (server error), the agent must rotate to the next provider without losing task state. Critical rules: (1) The retry must NOT count as a new iteration — only increment step count when the LLM actually generates a response. Use StepMetrics.retries to track failed API calls within a step. (2) The conversation history, sandbox state, current token totals, and task description must persist unchanged across the provider switch. (3) Different providers use different message formats (OpenAI vs Anthropic vs Ollama) — abstract the LLM API call behind a provider-agnostic function: def call_llm(messages, stop_sequences, max_tokens) → LLMResponse. Each provider implements this interface. (4) If all providers fail, write SolutionOutput(success=False, error='All providers exhausted') to disk and exit cleanly. (5) Log each rotation attempt with provider name, error code, and retry count for debugging.",
+    "topic": "agent-smith",
+    "tags": [
+      "API-rotation",
+      "rate-limit",
+      "provider-fallback",
+      "conversation-history",
+      "StepMetrics"
+    ]
+  }
+]

@@ -1,151 +1,205 @@
-import os
-from typing import Any
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
-import httpx
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from bm25_index import BM25Index
+from db import load_db_pairs
+from detector import build_topic_centroids
+from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
+from numpy_index import NumpyIndex
+from router import router as rag_router
+from seed import load_seed
+from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
 
-app = FastAPI(title="python-rag-service")
+# qa_cache shared across requests — populated at startup
+# solid and practical approach for small to medium-scale RAG (Retrieval-Augmented
+# Generation) systems, especially for prototyping or internal tools:
+# Strengths:
+# Fast in-memory access to QA pairs for quick retrieval.
+# Persistent vector storage in ChromaDB for scalable similarity search.
+# Clear separation: text data in memory, vectors in a vector DB.
+# Easy to extend and debug.
 
+# Limitations for large-scale/production:
+# In-memory cache (qa_cache["qa_pairs"]) may not scale for millions of documents
+# or distributed systems.
+# No real-time sync between memory and DB if data changes after startup.
+# No advanced retrieval (e.g., hybrid search, filtering, sharding).
+# Lacks user/session management, security, and distributed cache.
+# Best practices for production RAG:
 
-def _env(name: str, default: str) -> str:
-    value = os.getenv(name, default).strip()
-    return value.rstrip("/")
-
-
-CHROMA_URL = _env("CHROMA_URL", "http://chromadb:8000")
-OLLAMA_URL = _env("OLLAMA_URL", "http://ollama:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:4b")
-OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
-DEFAULT_COLLECTION = "my_rag_collection"
-
-
-class RagIndexRequest(BaseModel):
-    collection: str | None = None
-    documents: list[str]
-
-
-class RagAskRequest(BaseModel):
-    collection: str | None = None
-    question: str
-    top_k: int = Field(default=3, ge=1, le=20)
-
-
-def _collection_name(name: str | None) -> str:
-    if not name:
-        return DEFAULT_COLLECTION
-    trimmed = name.strip()
-    return trimmed if trimmed else DEFAULT_COLLECTION
-
-
-def _raise_for_status(resp: httpx.Response) -> None:
-    if resp.is_error:
-        raise HTTPException(status_code=502, detail=resp.text)
+# Use a scalable vector DB (like ChromaDB, Pinecone, Weaviate, etc.) as the single
+# source of truth.
+# Implement efficient retrieval pipelines (possibly with hybrid search: vectors +
+# metadata filters).
+# Use distributed caching (e.g., Redis) if you need fast access to frequently used data.
+# Keep your in-memory cache in sync with DB updates, or use the DB directly for retrieval.
+# Add monitoring, logging, and error handling for robustness.
+qa_cache: dict = {"qa_pairs": [], "bm25": None}
 
 
-async def _ensure_collection(client: httpx.AsyncClient, collection: str) -> None:
-    payload: dict[str, Any] = {
-        "name": collection,
-        "get_or_create": True,
-    }
-    resp = await client.post(f"{CHROMA_URL}/api/v1/collections", json=payload)
-    _raise_for_status(resp)
+def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
+    """Seed is the baseline. DB pairs are additive; DB wins on duplicate questions."""
+    try:
+        merged: dict[str, dict] = {p["question"]: p for p in seed_pairs}
+    except KeyError as ex:
+        raise ValueError(f"Seed pair missing 'question' field: {ex}") from ex
+
+    for p in db_pairs:
+        try:
+            merged[p["question"]] = p
+        except KeyError as ex:
+            raise ValueError(f"DB pair missing 'question' field: {ex}") from ex
+    return list(merged.values())
 
 
-async def _embed_texts(client: httpx.AsyncClient, texts: list[str]) -> list[list[float]]:
-    resp = await client.post(
-        f"{OLLAMA_URL}/api/embed",
-        json={"model": OLLAMA_EMBED_MODEL, "input": texts},
+async def _sync_to_chroma(pairs: list[dict]) -> None:
+    '''Syncs the given question-answer pairs to ChromaDB. generates unique IDs and
+    hashes for each pair and checks which pairs are new or changed compared to
+    existing entries in ChromaDB. Only new or changed pairs are embedded and
+    upserted to ChromaDB, optimizing performance by avoiding unnecessary
+    operations on unchanged data.'''
+    for p in pairs:
+        p["_id"] = make_doc_id(p["question"])
+        p["_hash"] = make_doc_hash(p["question"], p["answer"])
+        p["_text"] = format_doc(p["question"], p["answer"], p.get("tags", []))
+
+    # has try/catch for connection issues, will raise RuntimeError if ChromaDB is unreachable
+    ensure_collection()
+    existing = get_existing_hashes([p["_id"] for p in pairs])
+
+    to_update = [
+        p for p in pairs
+        if p["_id"] not in existing or existing[p["_id"]] != p["_hash"]
+    ]
+
+    if not to_update:
+        print(f"[chroma] all {len(pairs)} docs already up to date — skipping embed")
+        return
+
+    skip = len(pairs) - len(to_update)
+    print(f"[chroma] embedding {len(to_update)} new/changed docs (skipping {skip} unchanged)")
+
+    embeddings = await embed_texts([p["_text"] for p in to_update])
+    upsert(
+        ids=[p["_id"] for p in to_update],
+        documents=[p["_text"] for p in to_update],
+        embeddings=embeddings,
+        metadatas=[
+            {
+                "topic": p.get("topic", ""),
+                "doc_hash": p["_hash"],
+            }
+            for p in to_update
+        ],
     )
-    _raise_for_status(resp)
-    data = resp.json()
+    print(f"[chroma] upserted {len(to_update)} docs")
 
-    embeddings = data.get("embeddings")
-    if isinstance(embeddings, list) and embeddings:
-        return embeddings
 
-    embedding = data.get("embedding")
-    if isinstance(embedding, list) and embedding:
-        return [embedding]
+"""
+@asynccontextmanager
+• decorator from contextlib for writing async context managers.
+• Lets you manage setup and cleanup logic for resources (e.g., DB connections,
+  caches) asynchronously.
+• Code before 'yield' runs at startup (setup), code after 'yield' runs at
+  shutdown (cleanup).
+• Used by FastAPI for lifespan events (app startup/shutdown).
+"""
 
-    raise HTTPException(status_code=502, detail="empty embeddings response")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # will run when the app starts and stops.
+    # Step 1: always load seed
+    seed_pairs = load_seed()
+    print(f"[startup] step 1 — {len(seed_pairs)} pairs from seed.json")
+
+    # Step 2: try DB, merge
+    db_pairs = await load_db_pairs()
+    qa_cache["qa_pairs"] = _merge(seed_pairs, db_pairs)
+    print(f"[startup] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
+
+    # Step 3: ChromaDB + Ollama sync is optional at startup
+    try:
+        await _sync_to_chroma(qa_cache["qa_pairs"])
+        print("[startup] step 3 — ChromaDB sync complete")
+    except RuntimeError as exc:
+        print(f"[startup] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
+
+    # Step 4: embed all pairs → compute topic centroids → build BM25.
+    # We embed the full corpus here (not just changed docs) so centroids
+    # represent all topics correctly even when ChromaDB skipped some docs.
+    all_texts = [format_doc(p["question"], p["answer"], p.get("tags", []))
+                 for p in qa_cache["qa_pairs"]]
+    all_ids = [make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]]
+    all_topics = [p.get("topic", "unknown") for p in qa_cache["qa_pairs"]]
+    topic_intro_ids: dict[str, str] = {
+        p["topic"]: make_doc_id(p["question"])
+        for p in qa_cache["qa_pairs"]
+        if "intro" in p.get("tags", [])
+    }
+    print(f"[startup] intro docs mapped: {sorted(topic_intro_ids.keys())}")
+
+    # Initialise before try so NumpyIndex build below always has a defined variable.
+    # Edge case: if embed_texts raises, all_embeddings stays [] → NumpyIndex skipped,
+    # BM25 still works, dense search returns [] (degraded but not crashed).
+    all_embeddings: list[list[float]] = []
+    try:
+        stored = get_embeddings(all_ids)
+        all_embeddings = [stored[id_] for id_ in all_ids if id_ in stored]
+        if len(all_embeddings) != len(all_ids):
+            raise ValueError(f"ChromaDB returned {len(all_embeddings)}/{len(all_ids)} embeddings")
+        topic_centroids = build_topic_centroids(qa_cache["qa_pairs"], all_embeddings)
+        print(f"[startup] step 4 — topic centroids built: {sorted(topic_centroids.keys())}")
+    except Exception as exc:
+        print(f"[startup] WARNING: centroid computation failed — topic detection disabled: {exc}")
+        topic_centroids = {}
+
+    bm25 = BM25Index()
+    bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
+    qa_cache["bm25"] = bm25
+    print(f"[startup] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
+
+    # Build NumpyIndex from the embeddings computed above.
+    # Why: replaces ChromaDB HTTP roundtrip (~50–150ms) with an in-process
+    # matrix-vector multiply (~0.05ms). Embeddings are already in memory from
+    # the centroid computation step — no extra embed call needed.
+    # Edge case: if centroid computation failed, all_embeddings is empty → fall
+    # back to a zero matrix. dense search returns [] but BM25 still works.
+    numpy_idx = NumpyIndex()
+    if all_embeddings:
+        numpy_idx.build(
+            ids=all_ids,
+            embeddings=all_embeddings,
+            topics=all_topics,
+            documents=all_texts,
+        )
+        print(f"[startup] step 6 — NumpyIndex built ({len(all_ids)} docs)")
+    else:
+        print("[startup] step 6 — WARNING: NumpyIndex skipped (no embeddings)")
+
+    id_to_topic = dict(zip(all_ids, all_topics))
+
+    # expose indexes to router via app.state (avoids circular imports)
+    app.state.bm25 = bm25
+    app.state.numpy_index = numpy_idx
+    app.state.id_to_text = dict(zip(all_ids, all_texts))
+    app.state.centroids = topic_centroids
+    app.state.id_to_topic = id_to_topic
+    app.state.topic_intro_ids = topic_intro_ids
+
+    yield  # app runs and answers questions for users.
+
+    # when app shutdown, clear the qa_cache to free memory: needed if used not in a
+    # docker container, but in a serverless environment like AWS Lambda where the
+    # same instance may be reused for multiple requests. Clearing the qa_cache on
+    # shutdown helps prevent data leakage between requests and ensures that each
+    # request starts with a clean slate.
+    qa_cache["qa_pairs"] = []
+
+# docker compose logs -f python-rag
+app = FastAPI(lifespan=lifespan)
+app.include_router(rag_router)
 
 
 @app.get("/healthz")
-async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.post("/rag/index")
-async def rag_index(req: RagIndexRequest) -> dict[str, Any]:
-    documents = [doc.strip() for doc in req.documents if doc and doc.strip()]
-    if not documents:
-        raise HTTPException(status_code=400, detail="documents are required")
-
-    collection = _collection_name(req.collection)
-
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        await _ensure_collection(client, collection)
-
-        embeddings = await _embed_texts(client, documents)
-        if len(embeddings) != len(documents):
-            raise HTTPException(status_code=502, detail="embedding count mismatch")
-
-        ids = [f"doc-{i + 1}" for i in range(len(documents))]
-        payload = {
-            "ids": ids,
-            "documents": documents,
-            "embeddings": embeddings,
-        }
-
-        resp = await client.post(f"{CHROMA_URL}/api/v1/collections/{collection}/upsert", json=payload)
-        _raise_for_status(resp)
-
-    return {"ok": True, "indexed": len(documents), "collection": collection}
-
-
-@app.post("/rag/ask")
-async def rag_ask(req: RagAskRequest) -> dict[str, Any]:
-    question = req.question.strip()
-    if not question:
-        raise HTTPException(status_code=400, detail="question is required")
-
-    collection = _collection_name(req.collection)
-
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        query_embedding = await _embed_texts(client, [question])
-
-        query_payload: dict[str, Any] = {
-            "query_embeddings": query_embedding,
-            "n_results": req.top_k,
-        }
-        query_resp = await client.post(
-            f"{CHROMA_URL}/api/v1/collections/{collection}/query",
-            json=query_payload,
-        )
-        _raise_for_status(query_resp)
-
-        documents = query_resp.json().get("documents", [])
-        contexts = documents[0] if documents else []
-
-        context_text = "No context found."
-        if contexts:
-            context_text = "\n---\n".join(contexts)
-
-        prompt = (
-            "Use the context below to answer. If context is missing, say you are unsure briefly.\n\n"
-            f"Context:\n{context_text}\n\nQuestion:\n{question}"
-        )
-        chat_payload = {
-            "model": OLLAMA_MODEL,
-            "stream": False,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        chat_resp = await client.post(f"{OLLAMA_URL}/api/chat", json=chat_payload)
-        _raise_for_status(chat_resp)
-
-        answer = chat_resp.json().get("message", {}).get("content", "").strip()
-        if not answer:
-            raise HTTPException(status_code=502, detail="empty model answer")
-
-    return {"answer": answer, "contexts": contexts}
+def healthz():
+    return {"status": "ok", "qa_count": len(qa_cache["qa_pairs"])}

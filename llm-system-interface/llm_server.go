@@ -33,9 +33,7 @@ func main() {
 	// url: what client calls
 	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
 	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST", "OPTIONS")
-	// router.HandleFunc("/api/rag/index", handlers.RagIndex).Methods("POST", "OPTIONS") todo: implement RAG indexing endpoint, which accepts text and metadata, and stores it in a vector database like Pinecone or Weaviate. This is separate from the /ask endpoint, which only retrieves info.
-	// router.HandleFunc("/api/rag/ask", handlers.RagAsk).Methods("POST", "OPTIONS")
-	//router.HandleFunc("/api/generate-image", handlers.GenerateImage).Methods("POST", "OPTIONS") // placeholder for future image generation endpoint: todo: implement handlers.GenerateImage
+	router.HandleFunc("/api/community", handlers.RagAskStreaming).Methods("POST", "OPTIONS")
 
 	log.Println("Server running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", router))

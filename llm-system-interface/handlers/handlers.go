@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	// "bufio" for waht?
 	"encoding/json"
 	"llm-system-interface/models"
 	"llm-system-interface/services"
@@ -150,21 +149,3 @@ func GenerateText(w http.ResponseWriter, r *http.Request) {
 
 	streamSSE(w, ch) // talks to browser, sending each chunk as an SSE message
 }
-
-/**todo: not implemented; Images don't stream — they return a JSON response with a URL or base64 bytes.*/
-//func GenerateImage(w http.ResponseWriter, r *http.Request) {
-//	var req models.ImageRequest
-//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-//		http.Error(w, "Invalid request", http.StatusBadRequest)
-//		return
-//	}
-
-	// imageURL, err := services.GenerateImage(r.Context(), req)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusBadGateway)
-	// 	return
-	// }
-
-	// w.Header().Set("Content-Type", "application/json")
-	// json.NewEncoder(w).Encode(map[string]string{"url": imageURL})
-//}

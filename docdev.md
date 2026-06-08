@@ -2,6 +2,11 @@ For development, there is an extra docker-compose.dev.yml file that enables live
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 base stack only: (production)
 docker compose up --build
+=====================================================
+docker system prune -af --volumes 
+then:
+docker compose build --no-cache && docker compose up -d
+=====================================================
 
 Use --build only when you changed:
 Dockerfile/base image
@@ -59,7 +64,8 @@ docker volume prune -f
 docker network prune -f
 ===================================
 Remove everything (be careful!):
-docker system prune -af
+docker system prune -af --volumes --no-cache
+
 ====================================
 
 //shows disk usage broken down by images, containers, volumes, and build cache.
@@ -73,4 +79,22 @@ docker compose up -d --build caddy app
 
 for deleted files:
 git add -A
+==============================
+docker exec 42overflow-ollama-1 ollama list
+// shows the models currently available in the Ollama container
+==============
 
+if running on a machine with an NVIDIA GPU : 
+ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
+ =================
+ replace llm
+ ================= 
+  # 1. Remove old model
+  docker exec 42overflow-ollama-1 ollama rm gemma3:1b
+
+  # 2. Pull new model
+  docker exec 42overflow-ollama-1 ollama pull gemma3:4b
+
+  After that, verify it's there:
+
+  docker exec 42overflow-ollama-1 ollama list

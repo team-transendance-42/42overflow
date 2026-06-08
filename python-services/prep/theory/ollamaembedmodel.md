@@ -1,4 +1,4 @@
-OLLAMA_EMBED_MODEL is the model that converts text into vectors (lists of numbers) so your RAG system can do semantic search.
+OLLAMA_EMBED_MODEL is the model that converts text into vectors (lists of numbers) so the RAG system can do semantic search.
 
 The chat model (OLLAMA_MODEL) writes the final answer.
 The embedding model (OLLAMA_EMBED_MODEL) finds the relevant context first.
@@ -6,12 +6,12 @@ The embedding model (OLLAMA_EMBED_MODEL) finds the relevant context first.
 RAG quality depends heavily on this retrieval step. If retrieval is weak, the final answer is weak.
 =================================
 
-Why You Need It
+Why Is It Needed
 
 RAG has 2 different jobs:
 
 Retrieval job
-Find the most relevant chunks from your knowledge base.
+Find the most relevant chunks from the knowledge base.
 Needs embeddings + vector similarity.
 Generation job
 Use those chunks to answer naturally.
@@ -29,12 +29,7 @@ Ask question:
 Question -> same embedding model -> query vector
 ChromaDB returns nearest chunks
 Chat model gets prompt with those chunks and generates answer
-Relevant code path:
 
-Index: main.py:82
-Ask/query: main.py:106
-Ollama embed call: main.py:57
-Ollama chat call: main.py:144
 ======================================
 Critical Rule
 

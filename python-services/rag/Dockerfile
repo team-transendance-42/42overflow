@@ -13,10 +13,16 @@ RUN apt-get update \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev
 
-COPY main.py ./
+COPY . ./
+
+# Pre-download the default embedding model so the container never needs network at startup.
+# Default: BAAI/bge-small-en-v1.5 (384-dim, ~100 MB RAM) — for memory-constrained machines.
+# School computers: set EMBED_MODEL=nomic-ai/nomic-embed-text-v1.5 at runtime (downloads on first start).
+# Changing EMBED_MODEL also requires wiping the ChromaDB volume (dimension mismatch otherwise).
+RUN uv run python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
 
 EXPOSE 8090
 

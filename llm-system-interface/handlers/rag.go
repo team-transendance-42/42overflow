@@ -1,81 +1,56 @@
 package handlers
 
-// todo: not implemented
 import (
-	"encoding/json"
 	"llm-system-interface/models"
 	"llm-system-interface/services"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
-func RagIndex(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// ragQueue is a separate semaphore for RAG requests.
+// Capacity 1: only one community request runs at a time (Ollama is CPU-bound).
+// Kept separate from ollamaQueue so a slow RAG request does not block plain Ollama requests.
+var ragQueue = make(chan struct{}, 1)
+
+// RagAskStreaming handles POST /api/community.
+// Retrieves community contexts from the Python RAG service and streams
+// Gemma's answer constrained to those contexts.
+func RagAskStreaming(w http.ResponseWriter, r *http.Request) {
+	log.Printf("RagAskStreaming(): method=%s path=%s", r.Method, r.URL.Path)
+	if !setHeaders(w, r) {
 		return
 	}
 
-	var req models.RagIndexRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+	select {
+	case ragQueue <- struct{}{}:
+	case <-r.Context().Done():
+		return
+	case <-time.After(30 * time.Second):
+		http.Error(w, "Community service busy, try again shortly", http.StatusServiceUnavailable)
 		return
 	}
-	if len(req.Documents) == 0 {
-		http.Error(w, "documents are required", http.StatusBadRequest)
+	defer func() {
+		<-ragQueue
+		log.Println("RAG slot released after Community request.")
+	}()
+
+	var req models.TextRequest
+	if !decodeAndSanitize(w, r, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Prompt) == "" {
+		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
 
-	count, err := services.IndexDocuments(r.Context(), req.Collection, req.Documents)
+	ch, err := services.StreamRagAnswer(r.Context(), req.Prompt)
 	if err != nil {
-		http.Error(w, "RAG index error: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-	collection := strings.TrimSpace(req.Collection)
-	if collection == "" {
-		collection = "my_rag_collection"
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"ok":         true,
-		"indexed":    count,
-		"collection": collection,
-	})
-}
-
-func RagAsk(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		log.Printf("RagAskStreaming: StreamRagAnswer error: %v", err)
+		http.Error(w, "Community service error: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
-	var req models.RagAskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-	if strings.TrimSpace(req.Question) == "" {
-		http.Error(w, "question is required", http.StatusBadRequest)
-		return
-	}
-
-	answer, contexts, err := services.AskRag(r.Context(), req.Collection, req.Question, req.TopK)
-	if err != nil {
-		http.Error(w, "RAG ask error: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(models.RagAskResponse{
-		Answer:   answer,
-		Contexts: contexts,
-	})
+	streamSSE(w, ch)
 }
