@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 
-	const  currentUser = await prisma.user.findUnique({
+	const  currentUser = await db.user.findUnique({
 		where: { id: locals.user?.id },
 		select: { role: true }
 	});
@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw error(403, 'Forbidden');
 	}
 
-	const users = await prisma.user.findMany({
+	const users = await db.user.findMany({
 		where: { deleted_at: null },
 		select: isAdmin ? {
 			id: true,
