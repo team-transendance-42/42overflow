@@ -11,7 +11,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.session = session?.session ?? null;
 
    if (session?.user) {
-    await db.user.updateMany({
+    await db.user.update({
       where: { id: session.user.id },
       data: { last_seen: new Date() },
     });

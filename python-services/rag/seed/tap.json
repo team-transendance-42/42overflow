@@ -1,0 +1,123 @@
+[
+  {
+    "question": "What is TAP (Text Adventure Protocol) and what server must you build?",
+    "answer": "TAP is a 42 school project where you implement a multiplayer text adventure game server using a custom protocol. Players connect via TCP and interact with a persistent world through text commands: MOVE (between rooms), LOOK (describe current room), TAKE/DROP (item management), TALK (NPC dialogue), INVENTORY (show items held), and HELP. The server must: load world data from YAML or JSON files (at least 8 interconnected rooms forming loops, 3 distinct NPC types, a complete item system), validate all world references at startup, handle multiple concurrent players using asyncio, broadcast events to other players in the same room (PRESENCE ENTER/LEAVE, item events), implement at least one complete quest, and log all events as structured JSON without impacting performance. The protocol uses distinct message types: OK (success), ERR (error), and EVT (event broadcast to other players).",
+    "topic": "tap",
+    "tags": [
+      "intro",
+      "overview",
+      "protocol",
+      "asyncio",
+      "multiplayer"
+    ]
+  },
+  {
+    "question": "How does the TAP MOVE command work including PRESENCE protocol events?",
+    "answer": "MOVE <direction> (e.g., MOVE north): (1) Validate the exit exists in the current room; send ERR INVALID_EXIT if not. (2) Broadcast EVT ROOM PRESENCE LEAVE {player: name, room: current_room_id} to all OTHER players in the current room (not the moving player). (3) Remove player from current room. (4) Add player to the new room. (5) Send OK {room: new_room_id, description: ...} to the moving player. (6) Broadcast EVT ROOM PRESENCE ENTER {player: name, room: new_room_id} to all OTHER players now in the new room. Order matters: LEAVE must reach old room players before ENTER reaches new room players. Never send a player their own PRESENCE events — they received the OK response instead. Getting this order wrong causes client-side ghost-player bugs where players appear in both rooms simultaneously. The player list in each room must be a set, not a list, to prevent duplicate entries.",
+    "topic": "tap",
+    "tags": [
+      "MOVE",
+      "PRESENCE",
+      "event-order",
+      "broadcast",
+      "protocol"
+    ]
+  },
+  {
+    "question": "How does the TAP TAKE command handle item IDs, display names, and ambiguous matches?",
+    "answer": "TAKE accepts both item IDs (e.g., 'item.herbs') and multi-word display names (e.g., 'Frothy Ale'). Matching priority: (1) exact item ID match first, (2) case-insensitive full display name match, (3) case-insensitive partial/substring match. If partial matching finds multiple items, return ERR AMBIGUOUS_ITEM {matches: ['item.ale1', 'item.ale2']} — never silently pick the first match. If matched exactly one item: remove it from the room's item list, add it to the player's inventory, broadcast EVT ROOM ITEM_TAKEN {player: name, item: item_id, item_name: display_name} to all OTHER players in the room, send OK {item: item_id} to the taker. The atomic check-and-remove (no await between check and remove) is critical: if item_id not in room.items: send ERR NO_ITEM; return; item = room.items.pop(item_id); player.inventory[item_id] = item; await broadcast(...). Any await between check and pop allows another coroutine to take the item first.",
+    "topic": "tap",
+    "tags": [
+      "TAKE",
+      "item-matching",
+      "ambiguous",
+      "atomic-operation",
+      "broadcast"
+    ]
+  },
+  {
+    "question": "How must TAP handle a client disconnect without breaking broadcasts to other players?",
+    "answer": "When iterating over room players to broadcast a message, a broken connection raises BrokenPipeError or ConnectionResetError. A naive for loop that lets this exception propagate stops the broadcast — remaining players never receive the message. Correct pattern using asyncio.gather: results = await asyncio.gather(*[send_to(player, message) for player in room.players], return_exceptions=True). This runs all sends concurrently; failed sends return exceptions instead of raising them. After gather, check results for exceptions and clean up disconnected players: for player, result in zip(room.players, results): if isinstance(result, Exception): await cleanup_player(player). Cleanup must: remove from room, remove from global player registry, broadcast PRESENCE LEAVE to the room, persist any quest/inventory state. For synchronous exception handling without asyncio.gather: use try/except around each individual send inside the loop, collect failed players, then process cleanup after the loop completes.",
+    "topic": "tap",
+    "tags": [
+      "disconnect",
+      "broadcast",
+      "BrokenPipeError",
+      "asyncio-gather",
+      "cleanup"
+    ]
+  },
+  {
+    "question": "How must TAP startup world validation work and what must it check?",
+    "answer": "Before accepting any player connection, the server must validate the entire world file. Check: (1) Every exit target in every room exists as a room key (no undefined destination). (2) Every NPC spawn in a room references an NPC type defined in the npcs section. (3) Every item listed in a room's items array exists in the global items section. (4) Every quest's required_item exists in the global items section and is obtainable. (5) All exit direction names are from the allowed set (north, south, east, west, up, down). (6) No room is completely isolated (reachable from the start room via BFS). If any check fails, log the specific error (room name, exit direction, missing key) and exit with code 1 — never start a server with a broken world. Lazy validation (checking only when a player reaches the broken room) causes in-game crashes during peer review at the worst possible moment.",
+    "topic": "tap",
+    "tags": [
+      "startup-validation",
+      "world-file",
+      "exit-reference",
+      "NPC-spawn",
+      "item-validation"
+    ]
+  },
+  {
+    "question": "How does the TAP TAKE race condition work and how does asyncio prevent it?",
+    "answer": "Two players in the same room send TAKE item.herbs simultaneously. Without protection, both coroutines check 'is item in room?' (yes), then both pop it, and both receive the item — item duplication. In asyncio (single-threaded event loop), this race only occurs if there is an await between the check and the pop. If the check and pop happen in the same synchronous block: if item_id not in room.items: err; return; item = room.items.pop(item_id) — this is atomic from asyncio's perspective because no other coroutine can run between these two lines. The race occurs if you have: result = await db.fetch_item(item_id) followed by room.items.pop(item_id) — the await allows another coroutine to take the item. Solution: do all item checks and mutations synchronously (no awaits) in a single block, then await only the network sends afterward. With thread-based servers, a threading.Lock on room.items is required.",
+    "topic": "tap",
+    "tags": [
+      "race-condition",
+      "asyncio",
+      "atomic-operation",
+      "TAKE",
+      "item-duplication"
+    ]
+  },
+  {
+    "question": "How must TAP structured JSON logging work without impacting server performance?",
+    "answer": "Every server event (player connect, command received, item taken, MOVE, TALK, errors) must be logged as a JSON object: {timestamp: '...', player: '...', command: '...', args: {...}, result: '...'}. Two implementation mistakes that become bottlenecks at 50+ concurrent players: (1) Synchronous file I/O on every log call in the asyncio event loop — logging.FileHandler.emit() does a blocking write that stalls the event loop for all concurrent players during the write. Fix: use logging.handlers.QueueHandler + QueueListener — log calls push to an in-memory queue (non-blocking), a background thread handles the actual file writes. (2) Serializing full world state or full room state to JSON on every log line. Log only IDs and relevant fields: {player: 'alice', command: 'TAKE', item: 'item.herbs'} not the entire room object. JSON serialization of large objects is CPU-intensive and adds milliseconds per log call.",
+    "topic": "tap",
+    "tags": [
+      "JSON-logging",
+      "asyncio",
+      "QueueHandler",
+      "performance",
+      "non-blocking"
+    ]
+  },
+  {
+    "question": "How does a TAP fetch quest work: item acquisition, delivery, and reward?",
+    "answer": "A fetch quest has three stages: active (player has accepted the quest), has_item (player holds the required item), and complete (player delivered the item and received the reward). Quest completion must happen at TALK time (when the player talks to the quest-giver NPC with the item in inventory), not at TAKE time (when the item is picked up). Correct flow: player accepts quest (TALK npc → quest becomes active) → player picks up item.herbs (TAKE → has_item=True in quest state) → player returns to NPC (TALK npc → server checks: quest active AND item in inventory → remove item from inventory, mark quest complete, grant reward, send OK with reward info). Students who mark completion at TAKE time complete the quest before delivery, keep the item in inventory, and break the quest narrative. A player who drops the item after picking it up should NOT be able to complete the quest — check for the item in inventory at TALK time, not just the has_item flag.",
+    "topic": "tap",
+    "tags": [
+      "quest",
+      "fetch-quest",
+      "delivery",
+      "TALK",
+      "quest-state"
+    ]
+  },
+  {
+    "question": "How do you implement async server connections in TAP using asyncio and what is the connection lifecycle?",
+    "answer": "Use asyncio.start_server() to create a TCP server that calls a handler coroutine for each new connection. The handler receives (reader: asyncio.StreamReader, writer: asyncio.StreamWriter). Connection lifecycle: (1) Read the player's name/auth from the first message. (2) Register the player in the global player registry and the default starting room. (3) Broadcast PRESENCE ENTER to the starting room. (4) Enter the command loop: while True: try: line = await reader.readline() except ConnectionResetError: break; if not line: break; command, *args = line.decode().strip().split(); await handle_command(player, command, args, writer). (5) On exit (broken pipe or empty line): await cleanup_player(player). Always use writer.write() + await writer.drain() for sending — write() buffers, drain() flushes. Never block in the command handler — any I/O (database, filesystem) must be awaited. Run with asyncio.run(main()) where main creates the server and runs forever.",
+    "topic": "tap",
+    "tags": [
+      "asyncio",
+      "start_server",
+      "StreamReader",
+      "StreamWriter",
+      "connection-lifecycle"
+    ]
+  },
+  {
+    "question": "What are the world file requirements for TAP — minimum rooms, NPCs, and quest structure?",
+    "answer": "The subject requires: at least 8 interconnected rooms forming one or more loops (a loop means you can walk in a circle and return to the start — prevents the world from being a pure tree/dead-end structure), plus at least one optional branch (a dead-end room reachable only from one other room). At least 3 distinct NPC roles: a dialogue-only NPC (provides lore/information), a quest-giver NPC (initiates and completes at least one quest), and an enemy or shop NPC (unique gameplay mechanic). At least one complete quest with pickup and delivery. Items must exist as unique instances — if a sword is in the library, only one player can take it; there is no 'infinite supply'. Define the world in YAML (recommended) with keys: rooms (id, description, exits, items, npcs), items (id, name, description, weight, obtainable), npcs (id, name, type, dialogue_tree), quests (id, npc_id, required_item, reward_item). Load and validate at startup before accepting connections.",
+    "topic": "tap",
+    "tags": [
+      "world-design",
+      "rooms",
+      "NPC",
+      "quest",
+      "loops",
+      "YAML"
+    ]
+  }
+]

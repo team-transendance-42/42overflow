@@ -22,7 +22,7 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<Header />
+<Header user={data.user} />
 
 <div class="content">
 	<Sidebar userRole={data.userRole} />

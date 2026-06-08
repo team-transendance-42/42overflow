@@ -19,6 +19,7 @@
 	};
 
 	onMount(loadQuestions);
+	
 </script>
 
 <!-- Posts -->

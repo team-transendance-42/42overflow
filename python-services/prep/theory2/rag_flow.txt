@@ -1,0 +1,69 @@
+the LLM only sees the top-k chunks, not everything
+
+  This is the core idea of RAG. Here's what actually gets sent to the
+  LLM:
+
+  ---
+  The full pipeline
+
+  Your docs (all of them)
+          ↓
+     chunk + vectorize ALL             ← happens once at index time
+          ↓
+     store.vectors (all chunks)
+          ↓
+     retrieve() → compare query        ← cosine similarity vs ALL chunks
+                → pick TOP 3 only
+          ↓
+     build_prompt() → package only     ← only those 3 chunks go in
+                      those 3 chunks
+          ↓
+     generate() → send to LLM          ← LLM sees: 3 chunks + question
+          ↓
+     LLM answers
+
+  ---
+  Why not send everything?
+
+  LLMs have a context window limit — they can only read so many tokens
+  at once. You can't dump 500 docs into one prompt.
+
+  That's the whole point of the vector search — filter first, then send
+  only what's relevant.
+
+  ---
+  What the LLM actually receives
+
+  === CONTEXT ===
+  [Context 1] source=wiki.md  relevance=0.970
+  <chunk text>
+
+  [Context 2] source=book.md  relevance=0.850
+  <chunk text>
+
+  [Context 3] source=wiki.md  relevance=0.720
+  <chunk text>
+
+  === QUESTION ===
+  What is the capital of France?
+
+  Just 3 text strings. No vectors. No math. Plain text.
+
+  ---
+  Key insight
+
+  Stage: Index time
+  What happens: ALL docs → chunked → vectorized → stored
+  ────────────────────────────────────────
+  Stage: Query time
+  What happens: question → vectorized → compared to ALL stored vectors
+  ────────────────────────────────────────
+  Stage: LLM input
+  What happens: only TOP-K chunks as plain text + question
+  ────────────────────────────────────────
+  Stage: LLM output
+  What happens: answer grounded in those chunks
+
+  The vectors are never sent to the LLM. They're only used to find the
+  right chunks. The LLM only ever reads plain text — it just happens to
+  be the most relevant plain text, selected by the math.

@@ -1,0 +1,135 @@
+[
+  {
+    "question": "What is Pac-Man in the 42 curriculum and what must you build?",
+    "answer": "Pac-Man is a 42 AI module project where you implement a fully playable Pac-Man arcade clone in Python using a visual library (pygame recommended, or MLX42). The game must: load its configuration from a JSON file (with # comment support), generate the maze using the A-Maze-ing external package (another student's maze generator), place pellets and super-pacgums, implement ghost AI (chase, scatter, and frightened modes), handle collision detection, track lives and score, implement a highscore system, and support pause. The A-Maze-ing dependency is installed as a pip package (mazegen-*) — you import the MazeGenerator class and call generate() to get the maze grid. The project tests your ability to build a complete interactive application, integrate external packages gracefully, and handle all edge cases in a real-time game loop.",
+    "topic": "pacman",
+    "tags": [
+      "intro",
+      "overview",
+      "pygame",
+      "A-Maze-ing",
+      "game-loop"
+    ]
+  },
+  {
+    "question": "How do you parse the Pac-Man config.json with # comment support safely?",
+    "answer": "The config file uses JSON with lines starting with '#' as comments. Strip only lines where '#' is the first non-whitespace character — never strip '#' appearing inside a string value like 'score#1.json'. Safe approach: filtered = [line for line in raw.splitlines() if not line.strip().startswith('#')]; data = json.loads('\\n'.join(filtered)). Validate all mandatory keys after parsing: if any key is missing, print 'Error: missing required config key: <key>' and exit with code 1. Validate all value types and ranges: width/height must be positive integers, difficulty must be one of the allowed values, etc. Never let json.JSONDecodeError or KeyError propagate as a traceback — catch them and convert to clear error messages. The config should define: highscore_filename, level array, ghost speed, power-up duration, maze seed (for reproducibility), and display resolution.",
+    "topic": "pacman",
+    "tags": [
+      "config",
+      "JSON-comments",
+      "comment-parsing",
+      "validation",
+      "error-handling"
+    ]
+  },
+  {
+    "question": "How do you integrate the A-Maze-ing external package in Pac-Man and handle generator failures?",
+    "answer": "The A-Maze-ing package is installed as a pip package named mazegen-*. Import inside a try block at runtime (not at module level) so an import failure doesn't crash before the error handler runs: try: from mazegen import MazeGenerator; gen = MazeGenerator(width=w, height=h, seed=seed, perfect=False); maze = gen.generate() except Exception as e: print(f'Maze generator failed: {e}'); maze = fallback_maze(w, h). The fallback must be a minimal valid maze (e.g., a rectangular grid with only outer walls) that allows the game to continue. Use PERFECT=False for Pac-Man — perfect mazes (single path) have no loops, making ghost AI trivial and the game unplayable. Wrap every call to the external generator in broad try-except because student-written packages may raise AttributeError, RecursionError, or any other exception. Never let an external package crash propagate to the player.",
+    "topic": "pacman",
+    "tags": [
+      "A-Maze-ing",
+      "external-package",
+      "exception-handling",
+      "fallback-maze",
+      "PERFECT-flag"
+    ]
+  },
+  {
+    "question": "How does the Pac-Man game loop work and what frame rate should you target?",
+    "answer": "The game loop: (1) Process events (pygame.event.get() — keyboard input, window close). (2) Update game state: move player, move ghosts, check collisions, update timers. (3) Render: draw maze, pellets, ghosts, player, HUD. (4) Cap frame rate: clock.tick(60) for 60 FPS. Use delta time (dt = clock.tick(60) / 1000.0) to make movement frame-rate independent: entity.x += speed * dt * direction. Without delta time, the game runs faster on faster machines and movement speed is tied to frame rate. Track all timers (ghost edible duration, level countdown) using accumulated game_time += dt rather than system time — this ensures timers freeze correctly during pause. The main loop state machine: MENU → PLAYING → PAUSED → GAME_OVER → LEVEL_COMPLETE → HIGHSCORE_ENTRY. Each state has its own event handler and render function.",
+    "topic": "pacman",
+    "tags": [
+      "game-loop",
+      "frame-rate",
+      "delta-time",
+      "state-machine",
+      "pygame"
+    ]
+  },
+  {
+    "question": "How does ghost AI work in Pac-Man: chase, scatter, and frightened modes?",
+    "answer": "Ghosts cycle through three modes. Chase mode: each ghost uses BFS to find the shortest path to a target cell (Blinky targets Pac-Man's current cell; Pinky targets 4 cells ahead of Pac-Man; Inky and Clyde have their own targeting rules). BFS on the maze graph gives the optimal next move each frame. Scatter mode: ghosts retreat to fixed corner positions (each ghost has a designated corner), making the game temporarily easier. The chase/scatter cycle is time-based (e.g., scatter 7s → chase 20s → scatter 7s → chase forever). Frightened mode: activated by eating a super-pacgum, lasts edible_duration seconds. In frightened mode, ghosts move randomly (pick any valid direction that isn't a 180° reversal) and turn blue. Near expiry, ghosts flash (alternate blue and white every 0.2s). Ghosts cannot reverse direction except when switching from chase to scatter or when entering frightened mode. Implement ghost mode as an enum and a per-ghost timer.",
+    "topic": "pacman",
+    "tags": [
+      "ghost-AI",
+      "chase",
+      "scatter",
+      "frightened",
+      "BFS",
+      "modes"
+    ]
+  },
+  {
+    "question": "How must the super-pacgum edible timer work when a second one is eaten before the first expires?",
+    "answer": "The edible timer must RESET to its full duration from the moment the second super-pacgum is eaten — not stack additively, and not keep the remaining time from the first. Store edible_end_time = game_time + edible_duration (where game_time uses the delta-time accumulator). Every time a super-pacgum is eaten: edible_end_time = game_time + edible_duration (overwrite, not add). Ghosts check is_edible = (game_time < edible_end_time). The flash warning starts when game_time > edible_end_time - warning_duration (e.g., last 2 seconds). The most common bug: storing edible_start_time once and never updating it when subsequent pacgums are eaten. This causes the first pacgum's timer to expire mid-chase after the second pacgum — ghosts turn normal while Pac-Man is still in power mode, which is incorrect.",
+    "topic": "pacman",
+    "tags": [
+      "super-pacgum",
+      "edible-timer",
+      "timer-reset",
+      "ghost-state",
+      "edge-case"
+    ]
+  },
+  {
+    "question": "How do you detect the crossing collision when Pac-Man and a ghost swap cells in the same frame?",
+    "answer": "Standard same-cell collision check misses the case where Pac-Man moves from A to B and a ghost moves from B to A in the same frame — they pass through each other without occupying the same cell simultaneously. After applying all movements, check two conditions: (1) player.pos == ghost.pos (same cell), OR (2) player.prev_pos == ghost.pos AND ghost.prev_pos == player.pos (they swapped). If either is true and the ghost is not in frightened mode, Pac-Man loses a life. If the ghost IS in frightened mode, the ghost is eaten. Save previous positions before applying movements: player.prev_pos = player.pos; ghost.prev_pos = ghost.pos; then apply movements; then check both collision conditions for every ghost. Missing the crossing collision is the most consistently flagged bug in peer reviews for grid-based movement games.",
+    "topic": "pacman",
+    "tags": [
+      "collision-detection",
+      "crossing-collision",
+      "swap-cells",
+      "ghost",
+      "grid-movement"
+    ]
+  },
+  {
+    "question": "How must Pac-Man pause work and what common timer bug does it expose?",
+    "answer": "Pressing P must freeze all game state: Pac-Man stops, ghosts stop, all timers freeze (edible timer, level countdown, ghost respawn timer). The common bug: using time.time() or pygame.time.get_ticks() directly for timer checks. Since these use wall-clock time that advances during pause, a ghost that was edible for 5 more seconds will turn normal after 5 real seconds even if 3 of those seconds were spent paused. Correct approach: accumulate game_time using delta time only when not paused. In the main loop: if not paused: game_time += dt. All timer checks use game_time, not system time. This means: edible_end_time and level_end_time are expressed as game_time values, not system timestamps. The same pattern applies to ghost respawn timers. To implement pause: set paused = not paused on P keydown; skip the update step when paused; still render (show a 'PAUSED' overlay); still process quit events.",
+    "topic": "pacman",
+    "tags": [
+      "pause",
+      "timer-freeze",
+      "game-time",
+      "delta-time",
+      "wall-clock-bug"
+    ]
+  },
+  {
+    "question": "How must super-pacgums be placed when the maze corner cells are walls?",
+    "answer": "Super-pacgums must be in the 4 corners of the maze. Generated mazes frequently have walls at corner cells (since the A-Maze-ing generator may close all four walls of a corner cell to create the maze structure). Never place a super-pacgum inside a wall — the player can never reach it and the level becomes unwinnable. When the corner cell is a wall, do a BFS from that corner outward and place the super-pacgum on the nearest walkable (non-wall) cell. Implementation: for corner in [(0,0), (0,h-1), (w-1,0), (w-1,h-1)]: queue = deque([corner]); visited = {corner}; while queue: cell = queue.popleft(); if not maze.is_wall(cell): place_pacgum(cell); break; for neighbor in maze.neighbors(cell): if neighbor not in visited: visited.add(neighbor); queue.append(neighbor). Apply the same BFS logic for ghost spawn positions.",
+    "topic": "pacman",
+    "tags": [
+      "super-pacgum",
+      "corner-placement",
+      "wall-check",
+      "BFS",
+      "maze-generator"
+    ]
+  },
+  {
+    "question": "How do you implement the BFS-based ghost AI in Pac-Man and what prevents reverse movement?",
+    "answer": "Ghost chase mode uses BFS on the maze graph (cells as nodes, open passages as edges) to find the shortest path from the ghost's current position to its target cell (Pac-Man's position for Blinky). BFS runs once per ghost per frame update and returns the next cell on the shortest path. To prevent reverse movement (ghosts cannot make a 180° turn except when switching modes): when computing BFS, exclude the cell the ghost came from as a valid next step unless it is the only option. Track ghost.prev_pos and filter it from valid neighbors: valid_moves = [n for n in maze.open_neighbors(ghost.pos) if n != ghost.prev_pos]. In frightened mode, replace BFS with random valid move selection (also excluding reverse). Ghost movement speed is typically slower than Pac-Man (80% of player speed) and reduced further in frightened mode (50%). Update ghost positions at their own tick rate rather than every frame to control speed independently of frame rate.",
+    "topic": "pacman",
+    "tags": [
+      "ghost-AI",
+      "BFS",
+      "reverse-movement",
+      "frightened-mode",
+      "chase-mode"
+    ]
+  },
+  {
+    "question": "How do you implement the highscore system in Pac-Man: file format, read, write, and name validation?",
+    "answer": "Store the highscore file as JSON: [{\"name\": \"Alice\", \"score\": 15200}, ...] sorted by score descending, limited to top 10 entries. Read at startup (handle FileNotFoundError gracefully — start with empty list). After game over, if the player's score qualifies for the top 10, prompt for their name. Name validation: max 10 characters, alphanumeric and spaces only. Filter in pygame's event loop: if event.type == pygame.KEYDOWN: if event.key == pygame.K_BACKSPACE: name = name[:-1]; elif event.key == pygame.K_RETURN and name.strip(): save(); elif event.unicode in string.ascii_letters + string.digits + ' ': name = (name + event.unicode)[:10]. Write: insert new entry, sort by score descending, keep top 10, write with json.dump. Edge cases: all-spaces name (strip() → empty → re-prompt), backspace on empty string (name[:-1] → '' safely), paste of long string (slice to [:10]). The highscore file name comes from config.json (highscore_filename key).",
+    "topic": "pacman",
+    "tags": [
+      "highscore",
+      "JSON-file",
+      "name-validation",
+      "pygame-events",
+      "read-write"
+    ]
+  }
+]

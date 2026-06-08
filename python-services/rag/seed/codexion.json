@@ -1,0 +1,206 @@
+[
+  {
+    "question": "What is Codexion and how does it relate to the classic Dining Philosophers problem?",
+    "answer": "Codexion is a 42 school project that reframes the Dining Philosophers problem using coders instead of philosophers and USB dongles instead of forks. Each coder thread alternates between compiling (critical section requiring two dongles simultaneously), debugging, and refactoring. The core challenge is the same as Dijkstra's original: N threads share N resources arranged in a circle, and each thread needs two adjacent resources to do meaningful work. Codexion adds three layers on top of basic philosophers: a burnout timer (each coder must compile within time_to_burnout ms or they die), a dongle cooldown (mandatory rest between compile cycles), and a configurable scheduling policy (FIFO, Round-Robin, or EDF). These additions make it a realistic study of real-time scheduling, priority inversion, and starvation prevention.",
+    "topic": "codexion",
+    "tags": [
+      "intro",
+      "dining-philosophers",
+      "overview",
+      "threading",
+      "scheduling"
+    ]
+  },
+  {
+    "question": "What are the mandatory command-line arguments for Codexion and what does each one control?",
+    "answer": "Codexion takes exactly 8 mandatory integer arguments: number_of_coders (also the number of dongles on the table), time_to_burnout (milliseconds — if a coder has not started compiling within this window since their last compile or program start, they burn out), time_to_compile (milliseconds the coder sleeps while compiling), time_to_debug (milliseconds for the debug phase), time_to_refactor (milliseconds for the refactor phase), number_of_compiles_required (how many successful compiles each coder must complete for the simulation to end successfully), dongle_cooldown (milliseconds a coder must wait after releasing dongles before trying to acquire them again), and scheduler (the string name of the scheduling policy, e.g. FIFO, RR, EDF). All times are in milliseconds. The program must validate all arguments: negative values, zero where forbidden, and non-integer input must all produce clear error messages and exit cleanly.",
+    "topic": "codexion",
+    "tags": [
+      "arguments",
+      "parameters",
+      "usage",
+      "validation"
+    ]
+  },
+  {
+    "question": "How many threads does Codexion require and what is each thread responsible for?",
+    "answer": "Codexion requires N+1 threads: one thread per coder plus one monitor thread. Each coder thread runs a continuous cycle: attempt to acquire left dongle (mutex lock), then acquire right dongle, sleep for time_to_compile ms while 'compiling', release both dongles, sleep dongle_cooldown ms, sleep time_to_debug ms, sleep time_to_refactor ms, then repeat. The monitor thread runs separately in an infinite loop, sleeping 500–1000 microseconds between iterations, and checks each coder's elapsed time since their last compile. If any coder's elapsed time exceeds time_to_burnout, the monitor logs the burnout and sets a global stop flag. All threads must check the stop flag at the start of each cycle and exit cleanly. Global variables are forbidden — all shared state (dongles, timestamps, stop flag) lives in heap-allocated structs passed via pthread_create's void* argument.",
+    "topic": "codexion",
+    "tags": [
+      "threads",
+      "monitor",
+      "coder",
+      "thread-structure",
+      "lifecycle"
+    ]
+  },
+  {
+    "question": "What is EDF (Earliest Deadline First) scheduling and how is it implemented in Codexion?",
+    "answer": "EDF is a real-time scheduling policy where the task with the soonest absolute deadline gets priority access to a shared resource. In Codexion, each coder's deadline is last_compile_start + time_to_burnout — the moment they will burn out if they don't start compiling. When a dongle becomes available and multiple coders are waiting, EDF selects the one with the smallest deadline, preventing starvation of coders close to burning out. Implementation requires a min-heap priority queue: when a coder blocks waiting for a dongle, it inserts itself into the heap with its current deadline; when a dongle is released, the thread that holds the dongle mutex extracts the top of the heap and wakes that specific coder via its dedicated condition variable (not a broadcast). After each successful compile, the coder's deadline resets to now + time_to_burnout, so its position in the heap must be updated — this requires a remove-by-id operation, not just extract-min. Students who implement only extract-min without heap key updates produce an EDF that gives old (incorrect) priorities after the first compile cycle.",
+    "topic": "codexion",
+    "tags": [
+      "EDF",
+      "scheduling",
+      "priority-queue",
+      "min-heap",
+      "deadline"
+    ]
+  },
+  {
+    "question": "How does deadlock occur in Codexion and what is the standard prevention strategy?",
+    "answer": "Deadlock occurs when all N coders grab their left dongle simultaneously: each holds one dongle and waits for the one to their right, which is held by their neighbor — a circular wait. This is identical to the classic dining philosophers deadlock. The standard fix is asymmetric acquisition: one coder (typically the one with the highest ID, or coder N) acquires the right dongle before the left, while all others acquire left-then-right. This breaks the cycle because the asymmetric coder cannot be part of a circular wait. An alternative is a global mutex that serializes all dongle acquisitions, but this destroys all parallelism and makes the simulation meaninglessly sequential. A third approach uses a waiter/arbitrator mutex, but asymmetric acquisition is the cleanest and most commonly accepted solution. The key insight is that deadlock requires four conditions simultaneously: mutual exclusion, hold-and-wait, no preemption, and circular wait — breaking any one of them prevents deadlock.",
+    "topic": "codexion",
+    "tags": [
+      "deadlock",
+      "circular-wait",
+      "asymmetric-acquisition",
+      "prevention",
+      "dining-philosophers"
+    ]
+  },
+  {
+    "question": "How does the monitor thread detect coder burnout within the required 10ms window?",
+    "answer": "The subject requires burnout to be logged within 10ms of the actual burnout event. The monitor thread must check each coder's elapsed time frequently enough that even with OS scheduling jitter, it catches the burnout on time. The monitor should sleep only 500–1000 microseconds (usleep(500) or usleep(1000)) between checks, not the burnout interval itself. Each coder maintains a timestamp of when they last started compiling (set with clock_gettime(CLOCK_MONOTONIC) at compile start). The monitor computes elapsed = now - last_compile_start and compares it against time_to_burnout. If the monitor sleeps 10ms between checks, OS scheduling jitter (typically 2–5ms on Linux) pushes the actual wakeup to 12–15ms after burnout — outside the detection window and an automatic evaluation failure. The monitor iterates over all N coders in a loop before sleeping, so the sleep per coder is effectively usleep / N.",
+    "topic": "codexion",
+    "tags": [
+      "monitor",
+      "burnout",
+      "timing",
+      "10ms-window",
+      "usleep",
+      "CLOCK_MONOTONIC"
+    ]
+  },
+  {
+    "question": "What is the correct log output format in Codexion and why must a print mutex protect it?",
+    "answer": "The subject requires each log line in the format: <timestamp_ms> <coder_id> <action>, where timestamp is milliseconds since program start (computed as (now - start_time) / 1e6), coder_id is 1-indexed, and action is one of: 'has taken a dongle' / 'has put down the dongles' / 'is compiling' / 'has compiled' / 'is debugging' / 'is refactoring' / 'has burned out'. A dedicated print mutex (separate from dongle mutexes) must protect every printf/write call. Without it, concurrent threads can interleave their output mid-line, producing garbled logs that the evaluator's parser cannot split into valid records. The print mutex should be held only for the duration of the printf and released immediately — holding it during a sleep would serialize all logging and create artificial delays. Timestamps must be monotonically increasing within each coder's output sequence; the evaluator checks this explicitly.",
+    "topic": "codexion",
+    "tags": [
+      "logging",
+      "output-format",
+      "print-mutex",
+      "timestamp",
+      "evaluation"
+    ]
+  },
+  {
+    "question": "What is the dongle cooldown and what breaks if you apply it in the wrong order?",
+    "answer": "After a coder finishes compiling and releases both dongles back to the table, they must wait dongle_cooldown milliseconds before attempting to acquire dongles again. This prevents a single coder from monopolizing the dongles across back-to-back compile cycles and gives other coders a window to acquire them. The correct order is: compile → release both dongles (unlock mutexes) → sleep(dongle_cooldown) → debug → refactor → loop. If you apply the cooldown BEFORE releasing the dongles (sleep while holding the mutex), you block all other coders from the dongle for the duration of the cooldown — effectively the same as holding the dongle while sleeping, which the subject explicitly forbids. If dongle_cooldown >= time_to_burnout, every coder will burn out after their first compile cycle because the cooldown window alone exhausts their burnout budget; the program must still run this simulation correctly and log the burnouts rather than special-casing it.",
+    "topic": "codexion",
+    "tags": [
+      "dongle-cooldown",
+      "mutex-release-order",
+      "starvation",
+      "edge-case"
+    ]
+  },
+  {
+    "question": "How do you use pthread_cond_timedwait correctly and what is the most common implementation bug?",
+    "answer": "pthread_cond_timedwait blocks a thread until a condition is signaled OR until an absolute time (struct timespec) is reached. The critical detail: it takes an ABSOLUTE timestamp (seconds since epoch), not a relative duration. The most common bug is passing a relative timeout like {0, 5000000} — this means 'wake up at epoch + 5ms', which is in the past and causes the thread to return immediately on every call, producing a busy-wait loop that burns 100% CPU. Correct pattern: clock_gettime(CLOCK_REALTIME, &ts); ts.tv_nsec += timeout_ns; if (ts.tv_nsec >= 1000000000LL) { ts.tv_sec++; ts.tv_nsec -= 1000000000LL; } pthread_cond_timedwait(&cond, &mutex, &ts). Always use CLOCK_REALTIME (not CLOCK_MONOTONIC) for timedwait because POSIX requires it. The nanosecond overflow check is mandatory — forgetting it produces an invalid timespec that causes undefined behavior.",
+    "topic": "codexion",
+    "tags": [
+      "pthread_cond_timedwait",
+      "absolute-time",
+      "busy-wait",
+      "CLOCK_REALTIME",
+      "overflow"
+    ]
+  },
+  {
+    "question": "How must the EDF heap be updated after a coder successfully compiles, and what is remove-by-id?",
+    "answer": "After a coder completes a compile, their burnout deadline resets to now + time_to_burnout. If they are still in the EDF min-heap (waiting for their next dongle acquisition), their heap entry has a stale (old) deadline and they will receive priority they don't deserve, potentially starving coders who are genuinely close to burning out. The fix is to remove the coder's old heap entry and re-insert with the updated deadline. Remove-by-id requires storing each coder's current index in the heap and implementing 'bubble up / sift down' after setting that index's entry to a sentinel (-infinity). Students who implement only extract-min miss this entirely. An alternative design avoids the problem: coders do not insert themselves into the heap until they actually block on a dongle acquisition; since the deadline is recomputed at insertion time, stale entries never exist. This lazy-insertion approach is simpler to implement correctly.",
+    "topic": "codexion",
+    "tags": [
+      "EDF",
+      "heap-update",
+      "remove-by-id",
+      "deadline-reset",
+      "priority-queue"
+    ]
+  },
+  {
+    "question": "What is the EDF tie-breaker rule and why must it be deterministic?",
+    "answer": "When two coders have exactly the same burnout deadline, the EDF heap must break the tie consistently across runs. Without a deterministic tie-breaker, the heap's internal ordering is implementation-defined and varies between runs, platforms, and compilers — the evaluator constructs test cases that specifically trigger equal-deadline scenarios and checks that the output order is reproducible. The correct tie-breaker is coder ID: if deadlines are equal, the coder with the lower ID wins. This is implemented in the heap comparator: if (a.deadline == b.deadline) return a.id < b.id. Some students use arrival timestamp (FIFO) as a tie-breaker, which also works as long as it is consistently applied. Never break ties by pointer address, memory layout, or pthread internal state — these are non-deterministic and will produce different outputs on different runs.",
+    "topic": "codexion",
+    "tags": [
+      "EDF",
+      "tie-breaker",
+      "deterministic",
+      "heap-comparator",
+      "equal-deadline"
+    ]
+  },
+  {
+    "question": "How do you implement clean thread termination in Codexion when a coder burns out or the simulation ends?",
+    "answer": "A shared volatile int stop_flag (or _Atomic int in C11) is set when either a burnout is detected or all required compiles are complete. Every coder thread checks this flag at the top of its main loop, before any blocking operation. The main thread calls pthread_join on all coder threads and the monitor thread after setting the flag, waiting for them to exit naturally. pthread_cancel should not be used — it can leave mutexes locked and memory unfreed. If a coder thread is blocked in pthread_cond_wait when stop_flag is set, it must be woken up; the cleanest way is to broadcast on all condition variables after setting the flag. All dynamically allocated memory (coder structs, mutexes, condition variable arrays, the heap) must be freed after all threads are joined. Valgrind must report zero leaks and zero mutex errors on a clean exit — the evaluator typically runs with sanitizers enabled.",
+    "topic": "codexion",
+    "tags": [
+      "termination",
+      "stop-flag",
+      "pthread_join",
+      "cleanup",
+      "valgrind"
+    ]
+  },
+  {
+    "question": "Why must the initial EDF deadline be set at program start, and what breaks if you set it at first dongle acquisition?",
+    "answer": "A coder's deadline is last_compile_start + time_to_burnout. At program start, no coder has compiled yet, so last_compile_start should be set to the program's start time for all coders. If instead you set last_compile_start = 0 or leave it uninitialized, the first deadline computation produces a deadline in the past or far future, giving wrong EDF priorities in the first round. If you set it lazily at first dongle acquisition attempt, the time the coder spent waiting to acquire the first dongle is not counted against the burnout budget — a coder could wait 5× time_to_burnout before its first acquisition and never be detected as burned out. The burnout clock starts from the moment the simulation begins, not from the moment the coder first reaches the dongle queue.",
+    "topic": "codexion",
+    "tags": [
+      "initialization",
+      "deadline",
+      "burnout-clock",
+      "program-start",
+      "edge-case"
+    ]
+  },
+  {
+    "question": "What happens in Codexion when number_of_coders is 1, and how must the program handle it?",
+    "answer": "With 1 coder there is only 1 dongle on the table (left and right dongle are the same physical dongle). Compiling requires two dongles simultaneously, which is impossible with only one dongle — the coder can never compile. The simulation must run, detect the burnout after time_to_burnout milliseconds, log it, and exit cleanly. The program must NOT deadlock (the coder spinning forever trying to acquire a second dongle that doesn't exist), segfault, or loop silently. Many students handle N=1 by having the coder acquire the single dongle and then wait forever for a second — this causes the monitor to correctly detect burnout and set stop_flag, but students who check the stop_flag only after both acquisitions will deadlock. The stop_flag check must happen BEFORE each blocking acquisition attempt.",
+    "topic": "codexion",
+    "tags": [
+      "single-coder",
+      "edge-case",
+      "impossible-compile",
+      "burnout",
+      "deadlock"
+    ]
+  },
+  {
+    "question": "How do you measure elapsed time accurately in Codexion and why is gettimeofday insufficient?",
+    "answer": "Use clock_gettime(CLOCK_MONOTONIC, &ts) for all timing in Codexion. CLOCK_MONOTONIC is guaranteed never to go backward (unlike wall-clock time which can jump if NTP adjusts the system clock mid-simulation). gettimeofday() uses CLOCK_REALTIME which can leap forward or backward — a 1-second NTP adjustment would either make coders appear to burn out instantly or make them appear immune to burnout. The elapsed time computation: struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now); long elapsed_ms = (now.tv_sec - start.tv_sec) * 1000 + (now.tv_nsec - start.tv_nsec) / 1000000. Store the program's start time once in main() and pass it to all threads. For the print timestamp, compute ms since start using the same monotonic clock for consistency.",
+    "topic": "codexion",
+    "tags": [
+      "CLOCK_MONOTONIC",
+      "timing",
+      "gettimeofday",
+      "NTP",
+      "elapsed-time"
+    ]
+  },
+  {
+    "question": "In Codexion, how do you implement the EDF min-heap with remove-by-id without a standard library heap that supports it?",
+    "answer": "Python's heapq and C's naive heap don't support efficient remove-by-id. Implement a custom min-heap as an array of (deadline, coder_id) pairs with a position lookup dict: pos_of = {coder_id: index_in_heap}. When removing by id: find the index via pos_of[coder_id], swap it with the last element, update pos_of for the swapped element, pop the last element, then call sift-up or sift-down on the swapped position depending on whether the new value is smaller or larger than its parent. The sift operations update pos_of on every swap. Insertion: append at end, sift up, update pos_of. Extract-min: swap root with last, pop last, sift down root, update pos_of. In C: implement this as a fixed-size array of structs with a companion array int heap_pos[MAX_CODERS]. This design runs all operations in O(log N) and is the correct production implementation for EDF schedulers.",
+    "topic": "codexion",
+    "tags": [
+      "EDF",
+      "min-heap",
+      "remove-by-id",
+      "sift-up",
+      "sift-down",
+      "implementation"
+    ]
+  },
+  {
+    "question": "In Codexion, why must you use a dedicated condition variable per coder for EDF wakeup?",
+    "answer": "pthread_cond_broadcast wakes ALL threads waiting on a condition variable, causing a thundering herd: every coder wakes up, checks if the dongle is available, the highest-priority one takes it, and all others go back to sleep — wasting CPU on N-1 pointless wakeups. pthread_cond_signal wakes ONE thread, but which one is undefined by POSIX — the OS may wake any waiting thread, not the highest-priority EDF coder. The correct EDF implementation: each coder has its own dedicated condition variable (cond_t coder_cond[MAX_CODERS]). When a dongle is released and the EDF heap is non-empty, extract the top-priority coder from the heap and signal specifically its condition variable: pthread_cond_signal(&coder_cond[top_id]). This wakes exactly the right coder with O(1) overhead. The releasing coder must hold the dongle's mutex when signaling to prevent the woken coder from checking the dongle before it has been released.",
+    "topic": "codexion",
+    "tags": [
+      "condition-variable",
+      "pthread_cond_signal",
+      "EDF",
+      "thundering-herd",
+      "wakeup"
+    ]
+  }
+]
