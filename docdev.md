@@ -2,6 +2,11 @@ For development, there is an extra docker-compose.dev.yml file that enables live
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 base stack only: (production)
 docker compose up --build
+=====================================================
+docker system prune -af --volumes 
+then:
+docker compose build --no-cache && docker compose up -d
+=====================================================
 
 Use --build only when you changed:
 Dockerfile/base image
@@ -61,7 +66,6 @@ docker network prune -f
 Remove everything (be careful!):
 docker system prune -af --volumes --no-cache
 
- docker builder prune -af --volumes --no-cache
 ====================================
 
 //shows disk usage broken down by images, containers, volumes, and build cache.
