@@ -8,7 +8,8 @@
 
 <aside class="sidebar" style="width: {width};">
 	<slot />
-	<div>
+	<div class="top-links">
+		<a href="/subjects">Subjects</a>
 		<a href="/posts">View Posts</a>
 		<a href="/post-question">Post Question</a>
 		<a href="/ai-assist">AI Assist</a>
@@ -28,5 +29,11 @@
 	gap: 1rem;
 	font-weight: bold;
 	font-size: 0.8rem;
+}
+
+.top-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 </style>
