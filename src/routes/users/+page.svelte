@@ -27,7 +27,7 @@
 	{:else}
 		<div class="users-list">
 			{#each data.users as user}
-				<article class="user-card">
+				<a class="user-card" href={`/users/${user.id}`}>
 					<div class="user-main">
 						{#if user.image}
 							<img src={user.image} alt={user.name ?? 'User avatar'} class="avatar" />
@@ -45,11 +45,8 @@
 					<div class="user-meta">
 						<span class="role">{user.role}</span>
 						<span>Joined {formatDate(user.createdAt)}</span>
-						{#if data.canManageRoles}
-							<a class="edit-link" href={`/users/${user.id}`}>edit</a>
-						{/if}
 					</div>
-				</article>
+				</a>
 			{/each}
 		</div>
 	{/if}

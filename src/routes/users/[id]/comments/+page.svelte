@@ -1,0 +1,119 @@
+<script lang="ts">
+
+	type UserRole = 'USER' | 'MODERATOR' | 'ADMIN';
+
+	type UserDetails = {
+		id: string;
+	};
+
+	type Comment = {
+		id: number;
+		content: string;
+		created_at: string | Date;
+		deleted_at: string | Date | null;
+		postId: number;
+	};
+
+	let {
+		data
+	}: {
+		data: {
+			user: UserDetails;
+			comments: Comment[];
+		};
+	} = $props();
+
+	function formatDate(value: string | Date) {
+		return new Date(value).toLocaleDateString();
+	}
+
+	function confirmDelete(event: SubmitEvent) {
+		const ok = window.confirm('Are you sure you want to delete this comment? This action cannot be undone.');
+		if (!ok) {
+			// Prevent form submission
+			event.preventDefault();
+		}
+	}
+</script>
+
+<div class="edit-user-page">
+	<a href="/users" class="back-link">Back to users</a>
+		<nav class="tabs">
+ 			 <a
+				href={`/users/${data.user.id}`}
+				class="tab"
+				class:active={false}
+				>Profile</a
+			>
+			<a href={`/users/${data.user.id}/posts`} class="tab" class:active={false}>Posts</a>
+			<a href={`/users/${data.user.id}/comments`} class="tab" class:active={true}>Comments</a>
+		</nav>
+
+		{#if data.comments.length === 0}
+			<p>This user has no comments.</p>
+		{:else}
+			{#each data.comments as comment}
+				<section class="card">
+					<p>{comment.content}</p>
+					<div class="post-actions">
+						<form method="POST" action="?/deleteComment" onsubmit={confirmDelete}>
+							<input type="hidden" name="commentId" value={comment.id} />
+							<button type="submit" style="background-color: red;">Delete comment</button>
+						</form>
+						<a href={`/posts/${comment.postId}`} style="color: blue;">View post</a>
+					</div>
+				</section>
+			{/each}
+		{/if}
+</div>
+
+<style>
+	.tabs {
+		display: flex;
+		gap: 0.5rem;
+		border-bottom: 1px solid var(--color-neutral-300);
+		margin-bottom: 1rem;
+  	}
+
+  	.tab {
+		padding: 0.5rem 0.9rem;
+		text-decoration: none;
+		color: var(--color-text-primary);
+		background: transparent;
+		border: 1px solid transparent;
+		border-bottom: 1px solid transparent;
+		border-radius: 6px 6px 0 0;
+		font-weight: 600;
+  	}
+
+	.tab.active {
+		background: var(--color-neutral-100);
+		border-color: var(--color-neutral-300);
+		border-bottom-color: transparent;
+	}
+
+	.back-link {
+		font-size: 0.9rem;
+	}
+
+	.edit-user-page {
+		width: 100%;
+		max-width: 900px;
+		display: grid;
+		gap: 1rem;
+	}
+
+	.card {
+		border: 1px solid var(--color-neutral-400);
+		border-radius: var(--radius-md);
+		padding: 1rem;
+		display: grid;
+		gap: 0.75rem;
+		background-color: var(--color-neutral-100);
+	}
+
+	.post-actions {
+		display: flex;
+		gap: 1rem;
+	}
+</style>

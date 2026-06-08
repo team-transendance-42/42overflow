@@ -1,9 +1,10 @@
-<script>
+<script lang=ts>
   export let label = "";
   export let type = "text";
   export let placeholder = "";
   export let value = "";
   export let name = "";
+  export let disabled = false;
 </script>
 
 <div class="input-group">
@@ -17,6 +18,7 @@
     name={name}
     id={name}
     placeholder={placeholder}
+	{disabled}
   />
 </div>
 
@@ -31,7 +33,7 @@
   }
   
   input {
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-neutral-200);
     border-radius: 6px;
     outline: none;
     transition: border 0.2s ease;
@@ -45,13 +47,18 @@
   input {
     padding: 0.7rem 0.9rem;
     border-radius: 6px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-neutral-200);
     font-size: 1rem;
     outline: none;
     transition: border 0.2s ease;
   }
 
   input:focus {
-    border-color: black;
+    border-color: var(--color-neutral-900);
   }
+
+  input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 </style>

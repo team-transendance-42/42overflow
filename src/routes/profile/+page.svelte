@@ -2,9 +2,8 @@
   import Avatar from '$lib/components/Avatar.svelte';
 
   export let data;
-
   const user = data.user;
-  const profile = data.profile;
+  //const profile = data.profile;
 
 </script>
 
@@ -14,31 +13,25 @@
   </div>
 
 
-  <h1><strong>Name: </strong> {user?.name ?? 'No name set'}</h1>
+  <h1><strong>Name: </strong> {user?.first_name ?? 'No name set'} {user?.last_name ?? 'No name set'} </h1>
  
-  {#if profile?.username}
-    <p class="username"><strong>Username: </strong> {profile.username}</p>
+  {#if user?.name}
+    <p class="username"><strong>Username: </strong> {user.name}</p>
   {/if}
 
  <p class="email"><strong>Email:</strong> {user?.email}</p>
 
-  {#if profile?.interests}
+  {#if user?.interests}
     <div class="section">
-      <p><strong>Interests</strong>: {profile.interests}</p>
+      <p><strong>Interests</strong>: {user.interests}</p>
     </div>
   {/if}
 
-  {#if profile?.login}
-    <div class="nonefornow">
-      <span class="label">Intra</span>
-      <p>{profile.login}</p>
-    </div>
-  {/if}
 
-    {#if profile?.followers?.length > 0}
+    {#if user?.followers?.length > 0}
     <div class="interests">
       <span class="label"><strong>Following:</strong></span>
-      {#each profile.followers as f}
+      {#each user.followers as f}
 	    <div class="following-row">
 	    <Avatar src={f.following.image ?? ''} size="36px" />
         <a href="/profile/{f.following.name}" class="following-link">
@@ -64,8 +57,6 @@
   .avatar-section { 
 	margin: 1rem 0;  }
 
-  .avatar-section.outlined { 
-	border: 2px solid black; }
 
   .interests { 
 	margin: 0.75rem 0; }
@@ -88,7 +79,7 @@
     text-decoration: underline;}
 
   .following-link {
-  	color: #a5c11a;
+  	color: var(--color-primary-dark-400);
  }
 
   

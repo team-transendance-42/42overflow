@@ -1,4 +1,4 @@
-import { prisma } from '$lib/server/prisma';
+import { db } from '$lib/server/db';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -10,7 +10,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		};
 	}
 
-	const dbUser = await prisma.user.findUnique({
+	const dbUser = await db.user.findUnique({
 		where: {
 			id: locals.user.id
 		},
@@ -19,10 +19,11 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		}
 	});
 
-	return {
-		user: {
-			id: locals.user.id
-		},
-		userRole: dbUser?.role ?? null
-	};
+    return {
+        user: {
+            id: locals.user.id,
+			name: locals.user.name,
+        },
+        userRole: dbUser?.role ?? null
+    };
 };

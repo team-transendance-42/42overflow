@@ -46,5 +46,5 @@
 
 <style>
   .log-in-page { width: 100%; max-width: 400px; padding: 0; text-align: left; }
-  .error { color: red; font-size: 0.875rem; }
+  .error { color: var(--color-error-250); font-size: 0.875rem; }
 </style>

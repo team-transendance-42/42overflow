@@ -1,0 +1,33 @@
+ A tuple is an ordered, immutable collection. Like a list, but you
+  cannot change it after creation.
+
+  # list  → uses []  → mutable (can change)
+  my_list  = [1, "hello", {"key": "val"}]
+
+  # tuple → uses ()  → immutable (cannot change)
+  my_tuple = (1, "hello", {"key": "val"})
+
+  ---
+  Immutable means:
+
+  my_list[0]  = 99   # OK
+  my_tuple[0] = 99   # TypeError: tuple does not support item assignment
+
+================
+for rag:
+list[tuple[float, str, dict]]
+
+  a list where each item is a tuple of exactly 3 things — a float, a string, and a dict.
+
+  results: list[tuple[float, str, dict]] = [
+      (0.97, "Paris is the capital of France", {"source": "wiki"}),
+      (0.85, "France is in Europe",            {"source": "book"}),
+      (0.72, "The Eiffel Tower is in Paris",   {"source": "wiki"}),
+  ]
+
+  In RAG, this pattern is everywhere — it's typically:
+  (similarity_score, chunk_text, metadata)
+  ------
+  Syntax
+  List: [a, b, c]
+  Tuple: (a, b, c)

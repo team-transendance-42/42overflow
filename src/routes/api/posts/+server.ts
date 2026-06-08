@@ -31,12 +31,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   if (!myProfile) throw error(400, 'Profile not found');
 
-const { projectname, topic, body } = await request.json();
+const { projectname, body } = await request.json();
 
 const post = await db.post.create({
   data: {
 	title: projectname,
-	content: `${topic}\n\n${body}`,
+	content: body,
 	userId: myProfile.id
   }
 });

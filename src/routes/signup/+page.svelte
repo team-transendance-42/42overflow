@@ -12,6 +12,11 @@
 
   async function handleSignup() {
     error = '';
+
+	if (!email.trim() || !password.trim() || !name.trim()) {
+    error = 'All fields are required';
+    return;
+  }
     loading = true;
 
     const { data, error: err } = await authClient.signUp.email({
@@ -38,7 +43,7 @@
     <p class="error">{error}</p>
   {/if}
 
-  <Input label="Name" name="name" placeholder="Your name" bind:value={name} />
+  <Input label="Username" name="name" placeholder="Enter Username" bind:value={name} />
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
   <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
@@ -49,7 +54,7 @@
 
 <style>
   .sign-up-page { width: 100%; max-width: 400px; padding: 0; text-align: left; }
-  .error { color: red; font-size: 0.875rem; }
+  .error { color: var(--color-error-250); font-size: 0.875rem; }
 </style>
 
 

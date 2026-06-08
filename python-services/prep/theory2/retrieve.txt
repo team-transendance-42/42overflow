@@ -1,0 +1,31 @@
+ The full flow of retrieve (line 224)
+
+  def retrieve(query, store, vectorizer, k=3):
+
+      # Step 1: embed the user's question into the SAME vector space
+      query_vec = vectorizer.transform(query)
+      #           → dict[str, float]  e.g. {"python": 0.43, "vector":
+  0.31}
+
+      # Step 2: score every stored chunk against the query
+      scored = [
+          (cosine_similarity(query_vec, vec), text, meta)
+          #  ↑ float score            ↑ from zip  ↑ from zip
+          for vec, text, meta in zip(store.vectors, store.texts,
+  store.metadata)
+          #                      ↑ walks all 3 lists in sync
+      ]
+      # scored = [(0.97, "chunk text", {meta}), (0.72, ...), ...]
+
+      # Step 3: sort best first, return top k
+      scored.sort(key=lambda x: x[0], reverse=True)
+      return scored[:k]
+
+  The key insight: vec is not computed here — it was pre-computed during
+   indexing (build_index line 308) and stored in store.vectors.
+  Retrieval just reads what's already there.
+  --
+   zip stops at the shortest list — no error:
+
+  zip([1, 2, 3], ["a", "b"])
+  # → [(1, "a"), (2, "b")]   ← 3 is dropped
