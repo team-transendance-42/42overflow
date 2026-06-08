@@ -1,48 +1,39 @@
-<script>
+<script lang="ts">
   import { goto } from '$app/navigation'; 
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
-  import Tag from '$lib/components/Tag.svelte';
+  import Button from '$lib/components/Button.svelte';
 
   let projectname = "";
   let body = "";
-  let tagInput = "";
-  let category = "memory";
-  let tags = [];
   let error = "";
+  let submitting = false;
 
-  async function submitQuestion() {
-    if (!projectname || !body) {
+  async function submitQuestion() 
+  {
+    if (!projectname.trim() || !body.trim()) 
+	{
       error = "Please fill in all fields.";
       return;
     }
+	error = "";
+	submitting = true;
+	try {
+		const res = await fetch('/api/posts', 
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify
+			({projectname, body})
+		});
 
-    const res = await fetch('/api/questions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projectname,
-        body
-      })
-    });
-
-    if (res.ok) {
-      goto('/questions');
-    } else if (res.status === 401) {
-      error = "You must be logged in to post a question.";
-    } else {
-      error = "Something went wrong, please try again.";
-    }
-  }
-
-  function addTag() {
-    if (!tagInput.trim()) return;
-    tags = [...tags, { text: tagInput.trim(), category }];
-    tagInput = "";
-  }
-
-  function removeTag(index) {
-    tags = tags.filter((_, i) => i !== index);
+		if (res.ok) goto('/posts');
+		else if (res.status === 401) 
+		error = "You must be logged in to post a question.";
+		else error = "Something went wrong, please try again.";
+	}
+	finally {submitting = false;
+	}
   }
 </script>
 
@@ -68,28 +59,8 @@
     rows={5}
   />
 
-  <button on:click={submitQuestion}>Submit</button>
+  <Button label="Submit" type="button" onClick={submitQuestion}/>
 
-  <div class="tag-input">
-    <input placeholder="Add tag..." bind:value={tagInput} />
-    <select bind:value={category}>
-      <option value="memory">Memory</option>
-      <option value="webserv">Webserv</option>
-      <option value="custom">Custom</option>
-    </select>
-    <button type="button" on:click={addTag}>Add</button>
-  </div>
-
-  <div class="tag-list">
-    {#each tags as tag, i}
-      <Tag
-        text={tag.text}
-        category={tag.category}
-        removable={true}
-        onRemove={() => removeTag(i)}
-      />
-    {/each}
-  </div>
 </div>
 
 <style>
@@ -100,7 +71,7 @@
     text-align: left;
   }
   .error {
-    color: red;
+    color: var(--color-error-250);
     font-size: 0.875rem;
     margin-bottom: 0.5rem;
   }

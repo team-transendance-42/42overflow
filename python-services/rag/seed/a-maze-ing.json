@@ -1,0 +1,234 @@
+[
+  {
+    "question": "What is A-Maze-ing and what must you build?",
+    "answer": "A-Maze-ing is a 42 school project where you implement a maze generator in Python. The generator takes a configuration file (KEY=VALUE format with mandatory keys: WIDTH, HEIGHT, ENTRY, EXIT, OUTPUT_FILE, PERFECT) and produces a maze written to a file using a hexadecimal wall encoding. The project has three components: the generator algorithm (creates the maze), the output writer (hex encoding per cell), and the visual representation (terminal ASCII or MLX graphical display). Additionally, the maze generator class must be packaged as a pip-installable Python package (mazegen-*) that can be imported by other projects (like Pac-Man which uses it to generate game mazes). The project teaches maze generation algorithms, graph theory (spanning trees), hex encoding, BFS for shortest path, and Python packaging.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "intro",
+      "overview",
+      "maze-generator",
+      "pip-package",
+      "hex-encoding"
+    ]
+  },
+  {
+    "question": "What is the configuration file format for A-Maze-ing and how must errors be handled?",
+    "answer": "The config file has one KEY=VALUE pair per line. Lines starting with '#' are comments and must be ignored. Mandatory keys: WIDTH (int, maze width in cells), HEIGHT (int, maze height), ENTRY (x,y coordinates — comma-separated pair), EXIT (x,y coordinates), OUTPUT_FILE (string, path for the output file), PERFECT (True/False boolean). Optional keys: SEED (for reproducible generation), ALGORITHM (e.g., 'dfs', 'prim'), DISPLAY (e.g., 'ascii', 'mlx'). Error handling rules: missing config file → 'Error: config file not found: config.txt'; missing mandatory key → 'Error: missing required key: WIDTH'; invalid value (non-integer WIDTH) → 'Error: invalid value for WIDTH: abc (expected positive integer)'; ENTRY outside maze bounds → 'Error: ENTRY (0,5) is outside maze bounds 4x4'; ENTRY == EXIT → 'Error: ENTRY and EXIT must be different cells'. Never crash with a Python traceback — catch all errors and convert to clear messages.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "configuration",
+      "KEY=VALUE",
+      "error-handling",
+      "validation",
+      "mandatory-keys"
+    ]
+  },
+  {
+    "question": "What is the hex wall encoding in A-Maze-ing and how do you compute it for each cell?",
+    "answer": "Each cell is encoded as a single hexadecimal digit (0–F) representing which of its 4 walls are closed (1) or open (0). Bit layout: bit 0 (LSB) = North wall, bit 1 = East wall, bit 2 = South wall, bit 3 = West wall. Examples: 0 (0000) = all walls open; F (1111) = all walls closed; 5 (0101) = North and South walls closed, East and West open; A (1010) = East and West walls closed. Compute: value = 0; if north_closed: value |= 0x1; if east_closed: value |= 0x2; if south_closed: value |= 0x4; if west_closed: value |= 0x8. Write as uppercase hex: f'{value:X}'. The output file contains one row of hex digits per line (no separators between cells, just the digits concatenated per row). The wall coherence rule: if cell (x,y) has east wall closed, then cell (x+1,y) must have west wall closed. Violating coherence causes the validation script to fail.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "hex-encoding",
+      "wall-bits",
+      "North-East-South-West",
+      "coherence",
+      "output-format"
+    ]
+  },
+  {
+    "question": "What is wall coherence in A-Maze-ing and how do you guarantee it during generation?",
+    "answer": "Wall coherence means the wall state between two adjacent cells must be consistent: if cell A has its East wall closed, then cell B (A's eastern neighbor) must have its West wall closed. The same rule applies in all four directions. Coherence violations — where one cell says the passage is open but the neighbor says it is closed — produce a maze that appears valid from one side but not the other. The validation script the subject provides checks every adjacent pair for coherence. To guarantee coherence during generation: represent walls as PASSAGES (edges between cells), not as per-cell wall bits. When removing a wall between cells A and B, record that the passage A↔B is open — both cells share this state. Convert to hex encoding only when writing the output: for each cell, check each direction; if the passage to the neighbor exists, that wall bit is 0; if no passage exists (or the cell is at the border), the wall bit is 1. This shared-passage representation makes coherence automatic.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "wall-coherence",
+      "consistency",
+      "passages",
+      "generation",
+      "validation"
+    ]
+  },
+  {
+    "question": "What is a perfect maze and how does the PERFECT flag change the generation algorithm?",
+    "answer": "A perfect maze has exactly one path between any two cells — no loops, no isolated areas. This means the maze is a spanning tree of the cell graph: every cell is reachable from every other cell via exactly one path. When PERFECT=True, algorithms like recursive backtracker (DFS) or Prim's produce a spanning tree by adding passages without creating cycles. When PERFECT=False, the maze may have multiple paths between cells (loops) — achieved by randomly adding extra passages after generating the spanning tree. For Pac-Man usage, PERFECT=False is required because: (1) perfect mazes have dead ends everywhere making the game trivially easy to navigate, and (2) ghosts with BFS navigation in a perfect maze can always find the shortest path with no choice — the game becomes deterministic and boring. The PERFECT flag is parsed as a boolean: 'True' → True, 'False' → False; any other value → parse error.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "perfect-maze",
+      "spanning-tree",
+      "PERFECT-flag",
+      "DFS",
+      "Prim",
+      "loops"
+    ]
+  },
+  {
+    "question": "How does the recursive backtracker (DFS) algorithm generate a perfect maze?",
+    "answer": "The recursive backtracker (also called Depth-First Search or DFS maze generation): (1) Start at the ENTRY cell. Mark it as visited. (2) While there are unvisited cells reachable from the current cell: randomly choose an unvisited neighbor, remove the wall between current cell and chosen neighbor (add a passage), move to the chosen neighbor, mark it visited, recurse. (3) When all neighbors are visited (dead end), backtrack to the previous cell. This produces a perfect maze (spanning tree) with a bias toward long winding corridors. Implementation without recursion (to avoid stack overflow on large mazes): use an explicit stack. stack = [entry]; visited = {entry}; while stack: cell = stack[-1]; unvisited_neighbors = [n for n in neighbors(cell) if n not in visited]; if unvisited_neighbors: next = random.choice(unvisited_neighbors); add_passage(cell, next); visited.add(next); stack.append(next); else: stack.pop(). The seed controls random.choice — set random.seed(SEED) at the start for reproducibility.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "DFS",
+      "recursive-backtracker",
+      "algorithm",
+      "perfect-maze",
+      "implementation"
+    ]
+  },
+  {
+    "question": "How does Prim's algorithm generate a maze and how does it differ from DFS?",
+    "answer": "Prim's maze generation: (1) Start with all cells having all walls closed. Mark ENTRY as part of the maze. Add all walls of ENTRY to the wall list. (2) While the wall list is not empty: randomly pick a wall from the list; if exactly one of the two cells it divides is in the maze: remove the wall (add passage between them), add the new cell to the maze, add all walls of the new cell to the wall list. (3) If both cells are already in the maze, discard the wall (adding it would create a loop). Prim's produces a perfect maze with a bias toward shorter branches and a more uniform texture compared to DFS's long winding corridors. For an imperfect maze (PERFECT=False): after generating the spanning tree with either algorithm, randomly select extra walls and remove them (add passages) until the desired number of loops is added. Each extra passage creates one loop. A common choice is to add width×height//10 extra passages.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "Prim",
+      "algorithm",
+      "perfect-maze",
+      "wall-list",
+      "comparison-DFS"
+    ]
+  },
+  {
+    "question": "What is the '42' pattern requirement in A-Maze-ing and how do you implement it?",
+    "answer": "The maze must contain a visible '42' pattern in its visual representation, formed by cells that are fully closed (all 4 walls shut — hex value F). These fully-closed cells form the shape of the digit '4' and digit '2' when arranged on the grid. The '42' must be drawn on the maze grid during generation by pre-marking specific cells as permanently closed before running the maze algorithm. Implementation: define the '42' pixel pattern as a set of (row, col) offsets relative to a placement position (e.g., top-left at 1/3 of the maze height and width). Before generation, mark those cells as 'always_closed'. During generation, the algorithm skips adding passages to/from always_closed cells. During output encoding, always_closed cells get value F (1111). The '42' pattern requires minimum dimensions — if the maze is too small to fit the pattern without overlapping ENTRY or EXIT or the border, print an error: 'Maze too small to include 42 pattern' and either omit the pattern or raise a parse error depending on your implementation choice.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "42-pattern",
+      "visual",
+      "pre-marking",
+      "always-closed",
+      "minimum-size"
+    ]
+  },
+  {
+    "question": "What is the corridor width constraint in A-Maze-ing and how do you enforce it during generation?",
+    "answer": "The maze cannot have large open areas — corridors cannot be wider than 2 cells. Specifically: 3×3 (or larger) open areas are forbidden. A 2×3 or 3×2 open area is allowed. An open area means a rectangular region where all internal walls between cells are removed (all passages exist). To enforce this during generation: after each wall removal (passage addition), check if adding that passage would create a 3×3 open area. For each new passage added between cells A and B, check all 3×3 sub-grids that contain both A and B and verify that not all 9 cells in any such sub-grid are fully connected. If the check fails, reject the passage and choose a different one. An alternative: post-process the generated maze, detect 3×3 open areas, and add back one random wall per detected area. The constraint also interacts with the '42' pattern: the fully-closed '42' cells help break up potential large open areas near them.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "corridor-width",
+      "3x3-constraint",
+      "open-areas",
+      "post-processing",
+      "generation"
+    ]
+  },
+  {
+    "question": "How do you find and output the shortest path from ENTRY to EXIT in A-Maze-ing?",
+    "answer": "Use BFS (Breadth-First Search) on the maze's passage graph to find the shortest path. The passage graph: cells are nodes, and each passage (removed wall) is an edge. BFS guarantees the shortest path in an unweighted graph. Implementation: from collections import deque; queue = deque([(entry, [entry])]); visited = {entry}; while queue: cell, path = queue.popleft(); if cell == exit: return path; for neighbor in open_neighbors(cell): if neighbor not in visited: visited.add(neighbor); queue.append((neighbor, path + [neighbor])). Convert the cell path to directions: for each consecutive pair (cell, next_cell): if next_cell == (cell[0], cell[1]-1): dir='N'; elif east: dir='E'; elif south: dir='S'; elif west: dir='W'. Write the path as a space-separated string: 'E E S S W N'. The output file format after the hex grid: blank line, then ENTRY x,y on one line, EXIT x,y on the next, then the direction string on the third line.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "BFS",
+      "shortest-path",
+      "ENTRY-EXIT",
+      "directions",
+      "output-format"
+    ]
+  },
+  {
+    "question": "What is the A-Maze-ing pip package requirement and how do you build and publish it?",
+    "answer": "The reusable MazeGenerator class must be packaged as a pip-installable Python package named mazegen-* (e.g., mazegen-1.0.0). The entire package must live in a single Python file at the repository root. Build the package using Python's standard build tools: install build (pip install build), create pyproject.toml with [build-system] (requires = ['hatchling'] or 'setuptools'), [project] (name, version, requires-python), and [tool.hatch.build.targets.wheel] (packages = ['.']), then run python -m build to generate both .tar.gz and .whl files. The package is installed with pip install mazegen-1.0.0-py3-none-any.whl. The MazeGenerator class must expose: __init__(width, height, seed=None, perfect=True), generate() → maze structure, get_solution() → list of direction strings, get_cell(x, y) → cell wall state. Document the API in the README. During peer evaluation, the reviewer will rebuild the package from source in a fresh virtualenv — your pyproject.toml must be complete and correct.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "pip-package",
+      "mazegen",
+      "pyproject-toml",
+      "build",
+      "packaging",
+      "whl"
+    ]
+  },
+  {
+    "question": "What visual representation must A-Maze-ing provide and what user interactions are required?",
+    "answer": "The visual must show the maze clearly with walls, entry, exit, and optionally the solution path. Choose either terminal ASCII rendering (using box-drawing characters like ─ │ ┼ or simple +--- blocks) or graphical display using MiniLibX (MLX). ASCII rendering is simpler and more portable — use double-height rendering (each cell takes 2 rows and 2 columns in the terminal). Mandatory user interactions: (1) Re-generate: press 'R' to generate a new maze (with a new random seed) and display it. (2) Show/Hide path: press 'P' or 'S' to toggle showing the shortest path from ENTRY to EXIT visually (highlight path cells in a different color). (3) Change wall colours: press 'C' to cycle through wall color options (terminal uses ANSI escape codes; MLX uses RGB). Optional: press '4' or '2' to highlight the '42' pattern cells. The visual representation is evaluated during peer review — reviewers will press each key and verify the behavior. Missing any required interaction is a deduction.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "visual",
+      "ASCII",
+      "MLX",
+      "user-interactions",
+      "keybindings",
+      "display"
+    ]
+  },
+  {
+    "question": "How do you handle seed-based reproducibility in A-Maze-ing?",
+    "answer": "The maze must be randomly generated but deterministically reproducible: running the program twice with the same SEED in the config file must produce identical output files and identical visual results. Implementation: at the start of the generation function, call random.seed(SEED) if SEED is provided in the config. All randomness in the algorithm (choosing next cell in DFS, choosing which wall to remove in Prim's) must use Python's random module (random.choice, random.shuffle, random.randint). Do NOT mix numpy.random with Python's random — they have separate state and numpy calls between Python random calls would change the effective sequence. If no SEED is provided, Python's random uses system entropy (os.urandom) — the output is different each run, which is valid for the no-seed case. Document the seed format: must be a positive integer. Include a DEFAULT SEED in your default config file so reviewers can reproduce your example output.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "seed",
+      "reproducibility",
+      "random",
+      "deterministic",
+      "config"
+    ]
+  },
+  {
+    "question": "What does the A-Maze-ing validation script check and how do you make sure you pass it?",
+    "answer": "The validation script (provided with the subject) verifies: (1) File format — correct number of lines (HEIGHT lines of hex digits + blank line + 3 metadata lines). (2) Grid dimensions — each row has exactly WIDTH hex characters, each a valid hex digit 0–9 or A–F. (3) Wall coherence — for every adjacent cell pair, the wall state is consistent in both directions (east/west, north/south). (4) Border walls — all cells on the outer border have their outward-facing wall closed, except the ENTRY and EXIT cells which have one open wall on the border. (5) ENTRY and EXIT existence — the coordinates in the metadata match the config file. (6) Connectivity — BFS from ENTRY reaches EXIT (and all other cells for a perfect maze). (7) Path validity — the direction string in the metadata, when followed from ENTRY, reaches EXIT without passing through any closed wall. Run the validation script on your output after every code change during development: python3 validate.py maze.txt config.txt.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "validation",
+      "script",
+      "wall-coherence",
+      "border-walls",
+      "connectivity",
+      "path-validity"
+    ]
+  },
+  {
+    "question": "What common algorithm mistakes cause wall-coherence failures in A-Maze-ing?",
+    "answer": "Three common mistakes: (1) Storing walls per-cell without updating the neighbor: setting cell[x][y].east = OPEN without also setting cell[x+1][y].west = OPEN. The validation script finds this immediately. Fix: always update both cells when opening or closing a wall: open_passage(a, b) sets a's wall toward b AND b's wall toward a. (2) Index confusion: in a 2D grid, (x, y) might be row-major (y is the row, x is the column) in one place and column-major in another. A cell at visual position (column=3, row=2) might be stored as grid[2][3] (row, col) or grid[3][2] (col, row) — mixing these corrupts the coherence. Pick one convention (row, col) and stick to it everywhere. (3) Border wall omission: cells on the North border must have their North wall closed; East border → East wall closed; etc. The entry cell has one border wall open (the passage in), and the exit cell has one border wall open (the passage out). Forgetting to set border walls produces hex values that look valid but fail the boundary check.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "wall-coherence",
+      "common-mistakes",
+      "index-confusion",
+      "border-walls",
+      "per-cell-walls"
+    ]
+  },
+  {
+    "question": "How do you handle the case where ENTRY and EXIT are on the same cell or outside maze bounds?",
+    "answer": "These are required parse errors — the program must detect and report them before attempting generation. Checks: ENTRY x must be in [0, WIDTH-1] and ENTRY y in [0, HEIGHT-1]; same for EXIT. If ENTRY == EXIT (same coordinates), report: 'Error: ENTRY and EXIT must be different cells'. If either is out of bounds, report: 'Error: ENTRY (x,y) is outside maze bounds WIDTHxHEIGHT'. Additionally, validate that ENTRY is on the maze border (x=0, x=WIDTH-1, y=0, or y=HEIGHT-1) and that EXIT is also on the border — interior entry/exit points are unusual and may not be supported depending on your border-wall logic. The '42' pattern cells must also not overlap with ENTRY or EXIT — if they would, shift the '42' position or report that the maze is too small. All these checks happen in the config parsing phase before any maze structure is allocated.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "ENTRY-EXIT",
+      "validation",
+      "out-of-bounds",
+      "error-handling",
+      "border-position"
+    ]
+  },
+  {
+    "question": "How do you implement the A-Maze-ing visual display with ASCII terminal rendering?",
+    "answer": "ASCII rendering represents each maze cell as a 2×2 block of characters in the terminal. Convention: the top-left of each cell block is '+'; horizontal walls use '---'; vertical walls use '|'; open passages are spaces. For a maze cell at position (col, row): print '+' then (if north wall closed: '---') or '   '; then start the next line with (if west wall closed: '|') or ' '; then '   '; then (if east wall closed: '|') or ' '. The south wall of row R = north wall of row R+1 (coherence guaranteed). Print the entire grid row by row: for each maze row, print the top wall line, then the cell interior line. The bottom border is always fully closed. Use ANSI escape codes for color: \\033[31m for red walls, \\033[32m for the solution path, \\033[0m to reset. Terminal size: WIDTH×4 + 1 characters wide, HEIGHT×2 + 1 rows tall. Test with a 5×5 maze first and verify coherence visually before scaling up.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "ASCII-rendering",
+      "terminal",
+      "ANSI-colors",
+      "2x2-cell",
+      "visual"
+    ]
+  },
+  {
+    "question": "How does the A-Maze-ing maze generation handle the 'no isolated cells' connectivity requirement?",
+    "answer": "A valid maze must have full connectivity: every cell is reachable from every other cell. For a PERFECT maze, connectivity is guaranteed by the spanning tree algorithms (DFS, Prim) — they visit every cell exactly once, so every cell is connected by construction. For an IMPERFECT maze (PERFECT=False), the base spanning tree already provides full connectivity; adding extra passages only adds loops, never disconnects anything. However, bugs can break connectivity: (1) Forgetting to visit a cell during DFS (off-by-one in boundary checks causes the last row or column to be skipped). (2) Marking the '42' pattern cells as fully closed BEFORE running the algorithm, then having the algorithm refuse to visit them — these cells become isolated. Fix: run the maze generation ignoring the '42' cells, then post-mark '42' cells as fully closed (close all their passages). Post-marking may break connectivity for non-42 neighbors — remove the passage on the neighbor's side too and run BFS to verify connectivity after marking. If isolated cells remain, shift the '42' pattern position.",
+    "topic": "a-maze-ing",
+    "tags": [
+      "connectivity",
+      "isolated-cells",
+      "42-pattern",
+      "spanning-tree",
+      "BFS-verification"
+    ]
+  },
+  {
+    "question": "In A-Maze-ing, what is the difference between the maze structure accessible to MazeGenerator users and the hex output file format?",
+    "answer": "The MazeGenerator class exposes the maze structure in a format convenient for Python code: a 2D grid of cells, where each cell has boolean flags for each wall direction (cell.north_wall, cell.east_wall, cell.south_wall, cell.west_wall) or a set of open passages. Users can query: gen.get_cell(x, y) → Cell; cell.has_wall(direction) → bool; gen.get_solution() → List[str] of directions. This internal representation is not necessarily the same as the output file format. The hex output file format is derived from the internal representation at write time: for each cell, compute the hex digit from the four wall bits. The package documentation must show how to convert between representations. The key requirement: the package API must be clean enough for another student's Pac-Man project to import it without reading the source — instantiate MazeGenerator(width=30, height=20, seed=42, perfect=False); maze = gen.generate(); for col in range(maze.width): if maze.get_cell(col, row).has_wall('east'): draw_wall().",
+    "topic": "a-maze-ing",
+    "tags": [
+      "package-API",
+      "internal-representation",
+      "hex-format",
+      "MazeGenerator",
+      "documentation"
+    ]
+  }
+]

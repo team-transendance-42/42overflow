@@ -23,10 +23,10 @@ enum SubjectRole {
 
 model User {
   id            String  @id @default(cuid())
-  email         String	@unique
+  email         String  @unique
   emailVerified Boolean @default(false)
 
-  name       String		@unique // Username
+  name       String? @unique // Username
   first_name String?
   last_name  String?
 
@@ -50,6 +50,7 @@ model User {
 
   sessions Session[]
   accounts Account[]
+  Like     Like[]
 }
 
 model Session {
@@ -106,9 +107,10 @@ model Follow {
 }
 
 model Post {
-  id      Int    @id @default(autoincrement())
+  id      Int     @id @default(autoincrement())
   title   String
   content String
+  image   String?
 
   userId    String
   subjectId Int
@@ -117,15 +119,27 @@ model Post {
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
+  likes    Like[]
   user      User      @relation(fields: [userId], references: [id])
   subject   Subject   @relation(fields: [subjectId], references: [id])
   comments  Comment[]
 }
 
+model Like {
+  id        Int    @id @default(autoincrement())
+  userId    String
+  postId    Int?
+  commentId Int?
+
+  user    User     @relation(fields: [userId], references: [id])
+  post    Post?    @relation(fields: [postId], references: [id])
+  comment Comment? @relation(fields: [commentId], references: [id])
+}
+
 model Comment {
-  id      Int    @id @default(autoincrement())
+  id      Int     @id @default(autoincrement())
   content String
-  likes   Int    @default(0)
+  image   String?
 
   parentId Int?
   postId   Int
@@ -137,6 +151,7 @@ model Comment {
 
   post     Post      @relation(fields: [postId], references: [id])
   user     User      @relation(fields: [userId], references: [id])
+  likes    Like[]
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }

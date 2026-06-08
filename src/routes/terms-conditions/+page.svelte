@@ -14,7 +14,7 @@ Effective Date: [23 Feb 2026] </h2>
 
 <p>2. User Content</p>
 
-<p>You are responsible for the content you post (questions, comments, tags).</p>
+<p>You are responsible for the content you post (questions, comments, images, tags).</p>
 
 <p>By posting content, you grant us a license to display it within the app.</p>
 
@@ -30,19 +30,31 @@ Effective Date: [23 Feb 2026] </h2>
 
 <p>You may not copy, distribute, or reproduce content without permission. </p>
 
-<p>5. Limitation of Liability </p>
+<p>5. Account and Content Management </p>
+
+<p>This is a safe and reliable space for everyone. In some cases, we may suspend or close </p>
+
+<p>an account, or remove content that has been shared on the platform. </p>
+
+<p>We reserve the right to do this any reason including by law or valid legal request,  </p>
+
+<p>for the safety or protection of users, the platform, or the public, and  </p>
+
+<p>if the content or account poses a risk to the safety or integrity of the service.</p>
+
+<p>6. Limitation of Liability </p>
 
 <p>42overflow is provided “as is” and we are not liable for damages arising from your use of the service. </p>
 
 <p>We make no guarantees regarding uptime or availability. </p>
 
-<p>6. Changes to Terms </p>
+<p>7. Changes to Terms </p>
 
 <p>We may update these Terms and Conditions from time to time. </p>
 
 <p>Continued use of the service after changes constitutes acceptance.</p>
 
-<p>7. Governing Law </p>
+<p>8. Governing Law </p>
 
 <p>These Terms are governed by the laws of The Netherlands.</p>
 

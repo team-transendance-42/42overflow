@@ -9,10 +9,10 @@
   background-color: var(--color-neutral-100);
   border: 1px solid var(--color-neutral-500);
   border-radius: var(--radius-md);
-
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
-
   font-family: var(--font-family-base);
 }
 </style>
+
+

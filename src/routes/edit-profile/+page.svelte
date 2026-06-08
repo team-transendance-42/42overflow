@@ -2,8 +2,6 @@
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
-  import { authClient } from '$lib/auth-client';
-
   export let data;
 
   let firstname = data.user?.first_name ?? '';
@@ -15,31 +13,39 @@
   let error = '';
   let success = false;
   let loading = false;
+  let avatarRemoved = false;
 
   let fileInput: HTMLInputElement;
 
   function handleFileChange(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) previewUrl = URL.createObjectURL(file);
+    if (file) {
+      previewUrl = URL.createObjectURL(file);
+      avatarRemoved = false;
+    }
   }
 
   function removeAvatar() {
-  previewUrl = '';
-  if (fileInput) fileInput.value = ''; // reset the input
-}
-async function handleUpdate() {
-  error = '';
-  success = false;
-  loading = true;
-
-  const formData = new FormData();
-  formData.append('interests', interests);
-  formData.append('username', username);
-  formData.append('firstname', firstname);
-  formData.append('lastname', lastname);
-  if (fileInput?.files?.[0]) {
-    formData.append('avatarimage', fileInput.files[0]);
+    previewUrl = '';
+    if (fileInput) fileInput.value = '';
+    avatarRemoved = true;
   }
+
+  async function handleUpdate() {
+    error = '';
+    success = false;
+    loading = true;
+
+    const formData = new FormData();
+    formData.append('interests', interests);
+    formData.append('username', username);
+    formData.append('firstname', firstname);
+    formData.append('lastname', lastname);
+    if (fileInput?.files?.[0]) {
+      formData.append('avatarimage', fileInput.files[0]);
+    } else if (avatarRemoved) {
+      formData.append('removeAvatar', 'true');
+    }
 
   const res = await fetch('?/update', {
     method: 'POST',
@@ -64,7 +70,7 @@ async function handleUpdate() {
 
 </script>
 
-<form method="POST" action="?/update" use:enhance enctype="multipart/form-data">
+<form method="POST" action="?/update" enctype="multipart/form-data" on:submit|preventDefault={handleUpdate}>
 <div class="profile-page">
   <h1><strong>PROFILE PAGE</strong></h1>
 
@@ -93,8 +99,8 @@ async function handleUpdate() {
     <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
   </div>
   <Input label="User name" name="username" placeholder="User name" bind:value={username} />
-  <!-- Non-editable TODO -->
-  <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} />
+
+  <Input label="E-mail" name="email" placeholder="E-mail" bind:value={email} disabled  />
 
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
 
@@ -130,13 +136,5 @@ async function handleUpdate() {
   display: flex;
 }
 
-.remove-btn input {
-  display: none;
-}
-
-.file-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
 
 </style>

@@ -5,7 +5,7 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.user) throw redirect(303, '/login');
 
-const profile = await db.user.findUnique({
+const user = await db.user.findUnique({
     where: { id: locals.user.id },
     include: {
       followers: {
@@ -17,7 +17,7 @@ const profile = await db.user.findUnique({
   });
 
   return {
-    user: locals.user,
-    profile
+    user
+  
   };
 };
