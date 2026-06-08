@@ -12,13 +12,5 @@ export default defineConfig({
 		enhancedImages(),
 		sveltekit(),
 		paraglideVitePlugin({ project: './project.inlang', outdir: './src/lib/paraglide' })
-	],
-	server: {
-		proxy: {
-			'/api': {
-				target: apiProxyTarget,
-				changeOrigin: true
-			}
-		}
-	}
+	]
 });
