@@ -83,15 +83,15 @@ func getLimiter(key string) (*limiterEntry, bool) {
 	return entry, true
 }
 
-/*
-*
-todo: JWTAuth — runs before the rate limiter, verifies the token, and writes the user ID into context.aa(add JWT auth middleware that verifies the Bearer token and writes the user ID into context.
-Change limiter key selection to use context user ID first, IP second.
-extractClientKey — decides which bucket to rate-limit against (user ID or IP). It's a helper inside the rate limiter.
-todo: **With JWT:** replace all of this with `"user:" + userID` from context — unfakeable.
-Context is an object that carries a cancellation signal and deadline. Every HTTP request has one. If the browser disconnects, ctx is cancelled, and you can detect that to stop work early. It's passed as the first argument by convention in Go whenever a function does I/O.
-*/
+// extractClientKey returns a rate-limit bucket key for this request.
+// Prefers X-User-ID (set by SvelteKit after session auth) — unfakeable because it comes
+// from a verified session, not a client-controlled header. Falls back to IP so the
+// /healthz probe and any direct calls still work.
 func extractClientKey(r *http.Request) string {
+	if uid := strings.TrimSpace(r.Header.Get("X-User-ID")); uid != "" {
+		return "user:" + uid
+	}
+
 	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
 		// X-Forwarded-For may contain a comma-separated chain: client,proxy1,proxy2
 		first := strings.TrimSpace(strings.Split(xff, ",")[0])

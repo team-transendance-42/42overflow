@@ -556,6 +556,7 @@
             if (completedAnswer) {
                 history = [{ question: prompt, blocks: renderAnswer(completedAnswer) }, ...history];
                 question = '';
+                answer = '';
             }
         } catch (e) {
             if (e instanceof Error && e.name === 'AbortError') {
@@ -583,7 +584,11 @@
             stream = await navigator.mediaDevices.getUserMedia({ audio: true }); // Browser API — asks user for mic permission, returns an audio stream. await pauses until the user grants/denies.
         } catch (err) {
             console.error('getUserMedia error:', err);
-            error = 'Microphone access denied.';
+            if (err instanceof Error && err.name === 'NotFoundError') {
+                error = 'No microphone found — please connect one and try again.';
+            } else {
+                error = 'Microphone access denied.';
+            }
             return;
         }
         mediaRecorder = new MediaRecorder(stream);

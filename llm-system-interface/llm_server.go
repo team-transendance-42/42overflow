@@ -28,6 +28,7 @@ func main() {
 
 	middleware.StartCleanup() // background go routine with infinate loop, sleeps 5 min, cleans
 	router.Use(middleware.ErrorRecovery) //ErrorRecovery lets execution flow to RateLimiter only if no panic occurs.
+	router.Use(middleware.InternalSecret) // reject requests without valid X-Internal-Secret header
 	router.Use(middleware.RateLimiter)
 
 	// url: what client calls

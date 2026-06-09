@@ -17,7 +17,7 @@ export async function proxyLLM(
             headers: {
                 'Content-Type': request.headers.get('Content-Type') ?? 'application/json',
                 'X-Internal-Secret': env.LLM_INTERNAL_SECRET,
-                'X-User-ID': user.id,
+                'X-User-ID': user.id, // used by Go rate limiter to bucket per user, not per IP
             },
             body: request.body,
             signal: request.signal,
