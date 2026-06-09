@@ -136,14 +136,22 @@
 </script>
 
 <div>
-    <button onclick={openModal}>
-        {#if derivedParentId}
+    {#if derivedParentId}
+        <button
+            class="button-postcard clickable"
+            onclick={openModal}
+        >
             Reply
-        {/if}
-        {#if !derivedParentId}
+        </button>
+    {/if}
+    {#if !derivedParentId}
+        <button
+            class="button-postcard clickable mb-4 w-full"
+            onclick={openModal}
+        >
             Create New Comment
-        {/if}
-    </button>
+        </button>
+    {/if}
 </div>
 
 <Modal bind:showModal>

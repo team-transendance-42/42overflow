@@ -143,13 +143,11 @@
 </script>
 
 <div>
-    <button onclick={openModal}>
-        {#if derivedParentId}
-            Reply
-        {/if}
-        {#if !derivedParentId}
-            Edit
-        {/if}
+    <button
+        class="button-postcard edit clickable"
+        onclick={openModal}
+    >
+        Edit
     </button>
 </div>
 

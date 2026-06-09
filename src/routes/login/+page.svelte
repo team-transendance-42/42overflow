@@ -39,7 +39,9 @@
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
   <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
-  <Button label={loading ? 'Logging in...' : 'Log In'} type="button" onClick={handleLogin} />
+  <button class="button-primary" type="button" on:click={handleLogin}>
+    {loading ? 'Logging in...' : 'Log In'}
+  </button>
 
   <p>Don't have an account? <a href="/signup"><strong>Sign up</strong></a></p>
 </div>

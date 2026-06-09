@@ -1,5 +1,28 @@
+/* Backgrounds */
+.posts-background {
+    background-color: rgba(255, 255, 255, 1);
+    background-image:
+        url('/CodeLines/PNG/180221_CODAM_Lines-04.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: scroll;
+}
+
+/* Text */
+.white-text {
+	color: white;
+	text-shadow: rgb(20, 20, 20) 0px 0px 2px;
+}
+
+.black-text {
+	color: black;
+	text-shadow: rgb(230, 230, 230) 0px 0px 2px;
+}
+
 /* Posts */
 .postbox {
+	box-sizing: border-box;
 	width: 100%;
 	min-height: 150px;
 	background-color: var(--color-neutral-100);
@@ -7,9 +30,22 @@
 	border-radius: var(--radius-md);
 
 	padding: var(--space-md);
+	padding-bottom: 3rem;
 	margin-bottom: var(--space-lg);
 
 	font-family: var(--font-family-base);
+}
+
+.postbox.clickable {
+	transition:
+		transform 0.2s ease,
+		box-shadow 0.2s ease;
+}
+
+.postbox.clickable:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+	border-color: #60a5fa;
 }
 
 .questions-page {
@@ -23,4 +59,66 @@
 	margin-left: 8px;
 }
 
+/* Avatar */
+.avatar {
+	border-radius: 100%;
+	width: 100px;
+	height: 100px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
 
+.avatar img {
+	width: 100%;
+	height: 100%;
+}
+
+/* Buttons */
+.button-primary {
+    background-color: var(--color-neutral-900);
+    color: var(--color-neutral-200);
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+	margin-bottom: 1rem;
+}
+
+.button-primary:hover {
+	opacity: 0.85;
+}
+
+.button-postcard {
+	font-size: var(--font-size-small);
+	background-color: var(--color-neutral-900);
+	color: black;
+	padding: 0.4rem 0.8rem;
+	border: none;
+	border-radius: var(--radius-md);
+	cursor: pointer;
+	margin-top: var(--space-md);
+}
+
+.button-postcard.clickable:hover,
+.button-postcard.clickable:focus {
+	color: #1d4ed8;
+	text-decoration-thickness: 2px;
+}
+
+.button-postcard.delete {
+	background-color: var(--color-error-250);
+	color: white;
+}
+
+.button-postcard.like {
+	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button-postcard.edit {
+	background-color: var(--color-editor-bg);
+	color: white;
+}
