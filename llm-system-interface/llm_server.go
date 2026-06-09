@@ -32,9 +32,9 @@ func main() {
 	router.Use(middleware.RateLimiter)
 
 	// url: what client calls
-	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/community", handlers.RagAskStreaming).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST")
+	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST")
+	router.HandleFunc("/api/community", handlers.RagAskStreaming).Methods("POST")
 
 	log.Println("Server running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", router))

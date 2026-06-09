@@ -6,52 +6,14 @@ import (
 	"llm-system-interface/services"
 	"log"
 	"net/http"
-	"net/url"
-	"os"
 	"strings"
 )
 
-/**
-CORS (Cross-Origin Resource Sharing) is a security feature in browsers that restricts web pages from making requests to a different domain than the one that served the web page. When a web page tries to make a cross-origin request, the browser sends an HTTP request with an Origin header indicating the source of the request. The server can respond with specific CORS headers to allow or deny the request.
-CORS is a browser security mechanism; it doesn't protect against non-browser clients (curl, Postman, etc.)
-*/
-// buildAllowedOrigins reads ALLOWED_ORIGINS env var (comma-separated).
-func buildAllowedOrigins() map[string]bool {
-	allowed := map[string]bool{}
-	for _, o := range strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",") {
-		if o = strings.TrimSpace(o); o != "" {
-			allowed[o] = true
-		}
-	}
-	return allowed
-}
-
-var allowedOrigins = buildAllowedOrigins() //stores that map in memory for the lifetime of the server. saves rebuilding it on every request
-
-func allowedOrigin(origin string) string {
-	if origin == "" { return ""	}
-	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Host == "" { return ""}
-	if allowedOrigins[origin] { return origin}
-	return ""
-}
-
-/*  tells the browser which request headers are permitted in cross-origin requests. */
 func setHeaders(w http.ResponseWriter, r *http.Request) bool {
-	if origin := allowedOrigin(r.Header.Get("Origin")); origin != "" {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Vary", "Origin")
-	}
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization") //Authorization — reserved for when you add JWT auth; without it listed here, auth'd requests would be blocked by the browser before they even reach your server
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache") // required by sse spec to prevent buffering
+	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusNoContent)
-		return false
-	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return false
