@@ -1,0 +1,177 @@
+POST /rag/ask { question: "what is malloc?" }
+  │
+  ├─ 1. EMBED QUESTION
+  │   embedder.embed_texts(["what is malloc?"])
+  │   → key = "what is malloc?" (lowercased+stripped)
+  │   → LRU cache check: hit → return tuple in ~0ms
+  │                       miss → asyncio.to_thread(_embed_sync) → 100-300ms
+  │   → returns [list[float], 384-dim]
+  │
+  ├─ 2. DETECT TOPIC
+  │   detector.detect_topic(embedding, app.state.centroids)
+  │   → np.stack(centroids.values()) — builds (T,D) matrix EVERY request
+  │   → normalize all centroid rows + query → matmul → scores (T,)
+  │   → if best >= 0.70 AND margin >= 0.08 → return ("memory", 0.83)
+  │   → else → return (None, ...)
+  │
+  ├─ 3. HYBRID SEARCH
+  │   3a. NumpyIndex.search(embedding, n=20, topic_filter="memory")
+  │       → np.array(embedding) @ pre-normalized matrix → (N,) scores
+  │       → mask non-topic docs → top-20 by distance
+  │       → ~0.05ms
+  │
+  │   3b. BM25Index.search("what is malloc?", n=20, topic_filter="memory")
+  │       → _tokenize(query) → ["what", "malloc"]
+  │       → BM25Plus.get_scores → rank all N docs → filter by topic
+  │       → ~1-2ms (Python loop + rank_bm25)
+  │
+  │   3c. Fallback check: if (len(dense)+len(sparse)) < 3 → redo without filter
+  │
+  │   3d. RRF merge: score[id] += 1/(rank+60) for both lists
+  │       → top-4 by RRF score
+  │
+  │   3e. Intro pin: if topic detected & has intro doc not in top-4
+  │       → prepend intro, drop last result
+  │
+  ├─ 4. GENERATE
+  │   generator.generate(question, contexts)
+  │   → build_prompt: extract answer portion, truncate to 300 chars each
+  │   → POST /api/chat to Ollama (non-streaming, timeout=300s)
+  │   → hallucination marker check
+  │
+  └─ return { answer: "..." }
+
+  ---
+  Bugs
+
+  1. KeyError risk in topic_intro_ids — main.py:134
+  topic_intro_ids: dict[str, str] = {
+      p["topic"]: ...           # ← KeyError if "topic" key is missing
+      for p in qa_cache["qa_pairs"]
+      if "intro" in p.get("tags", [])
+  }
+  All other topic reads use p.get("topic", "unknown"). This one doesn't. If any seed file has "tags": ["intro"] but no "topic" key, startup
+  crashes. Fix:
+  p.get("topic", "unknown"): make_doc_id(p["question"])
+  
+  2. _sync_to_chroma mutates input pairs in-place — main.py:61-64
+  for p in pairs:
+      p["_id"] = ...
+      p["_hash"] = ...
+      p["_text"] = ...
+  pairs is qa_cache["qa_pairs"], a list of shared dict references. If the function raises mid-loop, the cache is left partially mutated. The
+  _id/_hash/_text keys are then never used by callers (step 4 recomputes make_doc_id again). The mutation is redundant and side-effectful.
+  
+  3. Fallback check counts duplicates — retriever.py:86
+  if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
+  Dense and sparse can return the same doc IDs. If both return the same 2 docs, 2 + 2 = 4 >= 3 — no fallback — but you only have 2 unique docs.
+  Should be:
+  if len({h["id"] for h in dense_hits} | {h["id"] for h in sparse_hits}) < _MIN_FILTERED:
+
+  4. _TABLE_EXISTS_QUERY checks lowercase but table may be case-sensitive — db.py:25
+  PostgreSQL information_schema.tables.table_name stores the name exactly as created. Prisma creates "QAPair" with quotes (preserving case). The
+  check table_name = 'QAPair' relies on this exact casing. If the Prisma migration ever changes the model name casing, the service silently falls
+  to seed-only without an error. Low risk, but the TODO comment on line 31 confirms this is unverified.
+
+  5. _HALLUCINATION_MARKERS recreated on every generate() call — generator.py:163
+  _HALLUCINATION_MARKERS = [...]   # inside the function body
+  Python rebuilds this list object on every call. Should be a module-level frozenset:
+  _HALLUCINATION_MARKERS = frozenset([...])
+
+  ---
+  Performance Issues
+
+  6. Centroid matrix rebuilt from scratch on every request — detector.py:138-155
+
+  This is the most impactful hidden cost:
+  def detect_topic(question_embedding, centroids):
+      topics = list(centroids.keys())           # new Python list
+      C = np.stack([np.array(v, ...) for ...])  # new matrix from Python dict
+      c_norms = np.linalg.norm(C, ...)
+      C_unit = C / c_norms                       # normalize again
+  The centroids dict never changes after startup. So C_unit (the normalized centroid matrix) is being recomputed from Python dicts → numpy →
+  normalize on every single request. For 10 topics × 384-dim, this is ~microseconds, but it's entirely avoidable.
+  
+  Fix: precompute and store (topics_list, C_unit_matrix) once at startup in app.state or wrap centroids in a class:
+  # at startup:
+  app.state.centroid_matrix = precompute_centroid_matrix(topic_centroids)
+
+  7. NumPy topic filter mask uses Python list comprehension — numpy_index.py:140-143
+  mask = np.array(
+      [t != topic_filter for t in self._topics], dtype=bool
+  )   
+  For N docs, this is a Python loop. Could be:
+  topics_arr = np.array(self._topics)          # build once at .build() time
+  mask = topics_arr != topic_filter            # fully vectorized, no Python loop
+  Store self._topics_arr: np.ndarray in build().
+
+  8. Step 4 in startup recomputes IDs already computed by _sync_to_chroma — main.py:132
+  all_ids = [make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]]
+  _sync_to_chroma already attached p["_id"] to every pair. Could use p["_id"] directly (if sync succeeded). Minor savings of N SHA-256 hashes.
+
+  9. No full-request cache
+  The LRU embedding cache helps for repeated identical questions, but the BM25 search, RRF merge, and Ollama call still run every time. For truly
+  identical questions, a response-level cache (even just a dict with question.lower().strip() as key and a TTL) would eliminate all compute and
+  the Ollama round-trip for hot questions.
+
+  ---
+  Architectural / Edge Cases
+
+  10. Startup embeds ALL docs via get_embeddings even after skipping unchanged ones
+  _sync_to_chroma skips unchanged docs (good). Then step 4 calls get_embeddings(all_ids) to fetch ALL embeddings from ChromaDB. This one HTTP call
+  still works. This is well-handled.
+
+  11. Intro doc pinning drops the last real result
+  results = [{intro}] + results[:-1]   # retriever.py:134
+  If the 4th result was highly relevant but the intro doc was inserted, you lose that context. The intro always displaces a real result regardless
+  of relevance score. Might produce slightly worse answers for direct targeted questions within a topic.
+
+  12. detect_topic confidence and margin thresholds are magic numbers with no calibration history
+  _CONFIDENCE_THRESHOLD = 0.70 and _MARGIN_THRESHOLD = 0.08 in detector.py:29-30. No tests validate these work correctly with your actual seed
+  data distribution. If topics are semantically close (e.g., "memory" vs "pointers"), the margin might never be met, permanently disabling topic
+  filtering.
+
+  13. No connection pool for DB — db.py:40
+  Opens and closes one connection per startup. Fine for startup. Would be a problem if load_db_pairs were called at request time.
+
+  14. httpx.AsyncClient never closed — generator.py:29
+  _http = httpx.AsyncClient(timeout=300.0) is module-level and never added to lifespan cleanup. On shutdown, asyncio will log a ResourceWarning.
+  Fix: move to app.state and call await _http.aclose() after yield in lifespan.
+
+  15. _merge silently accepts duplicate questions within seed files
+  Two seed JSON files with the same question: the second overwrites the first with no warning. By design (last-writer-wins), but makes seed
+  quality issues invisible.
+
+  ---
+  Summary Table
+
+  ┌─────┬────────────────────┬─────────────────────────────────────────────┬──────────────────────────────────────┐
+  │  #  │       Where        │                    Type                     │               Severity               │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 1   │ main.py:134        │ Bug: KeyError on missing topic field        │ Medium — crash on bad seed           │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 2   │ main.py:61         │ Bug: in-place mutation of shared cache      │ Low — no observable error currently  │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 3   │ retriever.py:86    │ Bug: fallback counts duplicate IDs          │ Low — subtle under-triggering        │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 4   │ db.py:25           │ Bug: case-sensitive table name assumption   │ Low — only fails on schema rename    │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 5   │ generator.py:163   │ Bug/perf: list rebuilt per call             │ Low                                  │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 6   │ detector.py:138    │ Perf: centroid matrix rebuilt every request │ Medium — avoidable CPU every call    │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 7   │ numpy_index.py:140 │ Perf: Python loop for topic mask            │ Low at 200 docs, matters at scale    │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 8   │ main.py:132        │ Perf: redundant SHA-256 at startup          │ Negligible                           │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 9   │ —                  │ Arch: no full-response cache                │ Medium — hot questions pay full cost │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 10  │ lifespan           │ Arch: NumpyIndex lost if ChromaDB down      │ Acceptable — BM25 fallback works     │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 11  │ retriever.py:134   │ Logic: intro pin drops relevant result      │ Low                                  │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 12  │ detector.py:29     │ Arch: uncalibrated thresholds               │ Medium — silent topic filter bypass  │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 13  │ db.py:40           │ Arch: single connection, no pool            │ Low — startup-only currently         │
+  ├─────┼────────────────────┼─────────────────────────────────────────────┼──────────────────────────────────────┤
+  │ 14  │ generator.py:29    │ Arch: httpx client never closed             │ Low — warning on shutdown            │
