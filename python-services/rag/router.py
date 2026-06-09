@@ -46,5 +46,3 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
 
     confidence = max((c["rrf_score"] for c in contexts), default=0.0)
     return RetrieveResponse(contexts=contexts, confidence=confidence)
-
-
