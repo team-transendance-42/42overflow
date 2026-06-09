@@ -581,7 +581,8 @@
         let stream: MediaStream; // type annotation, no val assigned
         try {
             stream = await navigator.mediaDevices.getUserMedia({ audio: true }); // Browser API — asks user for mic permission, returns an audio stream. await pauses until the user grants/denies.
-        } catch {
+        } catch (err) {
+            console.error('getUserMedia error:', err);
             error = 'Microphone access denied.';
             return;
         }
