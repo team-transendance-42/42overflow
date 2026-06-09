@@ -1,3 +1,9 @@
+best: use docker builder prune
+during all container running: to clear build up cache etc which grows to 30 and more gb
+other option:
+docker system prune -af --volumes
+===================
+
 For development, there is an extra docker-compose.dev.yml file that enables live reload for both Python and the app. This means code changes are reflected immediately in the local browser, without needing to rebuild the containers:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 base stack only: (production)
