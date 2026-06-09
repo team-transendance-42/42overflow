@@ -3,6 +3,10 @@ during all container running: to clear build up cache etc which grows to 30 and 
 other option:
 docker system prune -af --volumes
 ===================
+!!!NB!!!
+docker system df -v
+get info on docker images, voluesm build cache
+=========================
 
 For development, there is an extra docker-compose.dev.yml file that enables live reload for both Python and the app. This means code changes are reflected immediately in the local browser, without needing to rebuild the containers:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
@@ -19,7 +23,7 @@ Dockerfile/base image
 package.json or lockfile
 Anything copied during image build that is not from the live mount
 ================================
-dev stack with reload:
+dev stack with reload:docker system df -v
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ==============================
 for go we do need to recompile, didnt install an extra tool: 

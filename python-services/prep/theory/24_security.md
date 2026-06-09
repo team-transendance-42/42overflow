@@ -9,3 +9,4 @@
   llm-server is on the internal Docker network — not exposed to the internet. But any container on app-net could call it directly, bypassing auth
   entirely. The secret proves the request came through SvelteKit (which already verified the user), not from some other container or someone who
   found the internal port. It's a cheap trust boundary inside the network.
+  ==============
