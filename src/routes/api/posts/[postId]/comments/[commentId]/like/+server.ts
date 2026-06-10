@@ -23,7 +23,19 @@ export const POST = async ({ locals, params }: RequestEvent) => {
 			throw error(400, 'Invalid Comment ID');
 		}
 
-		// Like comment
+		// Check if user has already liked the comment
+		const existingLike = await db.like.findFirst({
+			where: {
+				userId: locals.user.id,
+				commentId: commentId
+			}
+		});
+
+		if (existingLike) {
+			throw error(400, 'User has already liked this comment');
+		}
+
+		// Create like
 		await db.like.create({
 			data: {
 				userId: locals.user.id,
