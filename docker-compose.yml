@@ -167,8 +167,7 @@ services:
     image: caddy:2.9-alpine
     restart: unless-stopped
     ports:
-      - "8080:80"   # HTTP -> HTTPS redirect
-      - "8443:443"  # HTTPS
+      - "8443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
