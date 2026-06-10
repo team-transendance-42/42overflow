@@ -13,12 +13,8 @@
 	let { comment, depth = 0 }: Props = $props();
 
 	// Derive postId and parentId for creating replies to this comment
-	let postId = $derived(comment.postId);
-	let parentId = $derived(comment.id);
-	// Check if the current user has liked this comment
-	let isLiked = $derived.by(() =>
-		Boolean(page.data.user?.id && comment.likes?.some((l: { userId: string }) => l.userId === page.data.user.id))
-	);
+	const postId = comment.postId;
+	const parentId = comment.id;
 	let isOwn = $derived.by(() => page.data.user?.id === comment.userId);
 
 	async function deleteComment() {
@@ -43,18 +39,18 @@
 
 	async function likeComment() {
 		// Toggle like/unlike based on current state
-		const response = await fetch(`/api/posts/${postId}/comments/${comment.id}/${isLiked ? 'unlike' : 'like'}`, {
+		const response = await fetch(`/api/posts/${postId}/comments/${comment.id}/${comment.userLiked ? 'unlike' : 'like'}`, {
 			method: 'POST',
 		});
 
 		if (!response.ok) {
 			const errorData = await response.json();
-			console.error(`Failed to ${isLiked ? "unlike" : "like"} comment:`, errorData);
-			alert(`Failed to ${isLiked ? "unlike" : "like"} comment: ${errorData.message || 'Unknown error'}`);
+			console.error(`Failed to ${comment.userLiked ? "unlike" : "like"} comment:`, errorData);
+			alert(`Failed to ${comment.userLiked ? "unlike" : "like"} comment: ${errorData.message || 'Unknown error'}`);
 			return;
 		}
 
-		console.log(`Comment with ID: ${comment.id} ${isLiked ? 'unliked' : 'liked'}`);
+		console.log(`Comment with ID: ${comment.id} ${comment.userLiked ? 'unliked' : 'liked'}`);
 		window.location.reload();
 	}
 
@@ -117,7 +113,7 @@
 		{/if}
 
 		<!-- Show Likes -->
-		<p>{comment.likes.length ? `${comment.likes.length} Likes` : '0 Likes'}</p>
+		<p>{comment.likeCount ?? 0} Likes</p>
 
 		<!-- Like Button -->
 		{#if !isOwn}
@@ -126,7 +122,7 @@
 				onclick={likeComment}
 				aria-label="Like comment"
 			>
-				{isLiked ? 'Unlike' : 'Like'}
+				{comment.userLiked ? 'Unlike' : 'Like'}
 			</button>
 		{/if}
 	</div>
