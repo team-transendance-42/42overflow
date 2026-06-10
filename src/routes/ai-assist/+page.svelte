@@ -178,6 +178,32 @@
         border-top: 1px solid var(--panel-border);
         margin: 1rem 0;
     }
+
+    /* visually hidden but announced by screen readers */
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .stt-status {
+        font-size: 0.82rem;
+        color: var(--olive-text);
+        text-align: center;
+        padding: 0 0.4rem;
+        animation: stt-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes stt-pulse {
+        0%, 100% { opacity: 0.35; }
+        50%       { opacity: 1; }
+    }
 </style>
 
 <script lang="ts">
@@ -192,6 +218,7 @@
     let dictating = $state(false);
     let mediaRecorder = $state<MediaRecorder | null>(null);
     let audioChunks: Blob[] = []; // Array of audio chunks for dictation
+    let sttStatus = $state(''); // drives aria-live region: 'Recording…', 'Transcribing…', or ''
 
     // TYPES
     type InlineToken =
@@ -597,14 +624,17 @@
         mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
 	        
         mediaRecorder.onstop = async () => {
+            sttStatus = 'Transcribing…';
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); //Blob = Binary Large Object — a browser built-in for raw binary data; type: 'audio/wav' tells the browser what MIME type this binary data is.
             await sendToWhisper(audioBlob); //puts the blob into a FormData and sends it via fetch
             stream.getTracks().forEach(track => track.stop());
+            sttStatus = '';
             await askQuestion();
         };
 
         mediaRecorder.start();
         dictating = true;
+        sttStatus = 'Recording…';
     }
 }
 
@@ -630,6 +660,7 @@ async function sendToWhisper(blob: Blob) {
         }
     } catch (err) {
         error = "Could not reach Whisper backend.";
+        sttStatus = '';
         console.error(err);
     }
 }
@@ -686,7 +717,14 @@ async function sendToWhisper(blob: Blob) {
             bind:value={question}
             placeholder="Ask a question..."
         />
-        <button type="button" onclick={toggleDictation} aria-pressed={dictating} disabled={loading && !dictating}>
+        <span aria-live="polite" aria-atomic="true" class="sr-only">{sttStatus}</span>
+        <button
+            type="button"
+            onclick={toggleDictation}
+            aria-pressed={dictating}
+            aria-label={dictating ? 'Stop voice input' : 'Start voice input'}
+            disabled={loading && !dictating}
+        >
             {dictating ? 'Stop Dictate' : 'Dictate'}
         </button>
         <button type="submit" disabled={loading || !question.trim()}>
@@ -698,6 +736,9 @@ async function sendToWhisper(blob: Blob) {
     </form>
     {#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
+    {/if}
+    {#if sttStatus}
+        <div class="stt-status" aria-hidden="true">{sttStatus}</div>
     {/if}
     {#if loading}
         <div style="text-align:center;">Loading...</div>
