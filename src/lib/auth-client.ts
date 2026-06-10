@@ -1,5 +1,4 @@
 import { createAuthClient } from 'better-auth/svelte';
 
-export const authClient = createAuthClient({
-  baseURL: 'http://localhost:5173',
-});
+// No baseURL — defaults to window.location.origin, works on any port (dev :5173, Docker :8080, production domain).
+export const authClient = createAuthClient();

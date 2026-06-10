@@ -34,7 +34,7 @@ from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
 # Use distributed caching (e.g., Redis) if you need fast access to frequently used data.
 # Keep your in-memory cache in sync with DB updates, or use the DB directly for retrieval.
 # Add monitoring, logging, and error handling for robustness.
-qa_cache: dict = {"qa_pairs": [], "bm25": None}
+qa_cache: dict = {"qa_pairs": []}
 
 
 def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
@@ -155,7 +155,6 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
 
     bm25 = BM25Index()
     bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
-    qa_cache["bm25"] = bm25
     print(f"[startup] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
 
     # Build NumpyIndex from the embeddings computed above.
