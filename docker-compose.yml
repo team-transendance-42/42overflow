@@ -62,8 +62,6 @@ services:
       - "8081"
     env_file:
       - ./llm-system-interface/.env
-    environment:
-      RAG_BACKEND: "python"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/healthz >/dev/null || exit 1"]
       interval: 10s
@@ -169,9 +167,12 @@ services:
     image: caddy:2.9-alpine
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8080:80"   # HTTP -> HTTPS redirect
+      - "8443:443"  # HTTPS
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
     depends_on:
       app:
         condition: service_healthy
@@ -186,6 +187,8 @@ volumes:
   chroma-data:
   uploads-data:
   whisper-model-cache:
+  caddy-data: # without those caddy regenerates self-signed certs on every container restart, which causes browsers to show security warnings;
+  caddy-config:
 
 networks:
   app-net:
