@@ -616,7 +616,7 @@ async function sendToWhisper(blob: Blob) {
 	Location: lives only in browser RAM, no file system path;The Whisper backend receives it as a multipart form upload and reads the bytes directly — it may or may not save it temporarily on its end. */
 
     try {
-        const response = await fetch('/stt/convert_audio', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
+        const response = await fetch('/api/stt', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
             method: 'POST',
             body: formData
         });
