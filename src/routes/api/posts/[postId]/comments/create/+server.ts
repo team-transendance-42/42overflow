@@ -3,6 +3,7 @@ import { uploadProductImage } from '$lib/fileUpload.ts';
 import { CommentSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
 import { z } from 'zod';
+import { broadcast } from '$lib/server/sse.ts';
 
 export const POST = async ({ locals, request, params }: RequestEvent) => {
     try {
@@ -52,8 +53,18 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 				postId: data.postId,
 				userId: locals.user.id,
 				image: imageUrl,
-			}
+			},
+            include: {
+                user: {
+                    select: { id: true, name: true }
+                }
+            }
 		});
+
+        broadcast({
+            type: 'comment-create',
+            comment
+        });
 
         return json({ comment }, { status: 201 });
     } catch (error) {

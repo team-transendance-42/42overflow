@@ -27,7 +27,18 @@ async function fetchCommentWithChildren(commentId: number) {
 	};
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+function enrich(comment: any, userId?: string) {
+	return {
+		...comment,
+		likeCount: comment.likes?.length ?? 0,
+		userLiked: userId
+			? comment.likes?.some((l: any) => l.userId === userId)
+			: false,
+		children: comment.children?.map((c: any) => enrich(c, userId)) ?? []
+	};
+}
+
+export const load: PageServerLoad = async ({ locals, params }) => {
     try {
         if (!params.id) {
             return ({ post: null });
@@ -62,10 +73,25 @@ export const load: PageServerLoad = async ({ params }) => {
 			new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 		);
 
+		if (!locals.user) {
+			return ({
+				post: {
+					...postwithcomments,
+					comments: commentsWithChildren
+				}
+			});
+		}
+
+		// Enrich comments with likeCount and userLiked for the current user
+		const userId = locals.user?.id;
+		const enriched = commentsWithChildren.map((c: any) =>
+			enrich(c, userId)
+		);
+
 		return ({
 			post: {
 				...postwithcomments,
-				comments: commentsWithChildren
+				comments: enriched
 			}
 		});
     } catch (error) {

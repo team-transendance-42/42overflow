@@ -79,6 +79,10 @@ func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 		}
 		ch <- text
 	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("readGeminiSSEToChannel: scanner error: %v", err)
+		ch <- models.StreamErrSentinel + err.Error()
+	}
 }
 
 func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiKey string) (*http.Response, error) {
@@ -176,6 +180,10 @@ func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, erro
 	resp, err := doGEMINIRequest(ctx, http.DefaultClient, body, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("do Gemini request: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("gemini HTTP %d", resp.StatusCode)
 	}
 
 	ch := make(chan string)

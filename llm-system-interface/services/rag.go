@@ -127,12 +127,18 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 //   - "do NOT include that sentence" prevents Gemma from appending the
 //     fallback phrase at the end of real answers (observed with Gemma 4B).
 func buildRAGPrompt(ctxStr, question string) string {
-	return "Answer ONLY from the community posts below. No outside knowledge.\n" +
-		"If the posts contain no relevant answer, respond with ONLY this sentence: " +
-		"\"The community hasn't covered this yet \xe2\x80\x94 be the first to post it!\"\n" +
-		"If you give an answer, do NOT include that sentence.\n\n" +
-		"Posts:\n---\n" + ctxStr + "\n\n" +
-		"Question: " + question
+	return "You are a tutor for 42 school students.\n" +
+		"Using the context below as your source, explain the concept clearly\n" +
+		"and completely \xe2\x80\x94 as if the student asked you in person.\n" +
+		"Cover what it is, why it matters, and the key details.\n" +
+		"Synthesise naturally; do not copy sentences verbatim from the context.\n" +
+		"If the context does not contain enough to answer, say: " +
+		"\"I don't have enough context to answer this fully.\"\n" +
+		"Never say things like \"The community hasn't covered this\" or " +
+		"\"be the first to post\" \xe2\x80\x94 you are a tutor, not a forum.\n\n" +
+		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
+		"=== QUESTION ===\n" + question + "\n\n" +
+		"=== ANSWER ==="
 }
 
 // StreamRagAnswer retrieves community contexts from the Python RAG service,

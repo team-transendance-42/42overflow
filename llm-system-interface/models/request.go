@@ -1,6 +1,10 @@
 package models
 
-const RoleUser      = "user"
+const RoleUser = "user"
+
+// StreamErrSentinel is a prefix sent on a chan string to signal a mid-stream error.
+// \x00 (null byte) never appears in LLM text output, so it cannot be confused with real content.
+const StreamErrSentinel = "\x00err:"
 
 type Message struct {
 	Role    string   `json:"role"`
@@ -11,6 +15,4 @@ type Message struct {
 type TextRequest struct {
 	Prompt   string    `json:"prompt"`             // current message (backward compatible)
 	Messages []Message `json:"messages,omitempty"` // full history (optional)
-	Model    string    `json:"model,omitempty"`
-	Stream   bool      `json:"stream,omitempty"`
 }
