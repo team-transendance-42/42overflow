@@ -1,6 +1,5 @@
 <script lang="ts">
   import Input from '$lib/components/Input.svelte';
-  import Button from '$lib/components/Button.svelte';
   import { authClient } from '$lib/auth-client';
   import { goto, invalidateAll } from '$app/navigation';
 
