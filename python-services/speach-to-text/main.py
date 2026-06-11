@@ -5,23 +5,8 @@ import tempfile # Standard library for creating temporary files/directories, sam
 import os
 from fastapi import FastAPI, File, UploadFile # FastAPI is a web framework like Express.js (Node) or Gin (Go). FastAPI is the app instance, File and UploadFile are types for handling multipart file uploads in route handlers.
 from fastapi.responses import JSONResponse # lets you return a JSON HTTP response explicitly — like res.json({...}) in Express or json.NewEncoder(w).Encode(...) in Go.
-from fastapi.middleware.cors import CORSMiddleware # Middleware that adds CORS headers to responses, so a browser frontend on a different origin can call this API. Same concept as CORS middleware in Express (cors npm package)
 
 app = FastAPI() # calls the constructor
-
-# --- CORS (Cross-Origin Resource Sharing) ---
-# Browsers block "cross-origin" requests by default for security.
-# STT is only reachable via the SvelteKit proxy (src/routes/stt/convert_audio/+server.ts),
-# which checks auth before forwarding here — CORS is a secondary safety net.
-# For production replace with your real domain, e.g.:
-#   allow_origins=["https://42overflow.com", "https://www.42overflow.com"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
-    allow_credentials=True, # you are allowed to send cookies and auth headers cross-origin
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # --- THEORY: Whisper Model Loading ---
 # 'base' is a good balance between speed and accuracy. 

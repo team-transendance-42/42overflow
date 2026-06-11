@@ -2,7 +2,7 @@
   Container Architecture Overview
 
   Browser
-    └── Caddy :8080 (reverse proxy, gzip)
+    └── Caddy :8443 (reverse proxy, gzip)
           ├── /api/*      → llm-server (Go) :8081
           ├── /stt/*      → python-stt (Whisper) :8091
           └── /*          → app (SvelteKit) :5173

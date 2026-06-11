@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15.13
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -47,8 +47,12 @@ services:
       python-rag:
         condition: service_healthy
     # for dev: --host = listen on 0.0.0.0 (all network interfaces) so the app is reachable from the host
+    # DANGER: --accept-data-loss silently DROPs any columns/tables not in the current schema — no prompt, no undo.
+    # This is intentional for a daily-wiped dev DB. If this DB holds data you care about,
+    # remove the flag and run migrations manually: npx prisma migrate dev
     command: >
-      sh -c "npx prisma db push --accept-data-loss &&
+      sh -c "echo 'WARNING: prisma db push --accept-data-loss is set — any columns/tables missing from schema will be DROPPED without prompt' &&
+      npx prisma db push --accept-data-loss &&
       npm run dev -- --host"
     networks:
       - app-net
@@ -62,8 +66,6 @@ services:
       - "8081"
     env_file:
       - ./llm-system-interface/.env
-    environment:
-      RAG_BACKEND: "python"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/healthz >/dev/null || exit 1"]
       interval: 10s
@@ -92,6 +94,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - app-net
 
@@ -122,7 +125,6 @@ services:
     build:
       context: ./python-services/speach-to-text
     restart: unless-stopped
-    command: ["uv", "run", "python", "main.py"]
     volumes:
       - whisper-model-cache:/root/.cache/whisper
     expose:
@@ -169,9 +171,11 @@ services:
     image: caddy:2.9-alpine
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
     depends_on:
       app:
         condition: service_healthy
@@ -186,6 +190,8 @@ volumes:
   chroma-data:
   uploads-data:
   whisper-model-cache:
+  caddy-data: # without those caddy regenerates self-signed certs on every container restart, which causes browsers to show security warnings;
+  caddy-config:
 
 networks:
   app-net:

@@ -23,9 +23,6 @@ Dockerfile/base image
 package.json or lockfile
 Anything copied during image build that is not from the live mount
 ================================
-dev stack with reload:docker system df -v
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-==============================
 for go we do need to recompile, didnt install an extra tool: 
 docker compose -d --build --no-cache llm-server
 or:

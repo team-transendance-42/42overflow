@@ -1,16 +1,10 @@
-{
-    auto_https off
-}
+localhost {
+    tls internal
 
-:80 {
-    # Enable response compression at the edge.
     encode gzip zstd
 
-    # Cache static assets aggressively.
     @static path /assets/* /favicon.ico /robots.txt
     header @static Cache-Control "public, max-age=31536000, immutable"
 
-    # All requests go to SvelteKit — it owns all routing including auth checks,
-    # AI proxying (/api/ai-assist, /api/ollama, /api/community) and STT (/stt/convert_audio).
     reverse_proxy app:5173
 }

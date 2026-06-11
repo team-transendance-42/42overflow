@@ -10,7 +10,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o llm_server llm_server.go
+RUN go build -o llm_server .
 
 # --- final stage: only the binary, no Go toolchain ---
 FROM alpine:3.21

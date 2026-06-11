@@ -9,9 +9,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv as the package/runtime manager.
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:${PATH}"
+RUN pip install uv
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev
