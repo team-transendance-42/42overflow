@@ -30,7 +30,7 @@
 	.user-card {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
+		align-items: center;5
 		gap: 1rem;
 		padding: 0.9rem;
 		border: 1px solid var(--color-neutral-400);

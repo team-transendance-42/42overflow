@@ -139,13 +139,11 @@
 
 	.slug {
 		margin: 0;
-		color: #666;
 		font-size: 0.9rem;
 	}
 
 	.description {
 		margin: 0;
-		color: #555;
 		font-size: 0.95rem;
 		line-height: 1.4;
 	}
@@ -164,12 +162,10 @@
 	}
 
 	.label {
-		color: #999;
 		font-weight: 500;
 	}
 
 	.value {
-		color: #333;
 		font-weight: 600;
 	}
 

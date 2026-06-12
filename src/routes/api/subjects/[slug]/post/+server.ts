@@ -30,3 +30,41 @@ export const POST: RequestHandler = async ({ request, locals, params }) => {
 
 	return json(post, { status: 201 });
 };
+
+export const GET: RequestHandler = async ({ url, params}) => {
+	const page = Number(url.searchParams.get('page')) || 1;
+	const limit = Number(url.searchParams.get('limit')) || 5;
+
+	const { slug } = params;
+	if (!slug) throw error(400, 'Slug is required');
+
+	const subject = await db.subject.findUnique({
+		where: { slug },
+		select: { id: true, deleted_at: true }
+	});
+
+	if (!subject || subject.deleted_at) throw error(404, 'Subject not found');
+
+	const [posts, total] = await Promise.all([
+		db.post.findMany({
+			skip: (page - 1) * limit,
+			take: limit,
+			orderBy: { created_at: 'desc' },
+			where: {
+				subjectId: subject.id,
+				deleted_at: null
+			},
+			include: {
+				user: { select: { name: true } }
+			}
+		}),
+		db.post.count({
+			where: {
+				subjectId: subject.id,
+				deleted_at: null
+			}
+		})
+	]);
+
+	return json({ data: posts, total });
+}
