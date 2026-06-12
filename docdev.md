@@ -8,6 +8,8 @@ docker compose build --no-cache && docker compose up -d
 docker system df -v // disk free
 get info on docker images, voluesm build cache
 =========================
+git push origin --delete 31-rag-improve  // delete remote branch
+============================
 git fetch origin
 git checkout remote-new-branch
 =====================================================
