@@ -1,5 +1,6 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
+import { broadcast } from '$lib/server/sse';
 
 export const POST = async ({ locals, params }: RequestEvent) => {
 	try {
@@ -47,6 +48,23 @@ export const POST = async ({ locals, params }: RequestEvent) => {
 				image: null,
 				deleted_at: new Date()
 			}
+		});
+
+		// re-fetch with relations if needed
+        const fullComment = await db.comment.findUnique({
+            where: { id: commentId },
+            include: {
+                user: true,
+                likes: true
+            }
+        });
+
+		broadcast({
+			type: 'comment-update',
+			comment: {
+                ...fullComment,
+                likeCount: fullComment.likes.length
+            }
 		});
 
 		console.log(`${new Date().toISOString()} - Successfully deleted comment ${commentId}`);

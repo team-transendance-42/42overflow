@@ -1,36 +1,197 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15.13
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: transcendance_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - app-net
 
   app:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    restart: unless-stopped
     volumes:
-      - ./:/app
+      - ./:/app # live code reload
       - /app/node_modules
       - uploads-data:/app/static/uploads
-    ports:
-      - "5173:5173"
+    expose:
+      - "5173"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/transcendance_db"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5173/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      llm-server:
+        condition: service_healthy
+      python-rag:
+        condition: service_healthy
+    # for dev: --host = listen on 0.0.0.0 (all network interfaces) so the app is reachable from the host
+    # DANGER: --accept-data-loss silently DROPs any columns/tables not in the current schema — no prompt, no undo.
+    # This is intentional for a daily-wiped dev DB. If this DB holds data you care about,
+    # remove the flag and run migrations manually: npx prisma migrate dev
     command: >
-      sh -c "npm ci --no-audit --prefer-offline &&
-      npx prisma generate &&
-      npx prisma db push &&
+      sh -c "echo 'WARNING: prisma db push --accept-data-loss is set — any columns/tables missing from schema will be DROPPED without prompt' &&
+      npx prisma db push --accept-data-loss &&
       npm run dev -- --host"
+    networks:
+      - app-net
+
+  llm-server:
+    build:
+      context: ./llm-system-interface
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8081"
+    env_file:
+      - ./llm-system-interface/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+      python-rag:
+        condition: service_healthy
+    networks:
+      - app-net
+
+  chromadb:
+    image: chromadb/chroma:0.5.5
+    expose:
+      - "8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-net
+
+  python-rag:
+    build:
+      context: ./python-services/rag
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8090"
+    env_file:
+      - ./llm-system-interface/.env
+    depends_on:
+      ollama:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8090/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 180s  # embedding 97 docs on CPU takes ~2min; 180s gives comfortable margin
+    networks:
+      - app-net
+
+  python-stt:
+    build:
+      context: ./python-services/speach-to-text
+    restart: unless-stopped
+    volumes:
+      - whisper-model-cache:/root/.cache/whisper
+    expose:
+      - "8091"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8091/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - app-net
+
+  ollama:
+    image: ollama/ollama:0.20.5
+    expose:
+      - "11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ollama-init:
+    build:
+      context: ./ollama-init
+      dockerfile: Dockerfile
+    env_file:
+      - ./llm-system-interface/.env
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - app-net
+    restart: "no"
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+      llm-server:
+        condition: service_healthy
+    networks:
+      - app-net
 
 volumes:
   postgres-data:
+  ollama-data:
+  chroma-data:
   uploads-data:
+  whisper-model-cache:
+  caddy-data: # without those caddy regenerates self-signed certs on every container restart, which causes browsers to show security warnings;
+  caddy-config:
+
+networks:
+  app-net:

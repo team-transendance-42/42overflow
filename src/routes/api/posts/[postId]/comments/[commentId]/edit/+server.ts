@@ -3,6 +3,7 @@ import { uploadProductImage } from '$lib/fileUpload.ts';
 import { CommentSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
 import { z } from 'zod';
+import { broadcast } from '$lib/server/sse';
 
 export const POST = async ({ locals, request, params }: RequestEvent) => {
     try {
@@ -82,8 +83,25 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 		// Edit comment
 		const editedComment = await db.comment.update({
 			where: { id: commentId },
-			data: toUpdateData
+			data: toUpdateData,
 		});
+
+        // re-fetch with relations if needed
+        const fullComment = await db.comment.findUnique({
+            where: { id: commentId },
+            include: {
+                user: true,
+                likes: true
+            }
+        });
+
+        broadcast({
+            type: 'comment-update',
+            comment: {
+                ...fullComment,
+                likeCount: fullComment.likes.length
+            }
+        });
 
         return json({ comment: editedComment }, { status: 201 });
     } catch (error) {

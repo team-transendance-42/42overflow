@@ -1,30 +1,12 @@
-step 1 — get mic access:
-const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-Browser asks user permission. Returns a MediaStream object (raw mic data).
-------------------------------------
 
-Step 2 — record:
-mediaRecorder = new MediaRecorder(stream);
-mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-mediaRecorder.start();
-MediaRecorder collects audio into chunks. Every time data is available, it's pushed to audioChunks[].
---------------------------------------
+  - Browser records audio via MediaRecorder → sends as multipart form to
+  /api/stt
+  - SvelteKit proxy (auth-gated, secret-protected) forwards to Python
+  python-stt:8091
+  - Whisper small model transcribes on CPU → returns JSON text
+  - Frontend inserts transcript into the prompt box
 
-Step 3 — stop and send:
-mediaRecorder.onstop = async () => {
-    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-    await sendToWhisper(audioBlob);         // transcribe
-    stream.getTracks().forEach(t => t.stop()); // release mic
-    await askQuestion();                    // send to LLM
-};
-When stopped: all chunks merged into one Blob, sent to Whisper, mic released, then question asked automatically.
----------------------------------------
-
-Step 4 — HTTP to Whisper:
-const formData = new FormData();
-formData.append('file', blob, 'recording.wav');
-fetch('http://localhost:8091/convert_audio', { method: 'POST', body: formData });
-FormData is a browser API for sending files over HTTP (like an HTML form upload).
+  That's a functional, self-hosted, server-side dictation feature.
 ---------------------------------------
 whisper models
 ---------------------------------------
