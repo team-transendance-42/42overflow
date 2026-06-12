@@ -47,12 +47,12 @@ services:
       python-rag:
         condition: service_healthy
     # for dev: --host = listen on 0.0.0.0 (all network interfaces) so the app is reachable from the host
-    # DANGER: --accept-data-loss silently DROPs any columns/tables not in the current schema — no prompt, no undo.
-    # This is intentional for a daily-wiped dev DB. If this DB holds data you care about,
-    # remove the flag and run migrations manually: npx prisma migrate dev
+    # DANGER: --force-reset drops and recreates the whole database if push detects
+    # changes that cannot be executed safely (all data lost). This is intentional for
+    # this disposable dev stack. Remove this flag if data must be preserved.
     command: >
-      sh -c "echo 'WARNING: prisma db push --accept-data-loss is set — any columns/tables missing from schema will be DROPPED without prompt' &&
-      npx prisma db push --accept-data-loss &&
+      sh -c "echo 'WARNING: prisma db push --force-reset is set - database may be dropped and recreated for schema sync' &&
+      npx prisma db push --accept-data-loss --force-reset &&
       npm run dev -- --host"
     networks:
       - app-net
