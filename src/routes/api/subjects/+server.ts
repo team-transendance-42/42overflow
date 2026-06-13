@@ -26,8 +26,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 				created_at: true,
 				_count: {
 					select: {
-						memberships: true,
-						posts: true
+						memberships: {
+							where: { user: { deleted_at: null } }
+						},
+						posts: {
+							where: { deleted_at: null }
+						}
 					}
 				},
 				memberships: locals.user ? {

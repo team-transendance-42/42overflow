@@ -36,6 +36,8 @@
 
 		questions = (json.data ?? []) as Post[];
 		total = json.total;
+		title = '';
+		content = '';
 	};
 
 	onMount(loadSubject);		
