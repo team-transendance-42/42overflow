@@ -4,6 +4,7 @@
   import Textarea from '$lib/components/Textarea.svelte';
 
   let projectname = "";
+  let subject = "";
   let body = "";
   let error = "";
   let submitting = false;
@@ -48,6 +49,13 @@
     name="projectname"
     placeholder="Enter project name"
     bind:value={projectname}
+  />
+
+    <Input
+    label="Subject"
+    name="subject"
+    placeholder="Enter subject"
+    bind:value={subject}
   />
 
   <Textarea
