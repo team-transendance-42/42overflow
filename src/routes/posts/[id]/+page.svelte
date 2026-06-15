@@ -78,13 +78,13 @@
 <!-- Post with Comments -->
 <div>
 	{#if post}
-		<div class="postbox white-text relative">
+		<div class="postbox white-text">
 			<div class="break-all line-clamp-1"><strong>Project:</strong> {post.title}</div>
 			<div class="break-all"><strong>Question:</strong> {post.content}</div>
 
 			<!-- View Profile Button -->
 			<button
-				class="button-postcard clickable absolute bottom-2 left-2"
+				class="button postcard clickable absolute bottom-2 left-2"
 				onclick={openProfile}
 				aria-label="View {post.user.name}'s profile'"
 			>

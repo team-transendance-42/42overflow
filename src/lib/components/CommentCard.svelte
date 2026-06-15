@@ -79,7 +79,7 @@
 			<!-- View Profile Button -->
 			{#if comment.deleted_at == null}
 				<button
-					class="button-postcard clickable"
+					class="button postcard clickable"
 					onclick={openProfile}
 					aria-label="View {comment.user.name}'s profile'"
 				>
@@ -88,7 +88,7 @@
 					</p>
 				</button>
 			{:else}
-				<div class="button-postcard">
+				<div class="button postcard">
 					<p class="author">
 						<em>[anonymous]</em>
 					</p>
@@ -108,7 +108,7 @@
 			<!-- Delete Comment -->
 			{#if isOwn && comment.deleted_at == null}
 				<button
-					class="bg-red-500 hover:bg-red-700"
+					class="button postcard delete clickable"
 					onclick={deleteComment}
 					aria-label="Delete comment"
 				>
@@ -118,7 +118,7 @@
 
 			<!-- Like Button -->
 			<button
-				class="button-postcard like clickable"
+				class="button postcard like clickable"
 				onclick={likeComment}
 				aria-label="Like comment"
 			>

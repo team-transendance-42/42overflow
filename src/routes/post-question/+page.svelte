@@ -58,7 +58,7 @@
     rows={5}
   />
 
-  <button class="button-primary" type="button" on:click={submitQuestion}>
+  <button class="button primary" type="button" on:click={submitQuestion}>
     {submitting ? 'Submitting...' : 'Submit'}
   </button>
 

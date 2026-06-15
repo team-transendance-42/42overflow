@@ -103,7 +103,7 @@
 
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
 
-  <button class="button-primary" type="button" on:click={handleUpdate}>
+  <button class="button primary" type="button" on:click={handleUpdate}>
     {loading ? 'Saving...' : 'Update'}
   </button>
 </div>

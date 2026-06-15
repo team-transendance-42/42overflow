@@ -38,7 +38,7 @@
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
   <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
-  <button class="button-primary" type="button" on:click={handleLogin}>
+  <button class="button primary" type="button" on:click={handleLogin}>
     {loading ? 'Logging in...' : 'Log In'}
   </button>
 

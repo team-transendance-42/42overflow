@@ -28,7 +28,7 @@
 
 		<!-- View Profile Button -->
 		<button
-			class="button-postcard clickable absolute bottom-2 left-2"
+			class="button postcard clickable absolute bottom-2 left-2"
 			onclick={openProfile}
 			aria-label="View {post.user.name}'s profile'"
 		>

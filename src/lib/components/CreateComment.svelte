@@ -1,10 +1,9 @@
 <script lang=ts>
-    import Modal from '$lib/components/Modal.svelte';
     import { CommentSchema } from '$lib/zodTypes.js';
     import type { CommentInput } from '$lib/zodTypes.js';
     import { z } from 'zod';
 
-    let showModal = $state(false);
+    let showPopover = $state(false);
 
     interface Props {
         postId: number;
@@ -14,6 +13,7 @@
     let { postId, parentId }: Props = $props();
     let derivedPostId = $derived(postId);
     let derivedParentId = $derived(parentId ?? undefined);
+    let popover: HTMLDivElement;
 
     type CommentFormInput = CommentInput & {
         image?: File;
@@ -101,7 +101,7 @@
             });
 
             if (response.ok) {
-                showModal = false;
+                showPopover = false;
                 previewUrl = '';
                 // Refresh page to show new comment
                 location.reload();
@@ -122,84 +122,97 @@
         }
     }
 
-    function openModal() {
-        showModal = true;
-        formData = {
-            postId: derivedPostId,
-            parentId: derivedParentId,
-            content: '',
-        };
-        errors = {};
-        previewUrl = '';
+    function handleDocumentClick(event: PointerEvent) {
+        if (
+            showPopover &&
+            popover &&
+            !popover.contains(event.target as Node)
+        ) {
+            showPopover = false;
+        }
     }
 
 </script>
 
-<div>
+<svelte:document onpointerdown={handleDocumentClick} />
+
+<div class="comment-container black-text">
     {#if derivedParentId}
         <button
-            class="button-postcard clickable"
-            onclick={openModal}
+            class="button postcard clickable"
+            onclick={(e) => {
+                e.stopPropagation();
+                showPopover = !showPopover
+            }}
         >
             Reply
         </button>
-    {/if}
-    {#if !derivedParentId}
+    {:else}
         <button
-            class="button-postcard clickable mb-4 w-full"
-            onclick={openModal}
+            class="button postcard clickable mb-4 w-full"
+            onclick={(e) => {
+                e.stopPropagation();
+                showPopover = !showPopover
+            }}
         >
             Create New Comment
         </button>
     {/if}
-</div>
 
-<Modal bind:showModal>
-	{#snippet header()}
-		<h2>Create New Comment</h2>
-	{/snippet}
-
-    <form onsubmit={handleSubmit}>
-		<!-- Content -->
-        <div>
-            <span title="The content of the comment.">ⓘ</span>
-            <label for="content">Content:</label>
-            <textarea
-                id="content"
-                bind:value={formData.content}
-                oninput={(event) => handleInput('content', (event.target as HTMLTextAreaElement).value)}
-                required
-            ></textarea>
-            {#if errors.content}
-                <p class="error">{errors.content[0]}</p>
-            {/if}
-        </div>
-
-		<!-- Image Upload -->
-        <div>
-            <label for="image">Image (optional):</label>
-            <input
-                type="file"
-                id="image"
-                class="small-input"
-                accept="image/jpeg, image/png, image/gif, image/webp"
-                onchange={handleImageSelect}
-            />
-            {#if previewUrl}
-                <div>
-                    <img src={previewUrl} alt="Preview" class="w-100"/>
+    {#if showPopover}
+        <div
+            class="comment-popover"
+            bind:this={popover}
+        >
+            <form onsubmit={handleSubmit}>
+                <!-- Content -->
+                <div class="textarea-group">
+                    <label for="content">Content:</label>
+                    <textarea
+                        id="content"
+                        bind:value={formData.content}
+                        oninput={(event) => handleInput('content', (event.target as HTMLTextAreaElement).value)}
+                        required
+                    ></textarea>
+                    {#if errors.content}
+                        <p class="error">{errors.content[0]}</p>
+                    {/if}
                 </div>
-            {/if}
-            {#if errors.image}
-                <p class="error">{errors.image[0]}</p>
-            {/if}
-        </div>
 
-		<!-- Submit Button -->
-        {#if isSubmitting}
-            <button type="button" disabled>Submitting...</button>
-        {:else}
-            <button type="submit">Create Comment</button>
-        {/if}
-    </form>
-</Modal>
+                <!-- Image Upload -->
+                <div class="input-group">
+                    <label for="image">Image (optional):</label>
+                    <input
+                        type="file"
+                        id="image"
+                        class="small-input"
+                        accept="image/jpeg, image/png, image/gif, image/webp"
+                        onchange={handleImageSelect}
+                    />
+                    {#if previewUrl}
+                        <div>
+                            <img src={previewUrl} alt="Preview" class="w-100"/>
+                        </div>
+                    {/if}
+                    {#if errors.image}
+                        <p class="error">{errors.image[0]}</p>
+                    {/if}
+                </div>
+
+                <button class="button secondary" onclick={() => showPopover = false}>
+                    Cancel
+                </button>
+
+                {#if isSubmitting}
+                    <button type="button" class="button secondary" disabled>
+                        Submitting...
+                    </button>
+                {:else}
+                    <button type="submit" class="button confirm">
+                        Post
+                    </button>
+                {/if}
+            </form>
+        </div>
+    {/if}
+</div>
