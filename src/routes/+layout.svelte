@@ -1,15 +1,40 @@
 <script lang="ts">
+	import '../app.css';
+	import '$lib/styles/tokens.css';
 	import { page } from '$app/state';
 	import { locales, localizeHref } from '$lib/paraglide/runtime';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import Footer from '$lib/components/Footer.svelte';
+	import Header from '$lib/components/Header.svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
+	import { onMount } from 'svelte';
+	let { children, data }: { children: Snippet; data: LayoutData } = $props();
 
-	let { children } = $props();
+	onMount(() => {
+		const interval = setInterval(() => {
+			fetch('/api/ping', { method: 'POST' });
+		}, 2 * 60 * 1000); // every 2 minutes
+
+		return () => clearInterval(interval);
+	});
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-{@render children()}
+<Header user={data.user} />
+
+<div class="content">
+	<Sidebar userRole={data.userRole} />
+
+	<main>
+		{@render children()}
+	</main>
+</div>
+
+<Footer />
+
+
 <div style="display:none">
 	{#each locales as locale}
 		<a href={localizeHref(page.url.pathname, { locale })}>
@@ -17,3 +42,26 @@
 		</a>
 	{/each}
 </div>
+
+<style>
+
+:global(body) {
+  margin: 0;
+  background-color: var(--color-neutral-500);
+  color: var(--color-neutral-900);
+  font-family: var(--font-family-base);
+  }
+
+  .content {
+		display: grid;
+		grid-template-columns: 150px 1fr;
+		min-height: calc(100vh -  /* header + nav height */ 120px);
+	}
+
+	main {
+		padding: 2rem;
+	}
+
+ 
+</style>
+

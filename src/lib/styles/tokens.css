@@ -1,0 +1,32 @@
+:root {
+
+  --color-primary-400: rgb(255 255 255);
+  --color-primary-dark-300: rgb(103 108 36);
+
+  --color-neutral-900: rgb(255 255 255);
+  --color-neutral-500: rgb(21 43 49);
+  --color-neutral-100: rgb(70 116 124);
+  --color-neutral-200: rgb(217 219 238);
+
+  --color-success-150: rgb(35 177 110);
+  --color-error-250: rgb(221 8 8);
+  --color-editor-bg: rgb(160 65 168);
+
+  --font-family-base: 'Manrope', sans-serif;
+
+  --font-size-h1: 25px;
+  --font-size-h2: 20px;
+  --font-size-body: 16px;
+  --font-size-small: 14px;
+  --font-size-medium: 30px;
+
+  --space-xxs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 30px;
+  --space-xl: 40px;
+
+  --radius-md: 8px;
+
+}

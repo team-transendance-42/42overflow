@@ -1,13 +1,22 @@
+import { auth } from '$lib/server/auth';
+import { db } from '$lib/server/db';
 import type { Handle } from '@sveltejs/kit';
-import { paraglideMiddleware } from '$lib/paraglide/server';
 
-const handleParaglide: Handle = ({ event, resolve }) =>
-	paraglideMiddleware(event.request, ({ request, locale }) => {
-		event.request = request;
+export const handle: Handle = async ({ event, resolve }) => {
+  const session = await auth.api.getSession({
+    headers: event.request.headers,
+  });
 
-		return resolve(event, {
-			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale)
-		});
-	});
+  event.locals.user = session?.user ?? null;
+  event.locals.session = session?.session ?? null;
 
-export const handle: Handle = handleParaglide;
+   if (session?.user) {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { last_seen: new Date() },
+    });
+  }
+
+
+  return resolve(event);
+};

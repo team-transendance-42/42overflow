@@ -68,4 +68,4 @@ if (typeof process !== 'undefined' && process && !dev) {
 	process.on('SIGTERM', shutdown);
 }
 
-export default prisma;
+export const db = prisma;

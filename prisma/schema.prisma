@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -7,83 +8,144 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// All 42 campuses
-model Campus {
-  id    Int    @id
-  name  String
-  users User[]
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
 }
 
-// An account
-model User {
-  id            Int     @id
-  login         String  @unique
-  email         String  @unique
-  password_hash String
-  image         String?
-  biography     String?
+// ─── better-auth required tables ─────────────────────────────────────────────
 
-  campusId Int?
+model User {
+  id            String  @id @default(cuid())
+  email         String  @unique
+  emailVerified Boolean @default(false)
+
+  name       String? @unique // Username
+  first_name String?
+  last_name  String?
+
+  image     String?
+  biography String?
+  interests String?
+
+  last_seen DateTime?
 
   anonymize_at DateTime?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @default(now()) @updatedAt
-  deleted_at   DateTime? // Soft delete
+  deleted_at   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  role         Role      @default(USER)
 
-  Campus    Campus?   @relation(fields: [campusId], references: [id])
-  Follower  Follow[]  @relation("Follower")
-  Following Follow[]  @relation("Following")
-  Post      Post[]
-  Comment   Comment[]
+  followers Follow[]  @relation("Follower")
+  following Follow[]  @relation("Following")
+  posts     Post[]
+  comments  Comment[]
+
+  sessions Session[]
+  accounts Account[]
+  Like     Like[]
 }
 
-// many-to-many relationship between users for followers and following
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id           String    @id @default(cuid())
+  userId       String
+  accountId    String
+  providerId   String
+  accessToken  String?
+  refreshToken String?
+  idToken      String?
+  expiresAt    DateTime?
+  password     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── your app models ──────────────────────────────────────────────────────────
+
 model Follow {
-  id          Int @id
-  followerId  Int // The user who follows
-  followingId Int // The user being followed
+  id          Int    @id @default(autoincrement())
+  followerId  String
+  followingId String
 
   follower  User @relation("Follower", fields: [followerId], references: [id])
   following User @relation("Following", fields: [followingId], references: [id])
 
-  @@unique([followerId, followingId]) // Ensure a user can't follow another user more than once
-  @@index([followerId]) // Fast lookup
+  @@unique([followerId, followingId])
+  @@index([followerId])
   @@index([followingId])
 }
 
-// A post created by a user
 model Post {
-  id      Int    @id
+  id      Int     @id @default(autoincrement())
   title   String
   content String
+  image   String?
 
-  userId Int
+  userId String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
-  deleted_at DateTime? // Soft delete (remove all post content, but keep threads intact)
+  deleted_at DateTime?
 
+  likes    Like[]
   user     User      @relation(fields: [userId], references: [id])
   comments Comment[]
 }
 
-// A comment on a post, or another comment (to create threads)
+model Like {
+  id        Int    @id @default(autoincrement())
+  userId    String
+  postId    Int?
+  commentId Int?
+
+  user    User     @relation(fields: [userId], references: [id])
+  post    Post?    @relation(fields: [postId], references: [id])
+  comment Comment? @relation(fields: [commentId], references: [id])
+
+  @@unique([userId, postId, commentId])
+}
+
 model Comment {
-  id      Int    @id
+  id      Int     @id @default(autoincrement())
   content String
-  likes   Int    @default(0)
+  image   String?
 
-  parentId Int? // For nested comments (threads)
-
-  postId Int
-  userId Int
+  parentId Int?
+  postId   Int
+  userId   String
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
-  deleted_at DateTime? // Soft delete (remove comment content, but keep threads intact)
+  deleted_at DateTime?
 
   post     Post      @relation(fields: [postId], references: [id])
   user     User      @relation(fields: [userId], references: [id])
+  likes    Like[]
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
 }
