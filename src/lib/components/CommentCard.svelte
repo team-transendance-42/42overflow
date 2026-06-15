@@ -75,7 +75,7 @@
 		{/if}
 
 		<!-- Buttons -->
-		<div class="absolute bottom-2 left-2 flex items-center gap-3">
+		<div class="comment-actions">
 			<!-- View Profile Button -->
 			{#if comment.deleted_at == null}
 				<button

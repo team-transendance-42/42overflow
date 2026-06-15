@@ -56,6 +56,49 @@
 	margin-left: 8px;
 }
 
+/* Card Images */
+.card-img {
+	height: 200px;
+	object-fit: cover;
+	border-radius: var(--radius-md);
+	margin-bottom: var(--space-md);
+}
+
+/* Comment Actions */
+.comment-actions {
+	position: absolute;
+	bottom: 0px;
+	left: 0.5rem;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+/* Comment Popover */
+.comment-container {
+    position: relative;
+}
+
+.comment-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+
+    z-index: 10;
+
+    width: 400px;
+    max-width: 90vw;
+
+    padding: 1rem;
+
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+
+    box-shadow:
+        0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
 /* Avatar */
 .avatar {
 	border-radius: 100%;
@@ -111,7 +154,6 @@
 	border: none;
 	border-radius: var(--radius-md);
 	cursor: pointer;
-	margin-top: var(--space-md);
 }
 
 .button.postcard.clickable:hover,
@@ -199,29 +241,4 @@ input:focus {
 input:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
-}
-
-/* Comment Popover */
-.comment-container {
-    position: relative;
-}
-
-.comment-popover {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-
-    z-index: 10;
-
-    width: 400px;
-    max-width: 90vw;
-
-    padding: 1rem;
-
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-
-    box-shadow:
-        0 10px 25px rgba(0, 0, 0, 0.15);
 }
