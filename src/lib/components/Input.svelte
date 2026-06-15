@@ -13,6 +13,7 @@
   {/if}
 
   <input
+    class="black-text"
     bind:value
     type={type}
     name={name}

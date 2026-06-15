@@ -79,7 +79,7 @@
 /* Buttons */
 .button-primary {
     background-color: var(--color-neutral-900);
-    color: var(--color-neutral-200);
+	color: black;
     padding: 0.6rem 1.2rem;
     border: none;
     border-radius: var(--radius-md);

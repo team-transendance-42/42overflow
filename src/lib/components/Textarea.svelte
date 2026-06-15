@@ -13,6 +13,7 @@
   {/if}
 
   <textarea
+    class="black-text"
     bind:value
     id={name}
     name={name}
