@@ -105,16 +105,16 @@
 				<EditComment {postId} {comment} />
 			{/if}
 
-		<!-- Delete Comment -->
-		{#if isOwn && comment.deleted_at == null}
-			<button
-				class="bg-red-500 hover:bg-red-700"
-				onclick={deleteComment}
-				aria-label="Delete comment"
-			>
-				Delete
-			</button>
-		{/if}
+			<!-- Delete Comment -->
+			{#if isOwn && comment.deleted_at == null}
+				<button
+					class="bg-red-500 hover:bg-red-700"
+					onclick={deleteComment}
+					aria-label="Delete comment"
+				>
+					Delete
+				</button>
+			{/if}
 
 			<!-- Like Button -->
 			<button
@@ -122,7 +122,7 @@
 				onclick={likeComment}
 				aria-label="Like comment"
 			>
-				{(isLiked ? `♥ ` : `♡ `) + {comment.likeCount ?? 0}}
+				{(comment.userLiked ? '♥ ' : '♡ ') + (comment.likeCount ?? 0)}
 			</button>
 		</div>
 	</div>
