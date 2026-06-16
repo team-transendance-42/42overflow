@@ -9,6 +9,7 @@ type RagRetrieveContext struct {
 
 // RagRetrieveResponse is the JSON response from Python /rag/retrieve.
 type RagRetrieveResponse struct {
-	Contexts   []RagRetrieveContext `json:"contexts"`
-	Confidence float64              `json:"confidence"`
+	Contexts       []RagRetrieveContext `json:"contexts"`
+	Confidence     float64              `json:"confidence"`
+	BestSimilarity float64              `json:"best_similarity"`
 }

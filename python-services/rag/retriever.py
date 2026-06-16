@@ -45,7 +45,7 @@ async def hybrid_search(
     centroids:       dict[str, list[float]],
     top_k:           int = 5,
     topic_intro_ids: dict[str, str] | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], float]:
     """
     Retrieve top-k docs using topic-aware hybrid search.
 
@@ -64,12 +64,25 @@ async def hybrid_search(
                          (no pinning) for backwards compatibility.
 
     Returns:
-        [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
-        sorted by descending rrf_score (best match first).
+        (results, best_similarity) where:
+        - results: [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
+          sorted by descending rrf_score (best match first).
+        - best_similarity: cosine similarity of the single best-matching doc
+          across the full corpus (unfiltered). Used by the Go service as a
+          semantic gate — questions with best_similarity < threshold are
+          off-topic and Ollama is not called.
     """
     # 1. Embed question — needed for both dense retrieval and centroid detection.
     #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
     question_embedding = (await embed_texts([question]))[0]
+
+    # 1b. Gate signal: best cosine against the FULL corpus (no topic filter, n=1).
+    #     Topic-filtered searches inflate scores within a narrow doc set.
+    #     We need the absolute best match across everything to judge relevance.
+    #     Cost: one matrix-vector multiply, ~0.05ms — negligible.
+    #     distance = 1 - cosine, so cosine = 1 - distance.
+    gate_hit = numpy_index.search(question_embedding, n=1)
+    best_similarity = round(1.0 - gate_hit[0]["distance"], 4) if gate_hit else 0.0
 
     # 2. Detect topic from embedding vs centroids (no-op if centroids={}).
     #    numpy matrix multiply — ~0.01ms for any reasonable number of topics.
@@ -133,4 +146,4 @@ async def hybrid_search(
                 "topic":     detected_topic,
             }] + results[:-1]
 
-    return results
+    return results, best_similarity

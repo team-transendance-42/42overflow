@@ -152,6 +152,7 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
     except Exception as exc:
         print(f"[startup] WARNING: centroid computation failed — topic detection disabled: {exc}")
         topic_centroids = {}
+        all_embeddings = []  # reset — do not pass partial list to NumpyIndex
 
     bm25 = BM25Index()
     bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)

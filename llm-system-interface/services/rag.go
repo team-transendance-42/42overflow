@@ -160,17 +160,35 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		return nil, fmt.Errorf("retrieve contexts: %w", err)
 	}
 
-	// minRagConfidence gate: RRF confidence reflects how many retrieval sources
-	// agreed. A pure-dense-only score (no BM25 term overlap) ≈ 1/60 = 0.0167.
-	// Greetings, gibberish, and off-topic queries land here because BM25 finds
-	// nothing; Gemma then hallucinates about the unrelated retrieved docs.
-	// Threshold 0.020 requires at least one BM25 hit — anything lower skips Ollama.
-	const minRagConfidence = 0.020
-	if retrieved.Confidence < minRagConfidence {
+	// Two-layer relevance gate — both must pass before Ollama is called.
+	//
+	// Layer 1 — RRF confidence (cheap keyword signal):
+	//   Pure-dense-only score (no BM25 term overlap) ≈ 1/60 = 0.0167.
+	//   Catches greetings and gibberish where BM25 finds nothing at all.
+	//
+	// Layer 2 — cosine similarity (semantic signal):
+	//   best_similarity is the raw cosine between the question embedding and
+	//   the single closest doc across the full corpus (unfiltered, n=1 search).
+	//   Unlike RRF, this measures actual meaning overlap, not retrieval agreement.
+	//   "meaning of life" → cosine ≈ 0.12 vs any C/git doc → blocked.
+	//   "what is malloc"  → cosine ≈ 0.80 vs malloc doc   → passes.
+	//   Threshold 0.45 sits between unrelated (~0.10–0.30) and on-topic (~0.65–0.90).
+	//   Tune by watching logs: docker compose logs llm-server -f
+	const (
+		minRagConfidence    = 0.020
+		minCosineSimilarity = 0.45
+	)
+	noContext := func() (<-chan string, error) {
 		ch := make(chan string, 1)
 		ch <- "I don't have enough context from the community posts to answer this."
 		close(ch)
 		return ch, nil
+	}
+	if retrieved.Confidence < minRagConfidence {
+		return noContext()
+	}
+	if retrieved.BestSimilarity < minCosineSimilarity {
+		return noContext()
 	}
 
 	// Build answer-only context blocks.
