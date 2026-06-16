@@ -12,4 +12,7 @@ type RagRetrieveResponse struct {
 	Contexts       []RagRetrieveContext `json:"contexts"`
 	Confidence     float64              `json:"confidence"`
 	BestSimilarity float64              `json:"best_similarity"`
+	// HasEmbeddings is false when NumpyIndex was not built at startup (embedding
+	// service unreachable). Go skips the semantic gate and uses RRF confidence alone.
+	HasEmbeddings bool `json:"has_embeddings"`
 }

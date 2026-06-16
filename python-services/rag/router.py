@@ -15,6 +15,7 @@ class RetrieveResponse(BaseModel):
     contexts: list[dict]
     confidence: float
     best_similarity: float
+    has_embeddings: bool
 
 
 @router.post("/rag/retrieve", response_model=RetrieveResponse)
@@ -36,7 +37,7 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
         raise HTTPException(status_code=503, detail="RAG index not ready — try again shortly")
 
     try:
-        contexts, best_similarity = await hybrid_search(
+        contexts, best_similarity, has_embeddings = await hybrid_search(
             body.question, bm25_index, numpy_index,
             id_to_text, id_to_topic, centroids,
             top_k=4,
@@ -50,4 +51,5 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
         contexts=contexts,
         confidence=confidence,
         best_similarity=best_similarity,
+        has_embeddings=has_embeddings,
     )

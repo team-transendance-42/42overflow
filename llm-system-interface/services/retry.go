@@ -3,10 +3,11 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
-	"fmt"
 )
 
 const (
@@ -19,6 +20,14 @@ func retryableStatus(code int) bool {
 	return code == http.StatusTooManyRequests ||
 		code == http.StatusServiceUnavailable ||
 		code == http.StatusGatewayTimeout
+}
+
+// drainAndClose reads up to 4KB from body so the TCP connection can be
+// returned to the pool, then closes it. The cap prevents blocking on a
+// misbehaving server that streams a huge error page.
+func drainAndClose(body io.ReadCloser) {
+	io.Copy(io.Discard, io.LimitReader(body, 4096)) //nolint:errcheck
+	body.Close()
 }
 
 // withRetry calls fn up to maxRetries times with exponential backoff.
@@ -47,7 +56,7 @@ func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Re
 			return resp, nil
 		}
 		lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
-		resp.Body.Close()
+		drainAndClose(resp.Body)
 		log.Printf("retry %d/%d: HTTP %d", i+1, maxRetries, resp.StatusCode)
 	}
 	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)

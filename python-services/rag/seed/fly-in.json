@@ -118,5 +118,17 @@
       "validation",
       "zone-name-dash"
     ]
+  },
+  {
+    "question": "What is Dijkstra's algorithm and when do you use it instead of BFS?",
+    "answer": "Dijkstra's algorithm finds the shortest path from a source node to all other nodes in a graph with non-negative edge weights. It works by greedily expanding the lowest-cost unvisited node: maintain a min-heap of (cost, node) pairs, start with (0, source), and repeatedly extract the minimum-cost entry, then relax its neighbors — if new_cost < current_best_cost[neighbor]: update best_cost and push (new_cost, neighbor) to the heap. Use BFS when all edges cost 1 (unweighted graph) — BFS is simpler and equally correct. Use Dijkstra when edges have different costs. In Fly-In, restricted zones cost 2 turns to enter while normal zones cost 1. With these different weights, BFS finds the path with fewest hops but not fewest turns — Dijkstra finds the route with minimum total turns. Implement using Python's heapq module (a min-heap). The most common bug: forgetting to skip already-settled nodes — if a node is popped from the heap and its recorded cost is stale (a cheaper path was found later), skip it.",
+    "topic": "fly-in",
+    "tags": ["concept", "Dijkstra", "shortest-path", "pathfinding", "weighted-graph", "fundamentals"]
+  },
+  {
+    "question": "What is multi-agent pathfinding and what makes it harder than single-agent pathfinding?",
+    "answer": "Multi-agent pathfinding (MAPF) is the problem of routing N agents from their start positions to their goal positions simultaneously, without conflicts. Single-agent pathfinding (BFS or Dijkstra) finds the optimal path for one agent ignoring all others. MAPF is harder because: (1) Capacity conflicts — multiple agents may want to occupy the same zone at the same time, exceeding its max_drones limit. (2) Edge conflicts — two agents may want to use the same connection in the same turn, exceeding max_link_capacity. (3) Deadlocks — agents block each other in a cycle where each is waiting for another to move. In Fly-In, the naive approach is to compute each drone's shortest path independently and then simulate — if conflicts occur, one drone waits. This is suboptimal but sufficient for the evaluation. A better approach is cooperative pathfinding: plan drone by drone, treating previously planned drones as dynamic obstacles (Prioritized Planning). Detecting deadlock (all drones blocked) requires checking if any drone can move on the current turn.",
+    "topic": "fly-in",
+    "tags": ["concept", "multi-agent-pathfinding", "MAPF", "capacity-constraints", "deadlock", "fundamentals"]
   }
 ]

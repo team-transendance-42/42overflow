@@ -9,9 +9,6 @@ import math
 # HELPERS
 #=============================================================================
 
-def magnitude(v: list[float]) -> float:
-    return math.sqrt(sum(x**2 for x in v))
-
 """
 zip(a, b)
 Pairs elements from a and b together into tuples:
@@ -34,6 +31,9 @@ Alternative (with NumPy for large arrays):
 import numpy as np
 np.dot(a, b)
 """
+def magnitude(v: list[float]) -> float:
+    return math.sqrt(sum(x**2 for x in v))
+
 def dot_product(a: list[float], b: list[float]) -> float:
     return sum(ai * bi for ai, bi in zip(a, b))
 

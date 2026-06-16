@@ -15,7 +15,7 @@ type ragCacheEntry struct {
 
 var (
 	ragCache   = make(map[string]ragCacheEntry)
-	ragCacheMu sync.Mutex
+	ragCacheMu sync.RWMutex
 )
 
 func ragCacheKey(question string) string {
@@ -24,17 +24,27 @@ func ragCacheKey(question string) string {
 
 func ragCacheGet(question string) (string, bool) {
 	key := ragCacheKey(question)
-	ragCacheMu.Lock()
-	defer ragCacheMu.Unlock()
+
+	ragCacheMu.RLock()
 	e, ok := ragCache[key]
+	ragCacheMu.RUnlock()
+
 	if !ok {
 		return "", false
 	}
-	if time.Now().After(e.expiresAt) {
-		delete(ragCache, key)
-		return "", false
+	if !time.Now().After(e.expiresAt) {
+		return e.answer, true
 	}
-	return e.answer, true
+
+	// Entry is expired: upgrade to write lock to delete it.
+	// Re-check after acquiring the write lock — another goroutine may have
+	// already deleted or replaced this entry between RUnlock and Lock.
+	ragCacheMu.Lock()
+	defer ragCacheMu.Unlock()
+	if current, still := ragCache[key]; still && time.Now().After(current.expiresAt) {
+		delete(ragCache, key)
+	}
+	return "", false
 }
 
 func ragCacheSet(question, answer string) {

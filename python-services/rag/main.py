@@ -11,8 +11,6 @@ from seed import load_seed
 from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
 
 # qa_cache shared across requests — populated at startup
-# solid and practical approach for small to medium-scale RAG (Retrieval-Augmented
-# Generation) systems, especially for prototyping or internal tools:
 # Strengths:
 # Fast in-memory access to QA pairs for quick retrieval.
 # Persistent vector storage in ChromaDB for scalable similarity search.
@@ -131,11 +129,17 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
                  for p in qa_cache["qa_pairs"]]
     all_ids = [make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]]
     all_topics = [p.get("topic", "unknown") for p in qa_cache["qa_pairs"]]
-    topic_intro_ids: dict[str, str] = {
-        p["topic"]: make_doc_id(p["question"])
-        for p in qa_cache["qa_pairs"]
-        if "intro" in p.get("tags", [])
-    }
+    topic_intro_ids: dict[str, str] = {}
+    for p in qa_cache["qa_pairs"]:
+        if "intro" not in p.get("tags", []):
+            continue
+        topic = p["topic"]
+        doc_id = make_doc_id(p["question"])
+        if topic in topic_intro_ids:
+            print(f"[startup] WARNING: duplicate intro tag for topic '{topic}' — "
+                  f"keeping first, ignoring: {p['question'][:60]!r}")
+            continue
+        topic_intro_ids[topic] = doc_id
     print(f"[startup] intro docs mapped: {sorted(topic_intro_ids.keys())}")
 
     # Initialise before try so NumpyIndex build below always has a defined variable.

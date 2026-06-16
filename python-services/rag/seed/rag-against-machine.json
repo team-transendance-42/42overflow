@@ -82,5 +82,29 @@
       "Qwen3",
       "evaluation-chain"
     ]
+  },
+  {
+    "question": "What is RAG (Retrieval-Augmented Generation) and why is it used?",
+    "answer": "RAG is an architecture that improves LLM answers by grounding them in retrieved documents rather than relying solely on training-time knowledge. The pipeline has three stages: (1) Indexing — split the knowledge base into chunks, embed or index each chunk for fast lookup. (2) Retrieval — for a given question, search the index for the most relevant chunks using keyword matching (BM25) or semantic similarity (vector embeddings). (3) Generation — pass the retrieved chunks as context to the LLM and instruct it to answer using only that context. RAG solves two fundamental LLM problems: hallucination (the model invents facts it doesn't know) and knowledge cutoff (the model knows nothing about events after its training date). In RAG-against-the-machine, the knowledge base is the vLLM codebase — the LLM answers questions about source code and documentation it was never trained on, because the relevant chunks are retrieved and injected at query time. Without RAG, a small 0.6B model would have no chance of answering questions about a specific codebase.",
+    "topic": "rag-against-machine",
+    "tags": ["concept", "RAG", "retrieval-augmented-generation", "grounding", "fundamentals"]
+  },
+  {
+    "question": "What is BM25 and how does it score document relevance?",
+    "answer": "BM25 (Best Match 25) is a term-frequency-based ranking function that scores documents by how well their keywords match a query. The score for a document d given query q: sum over query terms t of IDF(t) × (tf(t,d) × (k1+1)) / (tf(t,d) + k1 × (1 - b + b × |d|/avgdl)). IDF (inverse document frequency) rewards rare terms — a term appearing in 90% of documents is nearly meaningless, while a term in 1% of documents is highly discriminative. tf (term frequency) counts occurrences of the term in the document, but is saturation-capped by k1 (typically 1.2–2.0) so a document repeating a keyword 100 times doesn't dominate over one repeating it 5 times. |d|/avgdl normalizes by document length controlled by b (typically 0.75) to prevent long documents from winning by sheer volume. BM25 excels at exact keyword matches, making it ideal for code retrieval where function names, error messages, and parameter names are precise strings. BM25+ (the variant in call-me-maybe) adds a floor term to prevent zero scores for rare-but-present terms.",
+    "topic": "rag-against-machine",
+    "tags": ["concept", "BM25", "term-frequency", "IDF", "keyword-search", "fundamentals"]
+  },
+  {
+    "question": "What are vector embeddings and how do they enable semantic search?",
+    "answer": "Vector embeddings are dense numerical representations of text — each piece of text is converted to a vector (e.g., 768 floating-point numbers) by a neural embedding model. The key property: semantically similar texts produce vectors that are close together in the high-dimensional space, measured by cosine similarity. Unlike BM25 (which requires keyword overlap), embeddings capture meaning: 'what does malloc do' and 'how to allocate heap memory in C' produce similar vectors even with no shared words. Semantic search: embed the query, then find the stored document vectors with the highest cosine similarity using approximate nearest-neighbor search (HNSW in ChromaDB, or exact brute-force with numpy for small corpora). The trade-off vs BM25: embeddings catch paraphrases and synonyms but miss exact code identifiers ('pthread_cond_timedwait'); BM25 catches exact terms but misses synonyms. Hybrid search (BM25 + embeddings merged by RRF) combines both strengths — this is what the community RAG system uses.",
+    "topic": "rag-against-machine",
+    "tags": ["concept", "vector-embeddings", "semantic-search", "cosine-similarity", "dense-retrieval", "fundamentals"]
+  },
+  {
+    "question": "What is chunking in a RAG system and what makes a good chunk strategy?",
+    "answer": "Chunking splits the knowledge base into retrievable pieces before indexing. The LLM's context window is limited, so you can't inject the entire codebase — you retrieve only the most relevant chunks. Chunk size is the core trade-off: small chunks (50–100 tokens) are precise but may lack context (a function signature without its body); large chunks (500–1000 tokens) include more context but the embedding becomes a noisy average of many concepts, reducing retrieval precision. For RAG-against-the-machine (a code codebase), the correct chunking strategy respects code boundaries: use Python's AST module to split at function and class boundaries, never cut a function in half. This preserves semantic units — a chunk is a complete, meaningful piece of code with its full docstring and logic. For documentation, split at section or paragraph boundaries. Store absolute character indices (first_char, last_char) for each chunk in the original file — the evaluation metric uses character overlap to check if the ground-truth source was retrieved.",
+    "topic": "rag-against-machine",
+    "tags": ["concept", "chunking", "chunk-size", "AST", "character-indices", "fundamentals"]
   }
 ]

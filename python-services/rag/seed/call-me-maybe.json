@@ -142,5 +142,23 @@
       "JSON",
       "state-machine"
     ]
+  },
+  {
+    "question": "What is a finite state machine (FSM) and how is it used in parsing?",
+    "answer": "A finite state machine is a computational model that is always in exactly one of a fixed set of states, and transitions between states based on input. Each input character (or token) triggers a transition from the current state to a new state, according to a transition table. FSMs are the foundation of parsers because they can validate and process structured formats character by character in a single pass. In call-me-maybe, the FSM tracks the current position within the JSON being generated: states include EXPECT_OPEN_BRACE, IN_FUNCTION_NAME_KEY, AFTER_COLON, IN_PARAMETERS_OBJECT, IN_STRING_VALUE, IN_NUMBER_VALUE, DONE, etc. At each LLM generation step, the current FSM state determines which vocabulary tokens are valid next — any token whose text would produce an invalid state transition is masked to -inf. This guarantees that the LLM physically cannot generate structurally invalid JSON, regardless of what its weights would otherwise produce.",
+    "topic": "call-me-maybe",
+    "tags": ["concept", "FSM", "finite-state-machine", "parsing", "state-transitions", "fundamentals"]
+  },
+  {
+    "question": "What are logits in an LLM and how does token sampling work?",
+    "answer": "Logits are the raw unnormalized scores the LLM assigns to every token in its vocabulary after a forward pass. A typical small model (like Qwen3-0.6B) has a vocabulary of 30,000–150,000 tokens — at each generation step, every token in the vocabulary gets a logit score. To convert logits to probabilities, softmax is applied: p(token_i) = exp(logit_i) / sum(exp(logit_j) for all j). Sampling picks one token according to these probabilities; argmax always picks the highest-probability token (greedy/deterministic decoding). Temperature scaling divides all logits by T before softmax: T < 1 makes the distribution sharper (more deterministic), T > 1 makes it flatter (more random). In call-me-maybe, constrained decoding modifies logits BEFORE softmax: invalid tokens get logit = -inf, which gives probability = 0 after softmax, making them impossible to sample. The LLM still chooses freely among valid tokens — constrained decoding only removes structurally impossible choices.",
+    "topic": "call-me-maybe",
+    "tags": ["concept", "logits", "sampling", "softmax", "temperature", "LLM", "fundamentals"]
+  },
+  {
+    "question": "What is tokenization in language models and why does it matter?",
+    "answer": "Tokenization is the process of splitting text into discrete units (tokens) that the LLM operates on. A token is typically a word piece: common words are single tokens ('the', 'is'), rare words split into subwords ('tokenization' → 'token', 'ization'), and code often produces many short tokens (each bracket, operator, or keyword separately). The model never sees characters — it sees sequences of integer token IDs. Why it matters for call-me-maybe: a token like '\": \"' consists of three characters. A naive state machine that processes one character at a time cannot directly mask this token — it would need to simulate appending those three characters and check if any intermediate state is invalid. If any character in the token would produce an invalid state, the entire token must be masked. Multi-character tokens that span state boundaries (e.g., '\",' which closes a string and adds a comma) require the FSM to simulate all characters of the token before deciding if it is valid.",
+    "topic": "call-me-maybe",
+    "tags": ["concept", "tokenization", "token", "vocabulary", "subword", "LLM", "fundamentals"]
   }
 ]

@@ -39,7 +39,9 @@ func chatModelName() string {
 // extractAnswer pulls the "A: ..." portion from "Q: ...\nA: ..." formatted text.
 //
 // Theory: docs are formatted by Python's embedder.format_doc() as
-//   "Q: {question}\nA: {answer}"  or  "Q: ...\nA: ...\ntags: ..."
+//
+//	"Q: {question}\nA: {answer}"  or  "Q: ...\nA: ...\ntags: ..."
+//
 // The Q: line helped retrieve the doc but is redundant in the prompt — dropping
 // it saves ~40-60% of context tokens, directly speeding up per-token generation.
 //
@@ -77,12 +79,13 @@ func extractAnswer(text string) string {
 // with a new bytes.NewReader over the same marshalled bytes.
 //
 // Theory — why retries fix "connection refused" after python-rag restart:
-//   Go's http.DefaultTransport keeps idle TCP connections in a pool.
-//   After python-rag restarts it gets a new Docker-internal IP. The pooled
-//   connection to the old IP gets a RST and fails immediately. withRetry
-//   catches the network error, waits 1s, and creates a new TCP connection.
-//   Docker's embedded DNS resolver returns the new container IP on the fresh
-//   DNS lookup, so the retry succeeds.
+//
+//	Go's http.DefaultTransport keeps idle TCP connections in a pool.
+//	After python-rag restarts it gets a new Docker-internal IP. The pooled
+//	connection to the old IP gets a RST and fails immediately. withRetry
+//	catches the network error, waits 1s, and creates a new TCP connection.
+//	Docker's embedded DNS resolver returns the new container IP on the fresh
+//	DNS lookup, so the retry succeeds.
 //
 // Edge cases:
 //   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
@@ -127,13 +130,13 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 //   - "do NOT include that sentence" prevents Gemma from appending the
 //     fallback phrase at the end of real answers (observed with Gemma 4B).
 func buildRAGPrompt(ctxStr, question string) string {
-	return "You are a tutor for 42 school students.\n" +
-		"Using the context below as your source, explain the concept clearly\n" +
-		"and completely \xe2\x80\x94 as if the student asked you in person.\n" +
-		"Cover what it is, why it matters, and the key details.\n" +
-		"Synthesise naturally; do not copy sentences verbatim from the context.\n" +
-		"If the context does not contain enough to answer, say: " +
-		"\"I don't have enough context to answer this fully.\"\n" +
+	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
+		"STRICT RULES — follow exactly:\n" +
+		"1. If the context directly covers the question: answer clearly using ONLY what is written there.\n" +
+		"2. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
+		"   \"I don't have enough context to answer this.\"\n" +
+		"3. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
+		"4. If you are unsure whether the context covers it: apply rule 2.\n" +
 		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
 		"=== QUESTION ===\n" + question + "\n\n" +
 		"=== ANSWER ==="
@@ -176,7 +179,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	//   Tune by watching logs: docker compose logs llm-server -f
 	const (
 		minRagConfidence    = 0.020
-		minCosineSimilarity = 0.45
+		minCosineSimilarity = 0.55
 	)
 	noContext := func() (<-chan string, error) {
 		ch := make(chan string, 1)
@@ -187,7 +190,11 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	if retrieved.Confidence < minRagConfidence {
 		return noContext()
 	}
-	if retrieved.BestSimilarity < minCosineSimilarity {
+	// Semantic gate: only applied when NumpyIndex was built at startup.
+	// When has_embeddings=false (embedding service was down), best_similarity
+	// is always 0.0 — applying the gate would block all queries. Fall back to
+	// the RRF confidence gate alone, which still requires actual keyword overlap.
+	if retrieved.HasEmbeddings && retrieved.BestSimilarity < minCosineSimilarity {
 		return noContext()
 	}
 
