@@ -1,9 +1,20 @@
+rag db populate flow:
+Populate PostgreSQL
+  cat prisma/seed-qa-pairs.sql | docker compose exec -T postgres psql -U postgres transcendance_db
+
+ curl -X POST http://localhost:8090/admin/reload-from-db \
+    -H "X-Admin-Token: change-me-before-deploy"
+!!! nb: add cmds!! to show this todo!!
+===================================
 best: use docker builder prune
 during all container running: to clear build up cache etc which grows to 30 and more gb
 other option:
 docker system prune -af --volumes
 docker compose build --no-cache && docker compose up -d
 ===================
+docker compose restart python-rag
+docker compose logs python-rag -f --since 0s
+====================
 docker compose up --build --force-recreate llm-server -d
 ==========================================================
 !!!NB!!!
