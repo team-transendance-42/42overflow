@@ -4,6 +4,8 @@ other option:
 docker system prune -af --volumes
 docker compose build --no-cache && docker compose up -d
 ===================
+docker compose up --build --force-recreate llm-server -d
+==========================================================
 !!!NB!!!
 docker system df -v // disk free
 get info on docker images, voluesm build cache
@@ -14,7 +16,7 @@ git fetch origin
 git checkout remote-new-branch
 =====================================================
 for go we do need to recompile, didnt install an extra tool: 
-docker compose -d --build --no-cache llm-server
+docker compose -d --build llm-server
 or:
 docker compose up -d llm-server
 ==================================

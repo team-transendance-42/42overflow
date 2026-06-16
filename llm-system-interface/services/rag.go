@@ -134,8 +134,6 @@ func buildRAGPrompt(ctxStr, question string) string {
 		"Synthesise naturally; do not copy sentences verbatim from the context.\n" +
 		"If the context does not contain enough to answer, say: " +
 		"\"I don't have enough context to answer this fully.\"\n" +
-		"Never say things like \"The community hasn't covered this\" or " +
-		"\"be the first to post\" \xe2\x80\x94 you are a tutor, not a forum.\n\n" +
 		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
 		"=== QUESTION ===\n" + question + "\n\n" +
 		"=== ANSWER ==="
@@ -160,6 +158,19 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	if err := doJSONWithRetry(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
 		map[string]any{"question": question}, &retrieved); err != nil {
 		return nil, fmt.Errorf("retrieve contexts: %w", err)
+	}
+
+	// minRagConfidence gate: RRF confidence reflects how many retrieval sources
+	// agreed. A pure-dense-only score (no BM25 term overlap) ≈ 1/60 = 0.0167.
+	// Greetings, gibberish, and off-topic queries land here because BM25 finds
+	// nothing; Gemma then hallucinates about the unrelated retrieved docs.
+	// Threshold 0.020 requires at least one BM25 hit — anything lower skips Ollama.
+	const minRagConfidence = 0.020
+	if retrieved.Confidence < minRagConfidence {
+		ch := make(chan string, 1)
+		ch <- "I don't have enough context from the community posts to answer this."
+		close(ch)
+		return ch, nil
 	}
 
 	// Build answer-only context blocks.
@@ -216,7 +227,12 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 			sb.WriteString(chunk)
 			outCh <- chunk
 		}
-		ragCacheSet(question, sb.String())
+		// Only cache when the stream completed naturally. If ctx was cancelled
+		// (client disconnected), rawCh closes early with a partial answer —
+		// caching it would serve a truncated response to the next N users for 1h.
+		if ctx.Err() == nil {
+			ragCacheSet(question, sb.String())
+		}
 	}()
 	return outCh, nil
 }
