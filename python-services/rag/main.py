@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from bm25_index import BM25Index
 from db import load_db_pairs
@@ -160,7 +160,8 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
 
     bm25 = BM25Index()
     bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
-    print(f"[startup] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
+    vocab_size = len(bm25._bm25.idf) if bm25._bm25 else 0
+    print(f"[startup] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs, {vocab_size} unique tokens)")
 
     # Build NumpyIndex from the embeddings computed above.
     # Why: replaces ChromaDB HTTP roundtrip (~50–150ms) with an in-process
@@ -205,5 +206,12 @@ app.include_router(rag_router)
 
 
 @app.get("/healthz")
-def healthz():
-    return {"status": "ok", "qa_count": len(qa_cache["qa_pairs"])}
+def healthz(request: Request):
+    numpy_idx: NumpyIndex = request.app.state.numpy_index
+    bm25_idx: BM25Index = request.app.state.bm25
+    return {
+        "status": "ok",
+        "qa_count": len(qa_cache["qa_pairs"]),
+        "embeddings_ready": numpy_idx._matrix is not None,
+        "bm25_ready": bm25_idx._bm25 is not None,
+    }

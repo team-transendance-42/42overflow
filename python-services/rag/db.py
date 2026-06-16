@@ -16,7 +16,7 @@ important for high-performance web servers and APIs.
 # Expected columns in the QAPair table.
 # Matches the Prisma model proposed in the design.
 _QUERY = """
-    SELECT id, question, answer, topic, difficulty, source, tags
+    SELECT id, question, answer, topic, tags, source
     FROM "QAPair"
     ORDER BY id
 """
@@ -55,9 +55,8 @@ async def load_db_pairs() -> list[dict]:
                 "question": row["question"],
                 "answer": row["answer"],
                 "topic": row["topic"],
-                "difficulty": row["difficulty"],
-                "source": row["source"] or "db",
                 "tags": list(row["tags"] or []),
+                "source": row["source"] or "db",
             }
             for row in rows
         ]

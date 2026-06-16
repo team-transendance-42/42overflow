@@ -79,14 +79,14 @@ async def hybrid_search(
     #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
     question_embedding = (await embed_texts([question]))[0]
 
-    # 1b. Gate signal: best cosine against the FULL corpus (no topic filter, n=1).
+    # 1b. Gate signal: best cosine against the FULL corpus (no topic filter).
     #     Topic-filtered searches inflate scores within a narrow doc set.
     #     We need the absolute best match across everything to judge relevance.
-    #     Cost: one matrix-vector multiply, ~0.05ms — negligible.
-    #     distance = 1 - cosine, so cosine = 1 - distance.
-    gate_hit = numpy_index.search(question_embedding, n=1)
-    has_embeddings = len(gate_hit) > 0
-    best_similarity = round(1.0 - gate_hit[0]["distance"], 4) if has_embeddings else 0.0
+    #     n=20 instead of n=1: same matrix multiply cost, but the results are
+    #     reused as dense_hits when no topic filter is applied
+    full_hits = numpy_index.search(question_embedding, n=20)
+    has_embeddings = len(full_hits) > 0
+    best_similarity = round(1.0 - full_hits[0]["distance"], 4) if has_embeddings else 0.0
 
     # 2. Detect topic from embedding vs centroids (no-op if centroids={}).
     #    numpy matrix multiply — ~0.01ms for any reasonable number of topics.
@@ -98,14 +98,16 @@ async def hybrid_search(
         dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
         sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
 
-        # 3b. Fallback: too few filtered results → search full corpus instead.
-        #     Prevents over-filtering when a topic has few docs.
+        # 3b. Fallback: too few filtered results → reuse the full-corpus hits
+        #     already computed above. Prevents over-filtering when a topic has
+        #     few docs, and avoids a third matrix multiply.
         if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
-            dense_hits = numpy_index.search(question_embedding, n=20)
+            dense_hits = full_hits
             sparse_hits = bm25_index.search(question, n=20)
     else:
         # 4. Full corpus (no confident topic detected or centroids disabled).
-        dense_hits = numpy_index.search(question_embedding, n=20)
+        #    Reuse full_hits computed above — no extra matrix multiply needed.
+        dense_hits = full_hits
         sparse_hits = bm25_index.search(question, n=20)
 
     # 5. RRF merge: score each doc by rank position in each list.

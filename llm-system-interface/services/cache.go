@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-const ragCacheTTL = time.Hour
+const (
+	ragCacheTTL     = time.Hour
+	ragCacheMaxSize = 500 // max entries; oldest evicted when exceeded
+)
 
 type ragCacheEntry struct {
 	answer    string
@@ -14,8 +17,9 @@ type ragCacheEntry struct {
 }
 
 var (
-	ragCache   = make(map[string]ragCacheEntry)
-	ragCacheMu sync.RWMutex
+	ragCache      = make(map[string]ragCacheEntry)
+	ragCacheOrder []string // insertion order for FIFO eviction
+	ragCacheMu    sync.RWMutex
 )
 
 func ragCacheKey(question string) string {
@@ -51,9 +55,24 @@ func ragCacheSet(question, answer string) {
 	if strings.TrimSpace(answer) == "" {
 		return
 	}
+	key := ragCacheKey(question)
 	ragCacheMu.Lock()
 	defer ragCacheMu.Unlock()
-	ragCache[ragCacheKey(question)] = ragCacheEntry{
+
+	// Evict oldest entry when at capacity.
+	// FIFO is sufficient here — answers don't get "hotter" from re-reads,
+	// and TTL already handles staleness. True LRU would cost a write on
+	// every read, which defeats the RWMutex read-concurrency we set up.
+	if _, exists := ragCache[key]; !exists {
+		for len(ragCache) >= ragCacheMaxSize {
+			oldest := ragCacheOrder[0]
+			ragCacheOrder = ragCacheOrder[1:]
+			delete(ragCache, oldest)
+		}
+		ragCacheOrder = append(ragCacheOrder, key)
+	}
+
+	ragCache[key] = ragCacheEntry{
 		answer:    answer,
 		expiresAt: time.Now().Add(ragCacheTTL),
 	}
