@@ -230,5 +230,23 @@
       "MazeGenerator",
       "documentation"
     ]
+  },
+  {
+    "question": "What is depth-first search (DFS) and how does it generate a maze?",
+    "answer": "DFS explores a graph by going as deep as possible along one path before backtracking to try another. Algorithm: start at a cell, pick a random unvisited neighbor, move to it by carving a passage (removing the wall between them), mark it visited, and repeat. When all neighbors of the current cell are visited, backtrack to the previous cell and try another direction. DFS produces a perfect maze because it is equivalent to building a spanning tree of the grid graph — it visits every cell exactly once and connects them with exactly (N-1) passages where N is the total number of cells, leaving no loops and guaranteeing connectivity. The resulting mazes have long winding corridors and tend to have one obvious main trunk path. For A-Maze-ing, iterative DFS using an explicit stack is preferred over recursive DFS to avoid Python's default recursion limit of 1000 frames, which would crash on mazes larger than ~31×31 cells.",
+    "topic": "a-maze-ing",
+    "tags": ["concept", "DFS", "depth-first-search", "maze-generation", "spanning-tree", "fundamentals"]
+  },
+  {
+    "question": "What is breadth-first search (BFS) and when do you use it instead of DFS?",
+    "answer": "BFS explores a graph level by level — all nodes at distance 1 before distance 2, distance 2 before distance 3 — using a queue (FIFO) instead of a stack. BFS guarantees the shortest path in an unweighted graph (all edges cost 1) because it reaches every node via the fewest possible hops. DFS does not guarantee shortest paths — it reaches a node as soon as any path is found, which may be far from optimal. In A-Maze-ing, BFS finds the shortest path from ENTRY to EXIT: start from ENTRY with a queue, explore all adjacent cells that have open passages, track each cell's parent, stop when EXIT is reached, then backtrack through parents to reconstruct the path. In Pac-Man's ghost AI, BFS finds the shortest route from the ghost to Pac-Man's position on each frame. Choose BFS when you need shortest paths; choose DFS when you need to visit all nodes or generate mazes (where shortest path is irrelevant).",
+    "topic": "a-maze-ing",
+    "tags": ["concept", "BFS", "breadth-first-search", "shortest-path", "pathfinding", "fundamentals"]
+  },
+  {
+    "question": "What is Prim's algorithm and how does it differ from DFS for maze generation?",
+    "answer": "Prim's algorithm builds a minimum spanning tree by always expanding the cheapest frontier edge. For maze generation with equal weights: (1) Start with one cell in the 'in-maze' set. (2) Maintain a list of all walls between 'in-maze' cells and their unvisited neighbors. (3) Randomly pick one wall from this list, carve through it to add the neighbor to the maze, and add the new neighbor's walls to the list. (4) Repeat until all cells are in the maze. Unlike DFS, which follows one path deeply before backtracking, Prim's grows the maze outward from a frontier in multiple directions simultaneously. This produces mazes with shorter dead ends, more branching, and a less obvious main path — visually more 'bushy' than DFS mazes. Both algorithms produce perfect mazes (spanning trees with no loops), but the aesthetic character differs. A-Maze-ing uses Prim when the ALGORITHM config key is 'prim'.",
+    "topic": "a-maze-ing",
+    "tags": ["concept", "Prim", "spanning-tree", "maze-generation", "algorithm", "fundamentals"]
   }
 ]
