@@ -60,26 +60,9 @@
 </script>
 
 <div style="margin-left: {depth * 20}px;">
-	<div class=postbox>
-		<!-- View Profile Button -->
-		{#if comment.deleted_at == null}
-			<button
-				class="bg-sky-500 hover:bg-sky-700"
-				onclick={openProfile}
-				aria-label="View {comment.user.name}'s profile'"
-			>
-				<p class="author">
-					Posted by: {comment.user.name}
-				</p>
-			</button>
-		{:else}
-			<p class="author">
-				Posted by: [anonymous]
-			</p>
-		{/if}
-
+	<div class="postbox clickable relative">
 		<!-- Comment Content -->
-		<p>{comment.content}</p>
+		<div class="break-all">{comment.content}</div>
 
 		<!-- Comment Image (Optional) -->
 		{#if comment.image}
@@ -91,40 +74,57 @@
             />
 		{/if}
 
-		<!-- Reply to Comment -->
-		{#if comment.deleted_at == null}
-			<CreateComment {postId} {parentId} />
-		{/if}
+		<!-- Buttons -->
+		<div class="comment-actions">
+			<!-- View Profile Button -->
+			{#if comment.deleted_at == null}
+				<button
+					class="button postcard clickable"
+					onclick={openProfile}
+					aria-label="View {comment.user.name}'s profile'"
+				>
+					<p class="author">
+						Author: <em>{comment.user.name}</em>
+					</p>
+				</button>
+			{:else}
+				<div class="button postcard">
+					<p class="author">
+						<em>[anonymous]</em>
+					</p>
+				</div>
+			{/if}
 
-		<!-- Edit Comment -->
-		{#if isOwn && comment.deleted_at == null}
-			<EditComment {postId} {comment} />
-		{/if}
+			<!-- Reply to Comment -->
+			{#if comment.deleted_at == null}
+				<CreateComment {postId} {parentId} />
+			{/if}
 
-		<!-- Delete Comment -->
-		{#if isOwn && comment.deleted_at == null}
+			<!-- Edit Comment -->
+			{#if isOwn && comment.deleted_at == null}
+				<EditComment {postId} {comment} />
+			{/if}
+
+			<!-- Delete Comment -->
+			{#if isOwn && comment.deleted_at == null}
+				<button
+					class="button postcard delete clickable"
+					onclick={deleteComment}
+					aria-label="Delete comment"
+				>
+					Delete
+				</button>
+			{/if}
+
+			<!-- Like Button -->
 			<button
-				class="bg-red-500 hover:bg-red-700"
-				onclick={deleteComment}
-				aria-label="Delete comment"
-			>
-				Delete
-			</button>
-		{/if}
-
-		<!-- Show Likes -->
-		<p>{comment.likeCount ?? 0} Likes</p>
-
-		<!-- Like Button -->
-		{#if !isOwn}
-			<button
-				class="bg-blue-500 hover:bg-blue-700"
+				class="button postcard like clickable"
 				onclick={likeComment}
 				aria-label="Like comment"
 			>
-				{comment.userLiked ? 'Unlike' : 'Like'}
+				{(comment.userLiked ? '♥ ' : '♡ ') + (comment.likeCount ?? 0)}
 			</button>
-		{/if}
+		</div>
 	</div>
 
 	<!-- Render nested children/replies -->

@@ -1,5 +1,30 @@
+/* Backgrounds */
+.posts-background {
+    background-color: rgba(255, 255, 255, 1);
+    background-image:
+        url('/CodeLines/PNG/180221_CODAM_Lines-04.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: scroll;
+}
+
+/* Text */
+.white-text {
+	color: white;
+	text-shadow: rgb(20, 20, 20) 0px 0px 2px;
+}
+
+.black-text {
+	color: black;
+	text-shadow: rgb(230, 230, 230) 0px 0px 2px;
+}
+
 /* Posts */
 .postbox {
+	position: relative;
+
+	box-sizing: border-box;
 	width: 100%;
 	min-height: 150px;
 	background-color: var(--color-neutral-100);
@@ -7,9 +32,17 @@
 	border-radius: var(--radius-md);
 
 	padding: var(--space-md);
+	padding-bottom: 3rem;
 	margin-bottom: var(--space-lg);
 
 	font-family: var(--font-family-base);
+}
+
+.postbox.clickable:hover {
+	z-index: 10;
+
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+	border-color: #60a5fa;
 }
 
 .questions-page {
@@ -23,4 +56,189 @@
 	margin-left: 8px;
 }
 
+/* Card Images */
+.card-img {
+	height: 200px;
+	object-fit: cover;
+	border-radius: var(--radius-md);
+	margin-bottom: var(--space-md);
+}
 
+/* Comment Actions */
+.comment-actions {
+	position: absolute;
+	bottom: 0px;
+	left: 0.5rem;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+/* Comment Popover */
+.comment-container {
+    position: relative;
+}
+
+.comment-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+
+    z-index: 10;
+
+    width: 400px;
+    max-width: 90vw;
+
+    padding: 1rem;
+
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+
+    box-shadow:
+        0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Avatar */
+.avatar {
+	border-radius: 100%;
+	width: 100px;
+	height: 100px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.avatar img {
+	width: 100%;
+	height: 100%;
+}
+
+/* Buttons */
+.button {
+	background-color: var(--color-neutral-900);
+	color: black;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+	margin-bottom: 1rem;
+}
+
+.button:hover {
+	opacity: 0.85;
+}
+
+.button.primary {
+    background-color: var(--color-neutral-900);
+	color: black;
+}
+
+.button.secondary {
+	background-color: var(--color-neutral-500);
+	color: white;
+}
+
+.button.confirm {
+	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button.postcard {
+	font-size: var(--font-size-small);
+	background-color: var(--color-neutral-900);
+	color: black;
+	padding: 0.4rem 0.8rem;
+	border: none;
+	border-radius: var(--radius-md);
+	cursor: pointer;
+}
+
+.button.postcard.clickable:hover,
+.button.postcard.clickable:focus {
+	color: #1d4ed8;
+	text-decoration-thickness: 2px;
+}
+
+.button.postcard.delete {
+	background-color: var(--color-error-250);
+	color: white;
+}
+
+.button.postcard.like {
+	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button.postcard.edit {
+	background-color: var(--color-editor-bg);
+	color: white;
+}
+
+/* Textarea */
+.textarea-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: 0.4rem;
+}
+
+label {
+	font-size: 0.9rem;
+	font-weight: 500;
+}
+
+textarea {
+	padding: 0.7rem 0.9rem;
+	border-radius: 6px;
+	border: 1px solid var(--color-neutral-200);
+	font-size: 1rem;
+	outline: none;
+	transition: border 0.2s ease;
+
+	resize: vertical; /* user can resize vertically */
+}
+
+textarea:focus {
+	border-color: var(--color-neutral-900);
+}
+
+/* Input */
+.input-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: .4rem;
+}
+
+input {
+	border: 1px solid var(--color-neutral-200);
+	border-radius: 6px;
+	outline: none;
+	transition: border 0.2s ease;
+}
+
+label {
+	font-size: 0.9rem;
+	font-weight: 500;
+}
+
+input {
+	padding: 0.7rem 0.9rem;
+	border-radius: 6px;
+	border: 1px solid var(--color-neutral-200);
+	font-size: 1rem;
+	outline: none;
+	transition: border 0.2s ease;
+}
+
+input:focus {
+	border-color: var(--color-neutral-900);
+}
+
+input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
