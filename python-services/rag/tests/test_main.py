@@ -114,3 +114,25 @@ async def test_lifespan_sets_app_state():
             assert "codexion" in app.state.centroids
             assert "fly-in" in app.state.centroids
             assert len(app.state.centroids["codexion"]) == 768
+
+
+@pytest.mark.asyncio
+async def test_lifespan_does_not_call_load_db_pairs():
+    """Startup must be seed-only — load_db_pairs must not be called at boot."""
+    from main import lifespan
+    from fastapi import FastAPI
+    from unittest.mock import AsyncMock, patch
+
+    seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
+    mock_db = AsyncMock(return_value=[{"question": "DB-Q", "answer": "DB-A", "topic": "c", "tags": []}])
+    app = FastAPI()
+
+    with patch("chromadb.HttpClient"), \
+            patch("main.load_seed", return_value=seed_data), \
+            patch("main.load_db_pairs", mock_db), \
+            patch("main._sync_to_chroma", new_callable=AsyncMock), \
+            patch("main.get_embeddings", side_effect=lambda ids: {id_: [0.1] * 768 for id_ in ids}):
+        async with lifespan(app):
+            pass
+
+    mock_db.assert_not_called()

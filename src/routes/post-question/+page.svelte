@@ -3,8 +3,8 @@
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
 
-  let projectname = "";
-  let body = "";
+  let projectname = ""; // → Post.title in DB
+  let body = "";        // → Post.content in DB (labelled "Question" in the form)
   let error = "";
   let submitting = false;
 
@@ -23,7 +23,7 @@
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify
-			({projectname, body})
+			({projectname, body}) // subject is not included — no DB column for it yet
 		});
 
 		if (res.ok) goto('/posts');

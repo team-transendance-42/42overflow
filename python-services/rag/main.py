@@ -1,5 +1,6 @@
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 
 from bm25_index import BM25Index
 from db import load_db_pairs
@@ -106,14 +107,15 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
 """
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):  # will run when the app starts and stops.
-    # Step 1: always load seed
+async def _load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True) -> dict:
+    """Load seed + DB pairs, sync to Chroma, rebuild all indexes, update app.state.
+    Returns a summary dict. Called at startup and by the /admin/reload endpoint."""
+    from collections import Counter
+
     seed_pairs = load_seed()
     print(f"[startup] step 1 — {len(seed_pairs)} pairs from seed.json")
 
-    # Step 2: try DB, merge
-    db_pairs = await load_db_pairs()
+    db_pairs = await load_db_pairs() if include_db else []
     qa_cache["qa_pairs"] = _merge(seed_pairs, db_pairs)
     print(f"[startup] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
 
@@ -185,6 +187,20 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
     app.state.id_to_topic = id_to_topic
     app.state.topic_intro_ids = topic_intro_ids
 
+    topic_counts = Counter(all_topics)
+    return {
+        "total_docs": len(qa_cache["qa_pairs"]),
+        "db_docs": len(db_pairs),
+        "seed_docs": len(seed_pairs),
+        "topics": dict(sorted(topic_counts.items())),
+        "embeddings_ready": bool(all_embeddings),
+    }
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # will run when the app starts and stops.
+    await _load_and_index(app, label="startup", include_db=False)
+
     yield  # app runs and answers questions for users.
 
     # when app shutdown, clear the qa_cache to free memory: needed if used not in a
@@ -197,6 +213,18 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
 # docker compose logs -f python-rag
 app = FastAPI(lifespan=lifespan)
 app.include_router(rag_router)
+
+
+_ADMIN_TOKEN = os.getenv("RAG_ADMIN_TOKEN", "")
+
+
+@app.post("/admin/reload-from-db")
+async def reload_from_db(request: Request):
+    token = request.headers.get("X-Admin-Token", "")
+    if not _ADMIN_TOKEN or token != _ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    summary = await _load_and_index(app, label="reload", include_db=True)
+    return {"status": "ok", **summary}
 
 
 @app.get("/healthz")

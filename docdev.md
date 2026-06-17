@@ -1,7 +1,36 @@
+<<<<<<< Updated upstream
 best: use docker builder prune
 during all container running: to clear build up cache etc which grows to 30 and more gb
 other option:
 docker system prune -af --volumes
+=======
+rag db populate flow:
+Populate PostgreSQL
+  cat prisma/seed-qa-pairs.sql | docker compose exec -T postgres psql -U postgres transcendance_db
+
+ curl -X POST http://localhost:8090/admin/reload-from-db \
+    -H "X-Admin-Token: change-me-before-deploy"
+!!! nb: add cmds!! to show this todo!!
+========================================
+With fake data (dev_populate.py + reload):
+========================================
+  cd python-services/rag && uv run python dev_populate.py && cd ../.. &&
+  docker compose exec python-rag curl -s -X POST
+  http://localhost:8090/admin/reload-from-db -H 'X-Admin-Token:
+  My!Favourite-RAG-Token-Is-Longer-Than-Your-Entire-Codebase~42overflow'
+====================================
+  Only real DB data (reload only):
+  ===================================
+  docker compose exec python-rag curl -s -X POST
+  http://localhost:8090/admin/reload-from-db -H 'X-Admin-Token:
+  My!Favourite-RAG-Token-Is-Longer-Than-Your-Entire-Codebase~42overflow'
+===================================
+  docker system prune          # removes stopped containers, dangling
+  images, unused build cache
+  docker builder prune         # build cache only
+  docker system prune -a       # everything not currently in use
+  (aggressive)
+>>>>>>> Stashed changes
 ===================
 !!!NB!!!
 docker system df -v
