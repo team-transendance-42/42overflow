@@ -6,11 +6,11 @@ Populate PostgreSQL
     -H "X-Admin-Token: change-me-before-deploy"
 !!! nb: add cmds!! to show this todo!!
 ===================================
-best: use docker builder prune
-during all container running: to clear build up cache etc which grows to 30 and more gb
-other option:
-docker system prune -af --volumes
-docker compose build --no-cache && docker compose up -d
+  docker system prune          # removes stopped containers, dangling
+  images, unused build cache
+  docker builder prune         # build cache only
+  docker system prune -a       # everything not currently in use
+  (aggressive)
 ===================
 docker compose restart python-rag
 docker compose logs python-rag -f --since 0s
