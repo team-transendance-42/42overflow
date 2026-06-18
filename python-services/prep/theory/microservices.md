@@ -1,6 +1,6 @@
 Best practice for microservices:
 
-Each service (rag, speach-to-text, etc.) runs in its own container.
+Each service (rag, speech-to-text, etc.) runs in its own container.
 This is the standard in Docker/microservice architecture: isolation, independent scaling, and easier debugging.
 Yes, this means each container has its own Python install and dependencies, but this is normal and expected.
 Why not combine?

@@ -51,7 +51,7 @@ May not work in incognito/private mode or with some privacy extensions.
 
 Alternatives
 For local/offline STT, use a backend service (like Whisper) and send audio blobs from the browser.
-For cross-browser support, you must implement your own audio capture and backend STT.(SPEACH TO TEXT)
+For cross-browser support, you must implement your own audio capture and backend STT.(speech TO TEXT)
 ====================
 
 Whisper is an open-source speech-to-text (STT) model developed by OpenAI. It converts spoken audio into written text and supports many languages. Unlike browser APIs that send audio to cloud servers, Whisper can run locally on your own hardware (CPU or GPU), providing privacy and offline transcription. It's widely used for building custom, private, or cross-platform STT solutions.
