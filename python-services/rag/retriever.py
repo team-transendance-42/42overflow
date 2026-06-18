@@ -45,7 +45,7 @@ async def hybrid_search(
     centroids:       dict[str, list[float]],
     top_k:           int = 5,
     topic_intro_ids: dict[str, str] | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], float, bool]:
     """
     Retrieve top-k docs using topic-aware hybrid search.
 
@@ -64,12 +64,29 @@ async def hybrid_search(
                          (no pinning) for backwards compatibility.
 
     Returns:
-        [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
-        sorted by descending rrf_score (best match first).
+        (results, best_similarity, has_embeddings) where:
+        - results: [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
+          sorted by descending rrf_score (best match first).
+        - best_similarity: cosine similarity of the single best-matching doc
+          across the full corpus (unfiltered). Used by the Go service as a
+          semantic gate — questions with best_similarity < threshold are
+          off-topic and Ollama is not called.
+        - has_embeddings: True when NumpyIndex is built and best_similarity is
+          meaningful. False when NumpyIndex is empty (embedding failed at
+          startup) — Go skips the semantic gate and relies on RRF confidence alone.
     """
     # 1. Embed question — needed for both dense retrieval and centroid detection.
     #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
     question_embedding = (await embed_texts([question]))[0]
+
+    # 1b. Gate signal: best cosine against the FULL corpus (no topic filter).
+    #     Topic-filtered searches inflate scores within a narrow doc set.
+    #     We need the absolute best match across everything to judge relevance.
+    #     n=20 instead of n=1: same matrix multiply cost, but the results are
+    #     reused as dense_hits when no topic filter is applied.
+    full_hits = numpy_index.search(question_embedding, n=20)
+    has_embeddings = len(full_hits) > 0
+    best_similarity = round(1.0 - full_hits[0]["distance"], 4) if has_embeddings else 0.0
 
     # 2. Detect topic from embedding vs centroids (no-op if centroids={}).
     #    numpy matrix multiply — ~0.01ms for any reasonable number of topics.
@@ -84,11 +101,11 @@ async def hybrid_search(
         # 3b. Fallback: too few filtered results → search full corpus instead.
         #     Prevents over-filtering when a topic has few docs.
         if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
-            dense_hits = numpy_index.search(question_embedding, n=20)
+            dense_hits = full_hits
             sparse_hits = bm25_index.search(question, n=20)
     else:
         # 4. Full corpus (no confident topic detected or centroids disabled).
-        dense_hits = numpy_index.search(question_embedding, n=20)
+        dense_hits = full_hits
         sparse_hits = bm25_index.search(question, n=20)
 
     # 5. RRF merge: score each doc by rank position in each list.
@@ -133,4 +150,4 @@ async def hybrid_search(
                 "topic":     detected_topic,
             }] + results[:-1]
 
-    return results
+    return results, best_similarity, has_embeddings

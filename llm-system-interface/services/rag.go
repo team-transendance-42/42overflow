@@ -122,20 +122,16 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 }
 
 // buildRAGPrompt builds the grounded prompt sent to Ollama.
-// Key constraints:
-//   - "ONLY from posts" stops the model using its own training data.
-//   - "do NOT include that sentence" prevents Gemma from appending the
-//     fallback phrase at the end of real answers (observed with Gemma 4B).
+// Strict rules prevent hallucination: the model must ONLY use the provided
+// context and must not fall back to its training knowledge or guess.
 func buildRAGPrompt(ctxStr, question string) string {
-	return "You are a tutor for 42 school students.\n" +
-		"Using the context below as your source, explain the concept clearly\n" +
-		"and completely \xe2\x80\x94 as if the student asked you in person.\n" +
-		"Cover what it is, why it matters, and the key details.\n" +
-		"Synthesise naturally; do not copy sentences verbatim from the context.\n" +
-		"If the context does not contain enough to answer, say: " +
-		"\"I don't have enough context to answer this fully.\"\n" +
-		"Never say things like \"The community hasn't covered this\" or " +
-		"\"be the first to post\" \xe2\x80\x94 you are a tutor, not a forum.\n\n" +
+	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
+		"STRICT RULES \xe2\x80\x94 follow exactly:\n" +
+		"1. If the context directly covers the question: answer clearly using ONLY what is written there.\n" +
+		"2. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
+		"   \"I don't have enough context to answer this.\"\n" +
+		"3. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
+		"4. If you are unsure whether the context covers it: apply rule 2.\n" +
 		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
 		"=== QUESTION ===\n" + question + "\n\n" +
 		"=== ANSWER ==="
@@ -160,6 +156,35 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	if err := doJSONWithRetry(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
 		map[string]any{"question": question}, &retrieved); err != nil {
 		return nil, fmt.Errorf("retrieve contexts: %w", err)
+	}
+
+	// Two-layer relevance gate — both must pass before Ollama is called.
+	//
+	// Layer 1 — RRF confidence (keyword signal):
+	//   Pure-dense-only score (no BM25 term overlap) ≈ 1/60 = 0.0167.
+	//   Catches greetings and gibberish where BM25 finds nothing at all.
+	//
+	// Layer 2 — cosine similarity (semantic signal):
+	//   best_similarity is cosine between the question embedding and the
+	//   closest doc across the full corpus. "hi" → ~0.12, "what is malloc" → ~0.80.
+	//   Threshold 0.55 sits between unrelated (~0.10–0.30) and on-topic (~0.65–0.90).
+	//   Gate is skipped when HasEmbeddings=false (embedding service was down at
+	//   startup) — BestSimilarity would be 0.0 and would block all queries.
+	const (
+		minRagConfidence    = 0.020
+		minCosineSimilarity = 0.55
+	)
+	noContext := func() (<-chan string, error) {
+		ch := make(chan string, 1)
+		ch <- "Hi! I can only help with 42 School project questions — ask me about your projects and I'll look through what other students have shared."
+		close(ch)
+		return ch, nil
+	}
+	if retrieved.Confidence < minRagConfidence {
+		return noContext()
+	}
+	if retrieved.HasEmbeddings && retrieved.BestSimilarity < minCosineSimilarity {
+		return noContext()
 	}
 
 	// Build answer-only context blocks.
@@ -216,7 +241,12 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 			sb.WriteString(chunk)
 			outCh <- chunk
 		}
-		ragCacheSet(question, sb.String())
+		// Only cache when the stream completed naturally. If ctx was cancelled
+		// (client disconnected), rawCh closes early with a partial answer —
+		// caching it would serve a truncated response to the next N users for 1h.
+		if ctx.Err() == nil {
+			ragCacheSet(question, sb.String())
+		}
 	}()
 	return outCh, nil
 }
