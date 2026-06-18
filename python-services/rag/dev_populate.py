@@ -322,11 +322,8 @@ async def main(clean: bool) -> None:
         print(f"\n[done] inserted={inserted}  skipped={skipped}  total={len(POSTS)} posts")
 
         if inserted > 0:
-            print("\n--- Trigger RAG sync (run from project root) ---")
-            print("docker compose exec python-rag \\")
-            print('  curl -s -X POST http://localhost:8090/admin/reload-from-db \\')
-            print('  -H "X-Admin-Token: My!Favourite-RAG-Token-Is-Longer-Than-Your-Entire-Codebase~42overflow"')
-            print("\nThen open https://localhost:8443/posts to see the posts in the browser.")
+            print("\nNext: run 'bash reload_rag.sh' from the project root to sync.")
+            print("Then open https://localhost:8443/posts to see the posts.")
     finally:
         await conn.close()
 

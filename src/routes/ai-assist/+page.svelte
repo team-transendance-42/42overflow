@@ -682,7 +682,7 @@ async function sendToWhisper(blob: Blob) {
     {/snippet}
 
     <h2><b>Zombie Kittens</b> AI Assist 🐈‍⬛ </h2>
-    <p class="info">You can ask 2 questions a minute and 20 a day</p>
+    <p class="info">You can ask 5 questions a minute and 20 a day</p>
     <hr>
     <div class="parent-llms">
         <button

@@ -15,7 +15,7 @@
   - Forwards to http://python-stt:8091/convert_audio with
   X-Internal-Secret and X-User-ID headers
 
-  4. Python Whisper service (python-services/speach-to-text/main.py)
+  4. Python Whisper service (python-services/speech-to-text/main.py)
   - Receives file, rejects if > 10 MB
   - Saves to a temp .wav file
   - model.transcribe(tmp_path, language="en") — faster-whisper small

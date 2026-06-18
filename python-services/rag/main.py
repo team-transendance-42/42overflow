@@ -12,13 +12,9 @@ from seed import load_seed
 from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
 
 # qa_cache shared across requests — populated at startup
-# solid and practical approach for small to medium-scale RAG (Retrieval-Augmented
-# Generation) systems, especially for prototyping or internal tools:
 # Strengths:
 # Fast in-memory access to QA pairs for quick retrieval.
 # Persistent vector storage in ChromaDB for scalable similarity search.
-# Clear separation: text data in memory, vectors in a vector DB.
-# Easy to extend and debug.
 
 # Limitations for large-scale/production:
 # In-memory cache (qa_cache["qa_pairs"]) may not scale for millions of documents
