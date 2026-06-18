@@ -98,13 +98,15 @@ async def hybrid_search(
         dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
         sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
 
-        # 3b. Fallback: too few filtered results → search full corpus instead.
-        #     Prevents over-filtering when a topic has few docs.
+        # 3b. Fallback: too few filtered results → reuse the full-corpus hits
+        #     already computed above. Prevents over-filtering when a topic has
+        #     few docs, and avoids a third matrix multiply.
         if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
             dense_hits = full_hits
             sparse_hits = bm25_index.search(question, n=20)
     else:
         # 4. Full corpus (no confident topic detected or centroids disabled).
+        #    Reuse full_hits computed above — no extra matrix multiply needed.
         dense_hits = full_hits
         sparse_hits = bm25_index.search(question, n=20)
 
@@ -136,18 +138,22 @@ async def hybrid_search(
     ]
 
     # Pin intro doc: when a topic is detected and its intro doc is not already
-    # in the top-k results, insert it at position 0 and drop the last entry.
+    # in the top-k results, insert it at position 0.
     # Ensures vague queries always start with "what is X" context before detail entries.
+    # At capacity (len == top_k): drop the last entry to keep the count stable.
+    # Under capacity (len < top_k):  just prepend — spare slots exist, keep all docs.
     if detected_topic and topic_intro_ids:
         intro_id = topic_intro_ids.get(detected_topic)
         result_ids = {r["id"] for r in results}
         if intro_id and intro_id not in result_ids:
             intro_text = dense_text.get(intro_id) or id_to_text.get(intro_id, "")
-            results = [{
+            intro_doc = {
                 "id":        intro_id,
                 "text":      intro_text,
                 "rrf_score": 0.0,
                 "topic":     detected_topic,
-            }] + results[:-1]
+            }
+            tail = results[:-1] if len(results) >= top_k else results
+            results = [intro_doc] + tail
 
     return results, best_similarity, has_embeddings

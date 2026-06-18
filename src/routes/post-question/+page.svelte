@@ -3,8 +3,9 @@
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
 
-  let projectname = ""; // → Post.title in DB
-  let body = "";        // → Post.content in DB (labelled "Question" in the form)
+  let projectname = "";
+  let subject = "";
+  let body = "";
   let error = "";
   let submitting = false;
 
@@ -48,6 +49,13 @@
     name="projectname"
     placeholder="Enter project name"
     bind:value={projectname}
+  />
+
+    <Input
+    label="Subject"
+    name="subject"
+    placeholder="Enter subject"
+    bind:value={subject}
   />
 
   <Textarea

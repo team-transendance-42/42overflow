@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
+	"golang.org/x/time/rate" // rate.newLimiter
 )
 
 type limiterEntry struct {
@@ -32,12 +32,12 @@ Then per-client limiter runs
 */
 var (
 	mu            sync.Mutex
-	limiters      = make(map[string]*limiterEntry)
-	globalLimiter = rate.NewLimiter(rate.Limit(10.0/60.0), 5) // tocken bucket algorithm:Average: 10 requests/minute across all clients; Burst: up to 5 immediate requests before throttling starts
+	limiters      = make(map[string]*limiterEntry)            // kyes r str, val=ptr to limiterentry
+	globalLimiter = rate.NewLimiter(rate.Limit(10.0/60.0), 5) // token bucket algorithm:Average: 10 requests/minute across all clients; Burst: up to 5 immediate requests before throttling starts
 )
 
 const (
-	perStudentRateLimit = rate.Limit(5.0 / 60.0) // todo: revert to 2 requests/minute per student
+	perStudentRateLimit = rate.Limit(5.0 / 60.0) // todo: revert to 2 requests/minute per student, we were testing with more requests
 	perStudentBurst     = 2
 	perStudentDailyMax  = 20
 	limiterTTL          = 30 * time.Minute // remove inactive limiter entries after this idle time

@@ -39,7 +39,9 @@ func chatModelName() string {
 // extractAnswer pulls the "A: ..." portion from "Q: ...\nA: ..." formatted text.
 //
 // Theory: docs are formatted by Python's embedder.format_doc() as
-//   "Q: {question}\nA: {answer}"  or  "Q: ...\nA: ...\ntags: ..."
+//
+//	"Q: {question}\nA: {answer}"  or  "Q: ...\nA: ...\ntags: ..."
+//
 // The Q: line helped retrieve the doc but is redundant in the prompt — dropping
 // it saves ~40-60% of context tokens, directly speeding up per-token generation.
 //
@@ -77,12 +79,13 @@ func extractAnswer(text string) string {
 // with a new bytes.NewReader over the same marshalled bytes.
 //
 // Theory — why retries fix "connection refused" after python-rag restart:
-//   Go's http.DefaultTransport keeps idle TCP connections in a pool.
-//   After python-rag restarts it gets a new Docker-internal IP. The pooled
-//   connection to the old IP gets a RST and fails immediately. withRetry
-//   catches the network error, waits 1s, and creates a new TCP connection.
-//   Docker's embedded DNS resolver returns the new container IP on the fresh
-//   DNS lookup, so the retry succeeds.
+//
+//	Go's http.DefaultTransport keeps idle TCP connections in a pool.
+//	After python-rag restarts it gets a new Docker-internal IP. The pooled
+//	connection to the old IP gets a RST and fails immediately. withRetry
+//	catches the network error, waits 1s, and creates a new TCP connection.
+//	Docker's embedded DNS resolver returns the new container IP on the fresh
+//	DNS lookup, so the retry succeeds.
 //
 // Edge cases:
 //   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
@@ -126,7 +129,7 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 // context and must not fall back to its training knowledge or guess.
 func buildRAGPrompt(ctxStr, question string) string {
 	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
-		"STRICT RULES \xe2\x80\x94 follow exactly:\n" +
+		"STRICT RULES — follow exactly:\n" +
 		"1. If the context directly covers the question: answer clearly using ONLY what is written there.\n" +
 		"2. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
 		"   \"I don't have enough context to answer this.\"\n" +
@@ -165,11 +168,13 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	//   Catches greetings and gibberish where BM25 finds nothing at all.
 	//
 	// Layer 2 — cosine similarity (semantic signal):
-	//   best_similarity is cosine between the question embedding and the
-	//   closest doc across the full corpus. "hi" → ~0.12, "what is malloc" → ~0.80.
-	//   Threshold 0.55 sits between unrelated (~0.10–0.30) and on-topic (~0.65–0.90).
-	//   Gate is skipped when HasEmbeddings=false (embedding service was down at
-	//   startup) — BestSimilarity would be 0.0 and would block all queries.
+	//   best_similarity is the raw cosine between the question embedding and
+	//   the single closest doc across the full corpus (unfiltered, n=1 search).
+	//   Unlike RRF, this measures actual meaning overlap, not retrieval agreement.
+	//   "meaning of life" → cosine ≈ 0.12 vs any C/git doc → blocked.
+	//   "what is malloc"  → cosine ≈ 0.80 vs malloc doc   → passes.
+	//   Threshold 0.45 sits between unrelated (~0.10–0.30) and on-topic (~0.65–0.90).
+	//   Tune by watching logs: docker compose logs llm-server -f
 	const (
 		minRagConfidence    = 0.020
 		minCosineSimilarity = 0.55
@@ -183,6 +188,10 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	if retrieved.Confidence < minRagConfidence {
 		return noContext()
 	}
+	// Semantic gate: only applied when NumpyIndex was built at startup.
+	// When has_embeddings=false (embedding service was down), best_similarity
+	// is always 0.0 — applying the gate would block all queries. Fall back to
+	// the RRF confidence gate alone, which still requires actual keyword overlap.
 	if retrieved.HasEmbeddings && retrieved.BestSimilarity < minCosineSimilarity {
 		return noContext()
 	}

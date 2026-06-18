@@ -68,6 +68,7 @@ TEST_USER_ID = "rag-integration-test-user"
 TEST_USER_EMAIL = "rag-test@test.local"
 
 
+
 async def seed_db():
     print(f"[seed] connecting to {DB_URL}")
     conn = await asyncpg.connect(DB_URL)
@@ -126,6 +127,7 @@ def reload_rag():
             print(f"[reload] OK: {resp.json()}")
         else:
             print(f"[reload] FAIL HTTP {resp.status_code}: {resp.text[:200]}")
+
 
 
 def test_rag(verbose: bool = False):
@@ -192,6 +194,7 @@ if __name__ == "__main__":
         asyncio.run(seed_db())
     if args.reload:
         reload_rag()
+
     if args.test:
         ok = test_rag(verbose=args.verbose)
         sys.exit(0 if ok else 1)

@@ -131,5 +131,23 @@
       "pygame-events",
       "read-write"
     ]
+  },
+  {
+    "question": "What is a game loop and why does frame rate control matter?",
+    "answer": "The game loop is the central structure of every real-time game: it runs continuously, updating game state and rendering frames at a fixed rate. A basic game loop: while running: process_input(); update_state(dt); render(). The key parameter is dt (delta time) — the time elapsed since the last frame in seconds. All movement and timer logic must be multiplied by dt: ghost.x += ghost.speed * dt. Without dt, the game runs at different speeds on different machines: on a fast machine running 120 FPS, ghosts move twice as fast as on a 60 FPS machine. In Pac-Man, use pygame.time.Clock().tick(60) which caps the frame rate to 60 FPS and returns the number of milliseconds since the last tick — divide by 1000 to get dt in seconds. Separating update logic from render logic also allows pausing: set a paused flag, skip update_state() in the loop, but continue rendering the current frame. The most common bug is putting timers in frame counts (wait 60 frames) rather than elapsed time (wait 1 second) — frame counts break on any non-60 FPS machine.",
+    "topic": "pacman",
+    "tags": ["concept", "game-loop", "delta-time", "frame-rate", "pygame", "fundamentals"]
+  },
+  {
+    "question": "What is a finite state machine (FSM) and how does Pac-Man's ghost AI use it?",
+    "answer": "A finite state machine is always in exactly one of a fixed set of states, and transitions between states based on events or timers. Ghost AI in Pac-Man uses an FSM with three states: CHASE (ghost uses BFS to move toward its target), SCATTER (ghost moves to its designated home corner), and FRIGHTENED (ghost moves randomly, Pac-Man can eat it). Transitions: on a global scatter timer expiring → all ghosts switch CHASE→SCATTER; on the scatter timer expiring → SCATTER→CHASE; on a power pellet being eaten → all non-eaten ghosts switch to FRIGHTENED; on the frightened timer expiring or a ghost being eaten → FRIGHTENED→CHASE. Each ghost runs its own FSM instance with its own current state. The FSM elegantly encodes complex behavior in simple rules — without it, the conditional logic for all ghost behaviors (target selection, speed changes, direction reversal on mode switch) would be an unmanageable nest of if-statements. FSMs are used throughout games for any entity with distinct behavioral modes.",
+    "topic": "pacman",
+    "tags": ["concept", "FSM", "finite-state-machine", "ghost-AI", "game-AI", "fundamentals"]
+  },
+  {
+    "question": "What is collision detection and how does Pac-Man handle the crossing case?",
+    "answer": "Collision detection determines when two game entities occupy the same space at the same time. In grid-based games like Pac-Man, the simplest approach is cell equality: if pacman.cell == ghost.cell: handle_collision(). However, this misses the crossing case: if Pac-Man is moving right and a ghost is moving left, they swap cells in a single frame — one frame Pac-Man is at (3,5) and ghost is at (4,5), the next frame Pac-Man is at (4,5) and ghost is at (3,5) — they passed through each other without ever sharing a cell. The fix: check both current-cell collision AND crossing collision. Crossing collision: (pacman.prev_cell == ghost.cell) and (ghost.prev_cell == pacman.cell). Store prev_cell at the start of each update, then check both conditions after movement. In Pac-Man this is important during frightened mode: a ghost and Pac-Man crossing in opposite directions should still count as Pac-Man eating the ghost.",
+    "topic": "pacman",
+    "tags": ["concept", "collision-detection", "crossing-collision", "grid-game", "fundamentals"]
   }
 ]
