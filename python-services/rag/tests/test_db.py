@@ -49,3 +49,24 @@ def test_row_to_pair_topic_used_as_tag():
     pair = _row_to_pair(row)
     assert pair["topic"] == "agent-smith"
     assert "agent-smith" in pair["tags"]
+
+
+def test_row_to_pair_topic_from_subject_slug():
+    """project_name now comes from Subject.slug — underscores preserved by normalize."""
+    row = _FakeRow(id=10, project_name="push_swap", question="Q?", answers="A.")
+    pair = _row_to_pair(row)
+    assert pair["topic"] == "push_swap"
+    assert pair["tags"] == ["push_swap"]
+
+
+def test_row_to_pair_question_is_full_text():
+    """question field contains the combined title+body text from the new query."""
+    row = _FakeRow(
+        id=11,
+        project_name="minishell",
+        question="Why no fork for builtins?\n\nBecause builtins modify shell state.",
+        answers="Fork only for externals.",
+    )
+    pair = _row_to_pair(row)
+    assert "Why no fork" in pair["question"]
+    assert "shell state" in pair["question"]

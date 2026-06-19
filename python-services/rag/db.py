@@ -34,34 +34,36 @@ def _row_to_pair(row) -> dict:
 # Fetch all posts that have at least one non-deleted top-level comment.
 # JOIN (not LEFT JOIN) — posts with zero qualifying comments are excluded.
 # Nested thread replies (parentId IS NOT NULL) excluded to avoid noise.
+# Subject JOIN provides the canonical slug used as topic/tag.
 _QUERY = """
     SELECT
         p.id,
-        p.title                                     AS project_name,
-        p.content                                   AS question,
+        s.slug                                              AS project_name,
+        p.title || E'\\n\\n' || p.content                  AS question,
         string_agg(
             c.content,
             E'\\n\\n'
             ORDER BY c.created_at ASC
         ) FILTER (
             WHERE c.deleted_at IS NULL
-              AND c."parentId" IS NULL    -- nested thread replies excluded to avoid noise
-        )                                           AS answers
+              AND c."parentId" IS NULL
+        )                                                   AS answers
     FROM "Post" p
+    JOIN "Subject" s ON s.id = p."subjectId"
     JOIN "Comment" c
         ON  c."postId"   = p.id
         AND c.deleted_at IS NULL
-        AND c."parentId" IS NULL          -- nested thread replies excluded to avoid noise
+        AND c."parentId" IS NULL
     WHERE p.deleted_at IS NULL
       AND p.content     IS NOT NULL
       AND p.content     <> ''
-    GROUP BY p.id, p.title, p.content
+    GROUP BY p.id, s.slug, p.title, p.content
 """
 
 _TABLES_READY_QUERY = """
     SELECT COUNT(*) FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_name IN ('Post', 'Comment')
+      AND table_name IN ('Post', 'Comment', 'Subject')
 """
 
 
@@ -83,8 +85,8 @@ async def load_db_pairs() -> list[dict]:
 
     try:
         ready = await conn.fetchval(_TABLES_READY_QUERY)
-        print(f"[db] Post+Comment tables present: {ready == 2}")
-        if ready < 2:
+        print(f"[db] Post+Comment+Subject tables present: {ready == 3}")
+        if ready < 3:
             # Show what tables ARE in the public schema to help diagnose naming issues
             tables = await conn.fetch(
                 "SELECT table_name FROM information_schema.tables "
@@ -92,7 +94,7 @@ async def load_db_pairs() -> list[dict]:
             )
             names = [r["table_name"] for r in tables]
             print(f"[db] tables in public schema: {names}")
-            print("[db] Post or Comment table missing — skipping DB sync (schema not migrated yet)")
+            print("[db] Post, Comment, or Subject table missing — skipping DB sync (schema not migrated yet)")
             return []
 
         rows = await conn.fetch(_QUERY)
