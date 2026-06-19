@@ -3,31 +3,28 @@ import { db } from '$lib/server/db';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) throw error(401, 'Unauthorized');
+	try {
+		if (!locals.user)
+			throw error(401, 'Unauthorized');
 
-	const myProfile = await db.user.findUnique({
-		where: { id: locals.user.id }
-	});
+		const { projectname, subjectId, body } = await request.json();
 
-	if (!myProfile) throw error(400, 'Profile not found');
-
-	const { projectname, subject, body } = await request.json();
-
-	const subjectData = await db.subject.findUnique({
-		where: { name: subject },
-		select: { id: true }
-	});
-
-	if (!subjectData || !subjectData.id) throw error(400, 'Subject not found');
-
-	const post = await db.post.create({
-		data: {
-			title: projectname,   // form: projectname (labelled "Project Name")
-			subjectId: subjectData.id,
-			content: body,        // form: body (labelled "Question")
-			userId: myProfile.id
+		if (!projectname || !subjectId || !body) {
+			throw error(400, 'Project name, subject, and body are required');
 		}
-	});
 
-	return json(post, { status: 201 });
+		const post = await db.post.create({
+			data: {
+				title: projectname,   // form: projectname (labelled "Project Name")
+				subjectId: subjectId,
+				content: body,        // form: body (labelled "Question")
+				userId: locals.user.id
+			}
+		});
+
+		return json({ post }, { status: 201 });
+	} catch (err) {
+		console.error('Error creating post:', err);
+		return json({ error: 'Failed to create post' }, { status: 500 });
+	}
 };
