@@ -77,38 +77,64 @@ async def hybrid_search(
     """
     # 1. Embed question — needed for both dense retrieval and centroid detection.
     #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
-    question_embedding = (await embed_texts([question]))[0]
+    #    On failure: log and fall back to BM25-only (has_embeddings=False).
+    question_embedding: list[float] | None = None
+    try:
+        question_embedding = (await embed_texts([question]))[0]
+    except Exception as exc:
+        print(f"[retriever] WARNING: embedding failed — falling back to BM25-only: {exc}")
 
     # 1b. Gate signal: best cosine against the FULL corpus (no topic filter).
-    #     Topic-filtered searches inflate scores within a narrow doc set.
-    #     We need the absolute best match across everything to judge relevance.
-    #     n=20 instead of n=1: same matrix multiply cost, but the results are
-    #     reused as dense_hits when no topic filter is applied.
-    full_hits = numpy_index.search(question_embedding, n=20)
-    has_embeddings = len(full_hits) > 0
-    best_similarity = round(1.0 - full_hits[0]["distance"], 4) if has_embeddings else 0.0
+    #     Only meaningful when embeddings are available.
+    full_hits: list[dict] = []
+    has_embeddings = False
+    best_similarity = 0.0
+    if question_embedding is not None:
+        try:
+            full_hits = numpy_index.search(question_embedding, n=20)
+            has_embeddings = len(full_hits) > 0
+            best_similarity = round(1.0 - full_hits[0]["distance"], 4) if has_embeddings else 0.0
+        except Exception as exc:
+            print(f"[retriever] WARNING: dense search failed — using BM25 only: {exc}")
 
-    # 2. Detect topic from embedding vs centroids (no-op if centroids={}).
-    #    numpy matrix multiply — ~0.01ms for any reasonable number of topics.
-    detected_topic, _ = detect_topic(question_embedding, centroids)
+    # 2. Detect topic from embedding vs centroids (no-op if centroids={} or no embedding).
+    detected_topic = None
+    if question_embedding is not None:
+        try:
+            detected_topic, _ = detect_topic(question_embedding, centroids)
+        except Exception as exc:
+            print(f"[retriever] WARNING: topic detection failed: {exc}")
     use_filter = detected_topic is not None
 
     # 3a. Filtered retrieval when topic is confidently detected.
-    if use_filter:
-        dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
-        sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
+    if use_filter and question_embedding is not None:
+        try:
+            dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
+        except Exception as exc:
+            print(f"[retriever] WARNING: filtered dense search failed: {exc}")
+            dense_hits = full_hits
+        try:
+            sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
+        except Exception as exc:
+            print(f"[retriever] WARNING: filtered BM25 search failed: {exc}")
+            sparse_hits = []
 
-        # 3b. Fallback: too few filtered results → reuse the full-corpus hits
-        #     already computed above. Prevents over-filtering when a topic has
-        #     few docs, and avoids a third matrix multiply.
+        # 3b. Fallback: too few filtered results → reuse the full-corpus hits.
         if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
             dense_hits = full_hits
-            sparse_hits = bm25_index.search(question, n=20)
+            try:
+                sparse_hits = bm25_index.search(question, n=20)
+            except Exception as exc:
+                print(f"[retriever] WARNING: BM25 fallback search failed: {exc}")
+                sparse_hits = []
     else:
-        # 4. Full corpus (no confident topic detected or centroids disabled).
-        #    Reuse full_hits computed above — no extra matrix multiply needed.
+        # 4. Full corpus (no confident topic detected, centroids disabled, or no embedding).
         dense_hits = full_hits
-        sparse_hits = bm25_index.search(question, n=20)
+        try:
+            sparse_hits = bm25_index.search(question, n=20)
+        except Exception as exc:
+            print(f"[retriever] WARNING: BM25 search failed: {exc}")
+            sparse_hits = []
 
     # 5. RRF merge: score each doc by rank position in each list.
     #    Formula: score += 1 / (rank + k)   where k=60 is the RRF constant.

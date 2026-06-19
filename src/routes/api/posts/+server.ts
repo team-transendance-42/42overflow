@@ -1,4 +1,4 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -20,28 +20,4 @@ export const GET: RequestHandler = async ({ url }) => {
   ]);
 
   return json({ data: posts, total });
-};
-
-export const POST: RequestHandler = async ({ request, locals }) => {
-  if (!locals.user) throw error(401, 'Unauthorized');
-
-  const myProfile = await db.user.findUnique({
-	where: { id: locals.user.id }
-  });
-
-  if (!myProfile) throw error(400, 'Profile not found');
-
-// form field → DB column: projectname → Post.title, body → Post.content
-// subject exists in the form UI but is not sent here and has no DB column
-const { projectname, body } = await request.json();
-
-const post = await db.post.create({
-  data: {
-	title: projectname,   // form: projectname (labelled "Project Name")
-	content: body,        // form: body (labelled "Question")
-	userId: myProfile.id
-  }
-});
-
-  return json(post, { status: 201 });
 };
