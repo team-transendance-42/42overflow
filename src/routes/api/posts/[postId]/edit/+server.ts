@@ -1,9 +1,7 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
-import { uploadProductImage } from '$lib/fileUpload.ts';
-import { CommentSchema } from '$lib/zodTypes.js';
+import { PostSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
 import { z } from 'zod';
-import { broadcast } from '$lib/server/sse';
 
 export const POST = async ({ locals, request, params }: RequestEvent) => {
 	try {
@@ -19,93 +17,43 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 			throw error(400, 'Invalid Post ID');
 		}
 
-		if (!params.commentId) {
-			throw error(400, 'Comment ID is required');
-		}
-		const commentId = parseInt(params.commentId);
-		if (isNaN(commentId)) {
-			throw error(400, 'Invalid Comment ID');
-		}
-
-		// Get the comment to verify ownership
-		const comment = await db.comment.findUnique({
-			where: { id: commentId }
+		// Get the post to verify ownership
+		const post = await db.post.findUnique({
+			where: { id: postId }
 		});
 
-		if (!comment) {
-			throw error(404, 'Comment not found');
+		if (!post) {
+			throw error(404, 'Post not found');
 		}
 
-		// Check if the user owns the comment
-		if (comment.userId !== locals.user.id) {
-			throw error(403, 'You can only edit your own comments');
+		// Check if the user owns the post
+		if (post.userId !== locals.user.id) {
+			throw error(403, 'You can only edit your own posts');
 		}
 
 		const formData = await request.formData();
 
 		// Extract form fields and convert types
-		const parentIdValue = formData.get('parentId');
-		const commentData = {
+		const postData = {
 			postId: postId,
-			parentId: parentIdValue ? parseInt(parentIdValue as string) : null,
+			title: formData.get('title') as string,
 			content: formData.get('content') as string,
 		}
 
-		const data = CommentSchema.parse(commentData);
+		const data = PostSchema.parse(postData);
 
-		// Handle image upload
-		let imageUrl = null;
-
-		const imageFile = formData.get('image') as File;
-		if (imageFile && imageFile.size > 0) {
-			const uploadResult = await uploadProductImage(imageFile);
-			if (!uploadResult.success) {
-				return json({ error: uploadResult.error }, { status: 400 });
-			}
-			imageUrl = uploadResult.url;
-			console.log(`${new Date().toISOString()} - Image uploaded successfully: ${imageUrl}`);
-		}
-
-		let toUpdateData: any = {
-			content: data.content.trim(),
-		};
-
-		// Don't update image if no new image is provided (imageUrl is null)
-		if (imageUrl === null) {
-			if (formData.get('removeImage') === 'true') {
-				toUpdateData.image = null;
-			}
-		} else {
-			// Update with new image URL
-			toUpdateData.image = imageUrl;
-		}
-
-		// Edit comment
-		const editedComment = await db.comment.update({
-			where: { id: commentId },
-			data: toUpdateData,
-		});
-
-		// re-fetch with relations if needed
-		const fullComment = await db.comment.findUnique({
-			where: { id: commentId },
-			include: {
-				user: true,
-				likes: true
+		// Edit post
+		const editedPost = await db.post.update({
+			where: { id: postId },
+			data: {
+				title: data.title,
+				content: data.content
 			}
 		});
 
-		broadcast({
-			type: 'comment-update',
-			comment: {
-				...fullComment,
-				likeCount: fullComment.likes.length
-			}
-		});
-
-		return json({ comment: editedComment }, { status: 201 });
+		return json({ post: editedPost }, { status: 201 });
 	} catch (error) {
-		console.error('Error editing comment:', error);
+		console.error('Error editing post:', error);
 		if (error instanceof z.ZodError) {
 			return json({
 				error: 'Invalid input data',
@@ -115,6 +63,6 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 				}))
 			}, { status: 400 });
 		}
-		return json({ error: 'Failed to edit comment' }, { status: 500 });
+		return json({ error: 'Failed to edit post' }, { status: 500 });
 	}
 };

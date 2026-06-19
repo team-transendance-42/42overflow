@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	  orderBy: { created_at: 'desc' },
 	  where: { deleted_at: null },
 	  include: {
-		user: { select: { name: true } }
+		user: { select: { name: true, id: true } }
 	  }
 	}),
 	db.post.count({ where: { deleted_at: null } })

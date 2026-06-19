@@ -7,7 +7,6 @@
 
     interface Props {
         postId: number;
-        parentId?: number;
         post: any;
     }
 
@@ -122,6 +121,20 @@
             bind:this={popover}
         >
             <form onsubmit={handleSubmit}>
+				<!-- Title -->
+                <div class="textarea-group">
+                    <label for="title">Title:</label>
+                    <textarea
+                        id="title"
+                        bind:value={formData.title}
+                        oninput={(event) => handleInput('title', (event.target as HTMLTextAreaElement).value)}
+                        required
+                    ></textarea>
+                    {#if errors.title}
+                        <p class="error">{errors.title[0]}</p>
+                    {/if}
+                </div>
+
                 <!-- Content -->
                 <div class="textarea-group">
                     <label for="content">Content:</label>
@@ -136,27 +149,13 @@
                     {/if}
                 </div>
 
-                <!-- Image Upload -->
-                <div class="input-group">
-                    <label for="image">Image (optional):</label>
-                    <input
-                        type="file"
-                        id="image"
-                        class="small-input"
-                        accept="image/jpeg, image/png, image/gif, image/webp"
-                        onchange={handleImageSelect}
-                    />
-                    {#if previewUrl}
-                        <div>
-                            <img src={previewUrl} alt="Preview" class="w-100"/>
-                        </div>
-                    {/if}
-                    {#if errors.image}
-                        <p class="error">{errors.image[0]}</p>
-                    {/if}
-                </div>
-
-                <button class="button secondary" onclick={() => showPopover = false}>
+                <button
+					class="button secondary"
+					onclick={(event) => {
+						event.stopPropagation();
+						showPopover = false;
+					}}
+				>
                     Cancel
                 </button>
 
@@ -165,7 +164,10 @@
                         Submitting...
                     </button>
                 {:else}
-                    <button type="submit" class="button confirm">
+                    <button
+						type="submit"
+						class="button confirm"
+					>
                         Confirm
                     </button>
                 {/if}
