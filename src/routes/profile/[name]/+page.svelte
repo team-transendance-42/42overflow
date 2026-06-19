@@ -127,9 +127,10 @@
     color: var(--color-text-primary);
   }
 
-.post-card {display: block; text-decoration: none; color: var(--color-neutral-100); border: 1px solid var(--color-neutral-900); border-radius: 8px; padding: 0.75rem;}
+.label { display: block; margin-bottom: 0.5rem; }
+.post-card {display: block; text-decoration: none; color: var(--color-neutral-100); border: 1px solid var(--color-neutral-900); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; max-width: 420px;}
 .post-title { font-weight: 600; font-size: 0.95rem; }
 .post-content { font-size: 0.875rem; color: var(--color-text-secondary); }
 .no-posts { color: var(--color-text-secondary); }
 
-</style>
+</style> 
