@@ -29,3 +29,8 @@ vite.config.ts.timestamp-*
 
 # Images
 /uploads/images
+
+.opencode/
+notes
+permission-matrix.odt
+.~*
