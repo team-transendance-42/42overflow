@@ -4,15 +4,17 @@
 	import PostCard from '$lib/components/PostCard.svelte';
 	import { onMount } from 'svelte';
 
+	let { data } = $props();
+
 	type Post = ComponentProps<typeof PostCard>['post'];
 	
-	let title = '';
-	let content = '';
+	let title = $state('');
+	let content = $state('');
 	let message = '';
 	let error = '';
 
-	let questions: Post[] = [];
-	let currentPage = 1;
+	let questions: Post[] = $state([]);
+	let currentPage = $state(1);
 	let limit = 5;
 	let total = 0;
 
@@ -33,6 +35,12 @@
 	async function loadSubject() {
 		const res = await fetch(`/api/subjects/${$page.params.slug}/post?page=${currentPage}&limit=${limit}`);
 		const json = await res.json();
+
+		console.log('response status: ', res.status);
+		if (!res.ok) {
+			error = json.error || 'An error occurred while loading posts.';
+			return;
+		}
 
 		questions = (json.data ?? []) as Post[];
 		total = json.total;
@@ -57,7 +65,7 @@
 
 <!-- Pagination -->
 <div>
-	<button on:click={() => {
+	<button onclick={() => {
 		if (currentPage > 1) {
 			currentPage--;
 			loadSubject();
@@ -68,7 +76,7 @@
 
 	<span> - Page {currentPage} -</span>
 
-	<button on:click={() => {
+	<button onclick={() => {
 		if (currentPage * limit < total) {
 			currentPage++;
 			loadSubject();
@@ -81,8 +89,9 @@
 
 <div>
 	<h1><strong>CREATE A POST</strong></h1>
+	<a href="/post-question?subject={data.subject.name}">Go to new page</a>
 
-	<form on:submit={handleSubmit}>
+	<form onsubmit={handleSubmit}>
 		<div>
 			<label>
 				<div>Title</div>

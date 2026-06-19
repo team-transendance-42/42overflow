@@ -5,7 +5,7 @@
     let post = $derived(rawProps.post);
 
     function openPostPage() {
-        goto(`/posts/${post.id}`);
+        goto(`/s/${post.subject.slug}/posts/${post.id}`);
     }
 
 	function openProfile(event: Event) {
