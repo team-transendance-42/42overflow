@@ -200,14 +200,24 @@ def exercise_5() -> int:
     # Hint: for each vector, compute the AVERAGE cosine similarity to all others.
     # The one with the lowest average is the odd one out.
     min_avg = float('inf')
-    for i, v in vectors:
+    odd_index = -1
+    #for i, v in enumerate(vectors):
+    #    total = 0.0
+    #    for j in range(len(vectors)):
+    #        if j != i:
+    #            total += my_cosine(v, vectors[j])
+    #    avg = total / (len(vectors) - 1)
+    #    if (avg < min_avg):
+    #        min_avg = avg
+    #        odd_index = i
+	# optimized:
+    for i, v in enumerate(vectors):
         avg = sum(my_cosine(v, vectors[j]) for j in range(len(vectors)) if j != i) / (len(vectors) - 1)
-        if  avg < min_avg:
+        if avg < min_avg:
             min_avg = avg
             odd_index = i
-        
-        
-
+	
+                
     assert odd_index == 3, f"wrong: got {odd_index}, expected 3"
     print("EXERCISE 5 passed ✓")
     return odd_index
@@ -216,7 +226,7 @@ def exercise_5() -> int:
 # =============================================================================
 # EXERCISE 6 — Normalise a vector (make it unit length)
 # =============================================================================
-# A "unit vector" has magnitude = 1.0.
+# A "unit vector" has magnitude(len) = 1.0.
 # You create one by dividing each component by the vector's magnitude.
 #
 # Formula: normalise(v) = v / |v|   (component-wise)
@@ -225,6 +235,42 @@ def exercise_5() -> int:
 #   After normalisation, dot_product(a, b) == cosine_similarity(a, b)
 #   Production vector DBs pre-normalise everything so they only need
 #   a dot product (faster) instead of full cosine.
+#   v = arrow of any length
+#   v̂ = same direction, but length = 1
+#Normal cosine formula is:
+
+#cos(a,b)=
+#∣a∣∣b∣
+#a⋅b
+#	​
+#Meaning:
+#dot product (a · b)
+#divided by lengths of both vectors
+#So we must compute:
+#dot product
+#length of a
+#length of b
+#divisions
+#That is slower.
+#3. Trick used in real systems
+#Before storing vectors, we do:
+#make every vector length = 1
+#This is called normalization
+#So:
+#|a| = 1
+#|b| = 1
+#4. What happens then
+#Put into formula:
+#cos(a,b)=
+#1⋅1
+#a⋅b
+#	​
+#So it becomes:
+#cos(a,b)=a⋅b
+#After normalization:
+#dot product already tells you cosine similarity
+#dot product = similarity score
+#no extra math needed
 
 def normalise(v: list[float]) -> list[float]:
     # YOUR CODE — return a new list with each component divided by magnitude(v)
@@ -458,7 +504,7 @@ def run_all():
     exercise_2()
     exercise_3()
     exercise_4()
-    #exercise_5()
+    exercise_5()
     #exercise_6()
     #exercise_7()
     #exercise_8()

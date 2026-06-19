@@ -4,25 +4,25 @@ import uvicorn # An ASGI (Asynchronous Server Gateway Interface) web server — 
 import tempfile # Standard library for creating temporary files/directories, same concept as tmpfile() in C or File.createTempFile() in Java. You use it when you need scratch space on disk that gets cleaned up automatically.
 import os
 from fastapi import FastAPI, File, UploadFile # FastAPI is a web framework like Express.js (Node) or Gin (Go). FastAPI is the app instance, File and UploadFile are types for handling multipart file uploads in route handlers.
-from fastapi.responses import JSONResponse # lets you return a JSON HTTP response explicitly — like res.json({...}) in Express or json.NewEncoder(w).Encode(...) in Go.
+from fastapi.responses import JSONResponse # lets you return a JSON HTTP response explicitly
 
 app = FastAPI() # calls the constructor
 
-# --- THEORY: Whisper Model Loading ---
+# --- Whisper Model Loading ---
 # 'base' is a good balance between speed and accuracy. 
 # On the first run, this script will download about 140MB of model weights.
 # It stays in RAM once loaded so transcription is faster.
 #model = WhisperModel("base", device="cpu", compute_type="int8")
 model = WhisperModel("small", device="cpu", compute_type="int8")
 
-# --- FUNCTION: convert_audio ---
+# --- convert_audio ---
 # This is an "Asynchronous Endpoint." It handles the file upload from the browser.
 # 1. It receives the raw bytes of the audio file.
 # 2. It saves them to a temporary file (Whisper needs a file path, not a raw stream).
 # 3. It transcribes the audio using the CPU/GPU.
 # 4. It returns the text as a JSON object.
 @app.post("/convert_audio") # The @ is a decorator — Python's way of wrapping a function with extra behavior. This one registers the next function as the handler for POST /convert_audio; Equivalent in Go Gin: app.POST("/convert_audio", convertAudio)
-async def convert_audio(file: UploadFile = File(...)): # coroutine function (like async function in JS); While waiting, the server isn't blocked and can serve other requests
+async def convert_audio(file: UploadFile = File(...)): # UploadFile FastApi obj: file stream (you can read it without loading everything into memory)
     # Create a temporary file that won't be deleted automatically until we are done
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:  # like Java's try-with-resources
         content = await file.read()
