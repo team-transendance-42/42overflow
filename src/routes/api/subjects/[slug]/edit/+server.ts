@@ -2,6 +2,7 @@ import { json, error } from "@sveltejs/kit";
 import { db } from '$lib/server/db';
 import type { RequestHandler } from "@sveltejs/kit";
 import { SubjectRole } from "@prisma/client";
+
 export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	
 	const { description } = await request.json();

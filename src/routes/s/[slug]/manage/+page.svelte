@@ -156,7 +156,7 @@
 	</div>
 	<div>
 		<button on:click={archiveSubject} disabled={isArchiving}>
-			{isArchiving ? 'Archiving…' : 'Archive Subject'}
+			{isArchiving ? 'Archiving…' : 'Archive subject'}
 		</button>
 	</div>
 </section>
