@@ -86,7 +86,13 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
     skip = len(pairs) - len(to_update)
     print(f"[chroma] embedding {len(to_update)} new/changed docs (skipping {skip} unchanged)")
 
-    embeddings = await embed_texts([p["_text"] for p in to_update])
+    try:
+        embeddings = await embed_texts([p["_text"] for p in to_update])
+    except Exception as exc:
+        print(f"[chroma] ERROR: embedding failed for batch of {len(to_update)} docs — "
+              f"skipping upsert, ChromaDB will be stale until next reload. Reason: {exc}")
+        return
+
     upsert(
         ids=[p["_id"] for p in to_update],
         documents=[p["_text"] for p in to_update],
@@ -133,7 +139,7 @@ async def _load_and_index(app: FastAPI, label: str = "startup", include_db: bool
     try:
         await _sync_to_chroma(qa_cache["qa_pairs"])
         print(f"[{label}] step 3 — ChromaDB sync complete")
-    except RuntimeError as exc:
+    except Exception as exc:
         print(f"[{label}] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
 
     all_texts = [format_doc(p["question"], p["answer"], p.get("tags", []))
@@ -167,19 +173,25 @@ async def _load_and_index(app: FastAPI, label: str = "startup", include_db: bool
         all_embeddings = []
 
     bm25 = BM25Index()
-    bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
-    vocab_size = len(bm25._bm25.idf) if bm25._bm25 else 0
-    print(f"[{label}] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs, {vocab_size} unique tokens)")
+    try:
+        bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
+        vocab_size = len(bm25._bm25.idf) if bm25._bm25 else 0
+        print(f"[{label}] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs, {vocab_size} unique tokens)")
+    except Exception as exc:
+        print(f"[{label}] ERROR: BM25 index build failed — sparse retrieval disabled: {exc}")
 
     numpy_idx = NumpyIndex()
     if all_embeddings:
-        numpy_idx.build(
-            ids=all_ids,
-            embeddings=all_embeddings,
-            topics=all_topics,
-            documents=all_texts,
-        )
-        print(f"[{label}] step 6 — NumpyIndex built ({len(all_ids)} docs)")
+        try:
+            numpy_idx.build(
+                ids=all_ids,
+                embeddings=all_embeddings,
+                topics=all_topics,
+                documents=all_texts,
+            )
+            print(f"[{label}] step 6 — NumpyIndex built ({len(all_ids)} docs)")
+        except Exception as exc:
+            print(f"[{label}] ERROR: NumpyIndex build failed — dense retrieval disabled: {exc}")
     else:
         print(f"[{label}] step 6 — WARNING: NumpyIndex skipped (no embeddings)")
 

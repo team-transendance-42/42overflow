@@ -52,7 +52,11 @@ from config import EMBED_MODEL
 # Model is controlled by EMBED_MODEL env var (see config.py):
 #   BAAI/bge-small-en-v1.5        — 384-dim, ~100 MB RAM (default, memory-constrained)
 #   nomic-ai/nomic-embed-text-v1.5 — 768-dim, ~2 GB RAM  (school computers)
-_model = TextEmbedding(EMBED_MODEL)
+try:
+    _model: TextEmbedding | None = TextEmbedding(EMBED_MODEL)
+except Exception as _load_exc:
+    print(f"[embedder] FATAL: failed to load embedding model '{EMBED_MODEL}': {_load_exc}")
+    _model = None
 
 # LRU cache size: 512 slots x dim x 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
 # 512 is generous for a 42-school context — covers the most common questions.
@@ -82,7 +86,12 @@ def make_doc_hash(question: str, answer: str) -> str:
 
 def _embed_sync(texts: list[str]) -> list[list[float]]:
     """Synchronous batch embed. CPU-bound — must run in a thread pool."""
-    return [vec.tolist() for vec in _model.embed(texts)]
+    if _model is None:
+        raise RuntimeError(f"Embedding model '{EMBED_MODEL}' failed to load at startup")
+    try:
+        return [vec.tolist() for vec in _model.embed(texts)]
+    except Exception as exc:
+        raise RuntimeError(f"Embedding failed for {len(texts)} text(s): {exc}") from exc
 
 
 @lru_cache(maxsize=_CACHE_SIZE)

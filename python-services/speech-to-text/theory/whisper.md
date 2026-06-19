@@ -1,10 +1,14 @@
 
   - Browser records audio via MediaRecorder → sends as multipart form to
   /api/stt
+  - Caddy (reverse proxy) receives the request first, terminates TLS,
+  routes to SvelteKit
   - SvelteKit proxy (auth-gated, secret-protected) forwards to Python
   python-stt:8091
   - Whisper small model transcribes on CPU → returns JSON text
   - Frontend inserts transcript into the prompt box
+
+  Full chain: Browser → Caddy → SvelteKit → python-stt:8091 → Whisper
 
   That's a functional, self-hosted, server-side dictation feature.
 ---------------------------------------

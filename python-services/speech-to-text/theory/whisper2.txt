@@ -7,6 +7,16 @@ small — handles accents better, more robust to noise, better with uncommon voc
 python main.py
     │
     ├── loads Whisper model into RAM
+	 Machine RAM — the physical memory of whatever server is running the container. When the Python process starts, the OS allocates heap memory for
+  it, and the model weights (the .bin file on disk) are read into that heap. From that point on, the weights live in RAM as a large float array.
+   The "program" part — WhisperModel("base", ...) does two things at once:
+  1. Reads the model file from disk into RAM (the weights — ~140MB of numbers)
+  2. Initializes the CTranslate2 inference engine around those weights — allocates internal buffers, sets up the computation graph, prepares the
+  int8 quantized tensors
+
+  After that, the Python process is the running Whisper program. It's just a process sitting in memory holding those weights.
+  Every transcribe() call reuses the same weights already in RAM — no disk read, no reload. That's why startup is slow (~2-3s) but each subsequent
+  request is fast.
     ├── creates FastAPI app with CORS middleware
     └── starts uvicorn on port 8091
               │
