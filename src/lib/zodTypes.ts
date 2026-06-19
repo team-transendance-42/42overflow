@@ -28,3 +28,12 @@ export const CommentWithImageSchema = CommentSchema.extend({
 
 export type CommentInput = z.infer<typeof CommentSchema>;
 export type CommentWithImageInput = z.infer<typeof CommentWithImageSchema>;
+
+// Post schema
+export const PostSchema = z.object({
+	postId: z.number().int().positive(),
+	title: z.string().min(1).max(100),
+	content: z.string().min(1).max(500),
+});
+
+export type PostInput = z.infer<typeof PostSchema>;
