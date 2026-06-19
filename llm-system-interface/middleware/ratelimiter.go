@@ -37,7 +37,7 @@ var (
 )
 
 const (
-	perStudentRateLimit = rate.Limit(5.0 / 60.0) // todo: revert to 2 requests/minute per student, we were testing with more requests
+	perStudentRateLimit = rate.Limit(5.0 / 60.0)
 	perStudentBurst     = 2
 	perStudentDailyMax  = 20
 	limiterTTL          = 30 * time.Minute // remove inactive limiter entries after this idle time
