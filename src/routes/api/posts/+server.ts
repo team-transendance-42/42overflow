@@ -31,12 +31,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   if (!myProfile) throw error(400, 'Profile not found');
 
+// form field → DB column: projectname → Post.title, body → Post.content
+// subject exists in the form UI but is not sent here and has no DB column
 const { projectname, body } = await request.json();
 
 const post = await db.post.create({
   data: {
-	title: projectname,
-	content: body,
+	title: projectname,   // form: projectname (labelled "Project Name")
+	content: body,        // form: body (labelled "Question")
 	userId: myProfile.id
   }
 });

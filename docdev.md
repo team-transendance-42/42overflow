@@ -1,107 +1,132 @@
-best: use docker builder prune
-during all container running: to clear build up cache etc which grows to 30 and more gb
-other option:
-docker system prune -af --volumes
-===================
-!!!NB!!!
-docker system df -v
-get info on docker images, voluesm build cache
-=========================
+# Docker Cheatsheet
 
-For development, there is an extra docker-compose.dev.yml file that enables live reload for both Python and the app. This means code changes are reflected immediately in the local browser, without needing to rebuild the containers:
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-base stack only: (production)
+---
+
+## Inspect & Monitor
+
+```bash
+docker ps -a                        # list all containers
+docker images                       # list images
+docker volume ls                    # list volumes
+docker system df                    # disk usage (images, containers, volumes, build cache)
+docker system df -v                 # verbose disk usage breakdown
+docker compose logs -f app llm-server python-rag   # follow logs for services
+```
+
+---
+
+## Cleanup — Targeted
+
+```bash
+docker container prune              # remove stopped containers
+docker container prune -f           # same, no confirmation prompt
+docker image prune                  # remove dangling images
+docker image prune -a -f            # remove all unused images
+docker volume prune -f              # remove unused volumes
+docker network prune -f             # remove unused networks
+docker builder prune                # build cache only  ← best for reclaiming build cache (can grow 30GB+)
+```
+
+## Cleanup — Aggressive
+
+```bash
+docker system prune                 # stopped containers, dangling images, unused build cache
+docker system prune -a              # everything not currently in use
+docker system prune -af --volumes   # everything including volumes (be careful!)
+```
+
+---
+
+## Build & Start
+
+```bash
+# Production stack
 docker compose up --build
-=====================================================
-docker system prune -af --volumes 
-then:
+
+# Fresh build, no cache (use after prune)
 docker compose build --no-cache && docker compose up -d
-=====================================================
 
-Use --build only when you changed:
-Dockerfile/base image
-package.json or lockfile
-Anything copied during image build that is not from the live mount
-================================
-for go we do need to recompile, didnt install an extra tool: 
-docker compose -d --build --no-cache llm-server
-or:
-docker compose up -d llm-server
-==================================
-for debugg:
-docker compose logs -f app llm-server python-rag
-================================
-restart only app service:
-docker compose -f docker-compose.yml -f docker-compose.dev.yml restart app
+# Use --build only when you changed:
+#   - Dockerfile / base image
+#   - package.json or lockfile
+#   - Anything COPYed during image build (not from a live mount)
+```
 
-if changed dependencies or dockerfiles, also restart llm-server and python-rag:
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build app
-================================
-sudo systemctl start docker
-===
-sudo dockerd &
+---
 
-It manually starts the Docker daemon process in the background (& = background).
+## Rebuild Specific Services
 
-The daemon is the service that actually runs containers — the docker CLI  installed is just a client that talks to it. Without the daemon running, the CLI can't do anything.
+```bash
+# Go service (requires recompile — no live-reload tool installed)
+docker compose up -d --build --no-cache llm-server
 
-====
-docker ps -a
-docker images
-docker volume ls
-
-Remove all stopped containers:
-docker container prune
-
-Remove unused images:
-docker image prune
-Remove unused volumes:
-docker volume prune
-
-// for development
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build llm-server
-docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f llm-server
-docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f llm-server
-=================================
-
-docker container prune -f
-docker image prune -a -f
-docker volume prune -f
-docker network prune -f
-===================================
-Remove everything (be careful!):
-docker system prune -af --volumes --no-cache
-
-====================================
-
-//shows disk usage broken down by images, containers, volumes, and build cache.
-docker system df // disk free
-
-docker pull ollama/ollama:0.20.5
-// it fails again, the tag 0.20.5 may be broken on the registry. In that case, check your docker-compose.yml and try switching to ollama/ollama:latest or a nearby stable tag.
-
-docker compose logs python-stt
+# Frontend / Caddy
 docker compose up -d --build caddy app
+```
 
-for deleted files:
-git add -A
-==============================
+---
+
+## Docker Daemon (if not running)
+
+```bash
+sudo systemctl start docker         # preferred: start via systemd
+sudo dockerd &                      # fallback: start daemon manually in background
+```
+## Delete the stale collection
+	docker compose stop chromadb
+  docker volume rm 42overflow_chroma-data
+  docker compose up -d chromadb
+
+
+---
+
+## RAG — Sync & Populate
+
+
+**Files involved:**
+- `reload_rag.sh` — calls the RAG admin endpoint to reload from DB (run from project root)
+- `python-services/rag/dev_populate.py` — inserts fake users/posts/comments into Postgres for testing
+- `llm-system-interface/.env` — contains `RAG_ADMIN_TOKEN` (token is hardcoded in `reload_rag.sh`)
+- `python-services/rag/seed/` — static Q&A seed data loaded at RAG startup (not from DB)
+
+> **Note:** A post must have at least one comment to be picked up by the RAG.
+
+### 1. Reload RAG from real DB posts only
+
+```bash
+bash reload_rag.sh
+```
+
+### 2. Insert fake dev data (HappyFace22, Revolution12, Mystery User) then reload
+
+```bash
+# First time (or to add more posts without wiping existing ones):
+cd python-services/rag && uv run python dev_populate.py && cd ../..
+bash reload_rag.sh
+
+# Re-insert clean (wipes all fake posts first, then re-inserts):
+cd python-services/rag && uv run python dev_populate.py --clean && cd ../..
+bash reload_rag.sh
+```
+
+`dev_populate.py` connects to Postgres on **localhost:5433** (the host-mapped port).
+The stack must be running. Run it from the host, not inside a container.
+
+---
+
+## Ollama / LLM Model Management
+
+```bash
+# List models in Ollama container
 docker exec 42overflow-ollama-1 ollama list
-// shows the models currently available in the Ollama container
-==============
 
-if running on a machine with an NVIDIA GPU : 
- docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
- =================
- replace llm
- ================= 
-  # 1. Remove old model
-  docker exec 42overflow-ollama-1 ollama rm gemma3:1b
+# Switch model (example: gemma3:1b → gemma3:4b)
+docker exec 42overflow-ollama-1 ollama rm gemma3:1b
+docker exec 42overflow-ollama-1 ollama pull gemma3:4b
+docker exec 42overflow-ollama-1 ollama list   # verify
 
-  # 2. Pull new model
-  docker exec 42overflow-ollama-1 ollama pull gemma3:4b
+# Pull a specific tag (check registry if tag is broken — try :latest as fallback)
+docker pull ollama/ollama:latest
+```
 
-  After that, verify it's there:
-
-  docker exec 42overflow-ollama-1 ollama list
+---

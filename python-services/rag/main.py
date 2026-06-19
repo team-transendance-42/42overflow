@@ -1,7 +1,9 @@
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 
 from bm25_index import BM25Index
+from config import ADMIN_TOKEN
 from db import load_db_pairs
 from detector import build_topic_centroids
 from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
@@ -11,13 +13,9 @@ from seed import load_seed
 from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
 
 # qa_cache shared across requests — populated at startup
-# solid and practical approach for small to medium-scale RAG (Retrieval-Augmented
-# Generation) systems, especially for prototyping or internal tools:
 # Strengths:
 # Fast in-memory access to QA pairs for quick retrieval.
 # Persistent vector storage in ChromaDB for scalable similarity search.
-# Clear separation: text data in memory, vectors in a vector DB.
-# Easy to extend and debug.
 
 # Limitations for large-scale/production:
 # In-memory cache (qa_cache["qa_pairs"]) may not scale for millions of documents
@@ -44,11 +42,20 @@ def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
     except KeyError as ex:
         raise ValueError(f"Seed pair missing 'question' field: {ex}") from ex
 
+    added = 0
+    overwritten = 0
     for p in db_pairs:
         try:
+            if p["question"] in merged:
+                overwritten += 1
+            else:
+                added += 1
             merged[p["question"]] = p
         except KeyError as ex:
             raise ValueError(f"DB pair missing 'question' field: {ex}") from ex
+
+    print(f"[merge] seed={len(seed_pairs)}  db={len(db_pairs)}  "
+          f"new={added}  overwritten={overwritten}  total={len(merged)}")
     return list(merged.values())
 
 
@@ -106,63 +113,64 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
 """
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):  # will run when the app starts and stops.
-    # Step 1: always load seed
+async def _load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True) -> dict:
+    """Load seed + DB pairs, sync to Chroma, rebuild all indexes, update app.state.
+    Returns a summary dict. Called at startup and by the /admin/reload endpoint."""
+    from collections import Counter
+
     seed_pairs = load_seed()
-    print(f"[startup] step 1 — {len(seed_pairs)} pairs from seed.json")
+    print(f"[{label}] step 1 — {len(seed_pairs)} pairs from seed.json")
 
-    # Step 2: try DB, merge
-    db_pairs = await load_db_pairs()
+    db_pairs = await load_db_pairs() if include_db else []
     qa_cache["qa_pairs"] = _merge(seed_pairs, db_pairs)
-    print(f"[startup] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
+    print(f"[{label}] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
+    topic_counts = Counter(p.get("topic", "unknown") for p in qa_cache["qa_pairs"])
+    print(f"[{label}] topics in corpus: {dict(sorted(topic_counts.items()))}")
+    db_sourced = [p for p in qa_cache["qa_pairs"] if p.get("source", "").startswith("db") or p.get("id", "").startswith("db-")]
+    seed_sourced = len(qa_cache["qa_pairs"]) - len(db_sourced)
+    print(f"[{label}] DB-sourced pairs in merged corpus: {len(db_sourced)}")
 
-    # Step 3: ChromaDB + Ollama sync is optional at startup
     try:
         await _sync_to_chroma(qa_cache["qa_pairs"])
-        print("[startup] step 3 — ChromaDB sync complete")
+        print(f"[{label}] step 3 — ChromaDB sync complete")
     except RuntimeError as exc:
-        print(f"[startup] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
+        print(f"[{label}] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
 
-    # Step 4: embed all pairs → compute topic centroids → build BM25.
-    # We embed the full corpus here (not just changed docs) so centroids
-    # represent all topics correctly even when ChromaDB skipped some docs.
     all_texts = [format_doc(p["question"], p["answer"], p.get("tags", []))
                  for p in qa_cache["qa_pairs"]]
     all_ids = [make_doc_id(p["question"]) for p in qa_cache["qa_pairs"]]
     all_topics = [p.get("topic", "unknown") for p in qa_cache["qa_pairs"]]
-    topic_intro_ids: dict[str, str] = {
-        p["topic"]: make_doc_id(p["question"])
-        for p in qa_cache["qa_pairs"]
-        if "intro" in p.get("tags", [])
-    }
-    print(f"[startup] intro docs mapped: {sorted(topic_intro_ids.keys())}")
+    topic_intro_ids: dict[str, str] = {}
+    for p in qa_cache["qa_pairs"]:
+        if "intro" not in p.get("tags", []):
+            continue
+        topic = p["topic"]
+        doc_id = make_doc_id(p["question"])
+        if topic in topic_intro_ids:
+            print(f"[{label}] WARNING: duplicate intro tag for topic '{topic}' — "
+                  f"keeping first, ignoring: {p['question'][:60]!r}")
+            continue
+        topic_intro_ids[topic] = doc_id
+    print(f"[{label}] intro docs mapped: {sorted(topic_intro_ids.keys())}")
 
-    # Initialise before try so NumpyIndex build below always has a defined variable.
-    # Edge case: if embed_texts raises, all_embeddings stays [] → NumpyIndex skipped,
-    # BM25 still works, dense search returns [] (degraded but not crashed).
     all_embeddings: list[list[float]] = []
+    topic_centroids: dict = {}
     try:
         stored = get_embeddings(all_ids)
         all_embeddings = [stored[id_] for id_ in all_ids if id_ in stored]
         if len(all_embeddings) != len(all_ids):
             raise ValueError(f"ChromaDB returned {len(all_embeddings)}/{len(all_ids)} embeddings")
         topic_centroids = build_topic_centroids(qa_cache["qa_pairs"], all_embeddings)
-        print(f"[startup] step 4 — topic centroids built: {sorted(topic_centroids.keys())}")
+        print(f"[{label}] step 4 — topic centroids built: {sorted(topic_centroids.keys())}")
     except Exception as exc:
-        print(f"[startup] WARNING: centroid computation failed — topic detection disabled: {exc}")
-        topic_centroids = {}
+        print(f"[{label}] WARNING: centroid computation failed — topic detection disabled: {exc}")
+        all_embeddings = []
 
     bm25 = BM25Index()
     bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
-    print(f"[startup] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs)")
+    vocab_size = len(bm25._bm25.idf) if bm25._bm25 else 0
+    print(f"[{label}] step 5 — BM25 index built ({len(qa_cache['qa_pairs'])} docs, {vocab_size} unique tokens)")
 
-    # Build NumpyIndex from the embeddings computed above.
-    # Why: replaces ChromaDB HTTP roundtrip (~50–150ms) with an in-process
-    # matrix-vector multiply (~0.05ms). Embeddings are already in memory from
-    # the centroid computation step — no extra embed call needed.
-    # Edge case: if centroid computation failed, all_embeddings is empty → fall
-    # back to a zero matrix. dense search returns [] but BM25 still works.
     numpy_idx = NumpyIndex()
     if all_embeddings:
         numpy_idx.build(
@@ -171,19 +179,31 @@ async def lifespan(app: FastAPI):  # will run when the app starts and stops.
             topics=all_topics,
             documents=all_texts,
         )
-        print(f"[startup] step 6 — NumpyIndex built ({len(all_ids)} docs)")
+        print(f"[{label}] step 6 — NumpyIndex built ({len(all_ids)} docs)")
     else:
-        print("[startup] step 6 — WARNING: NumpyIndex skipped (no embeddings)")
+        print(f"[{label}] step 6 — WARNING: NumpyIndex skipped (no embeddings)")
 
     id_to_topic = dict(zip(all_ids, all_topics))
 
-    # expose indexes to router via app.state (avoids circular imports)
     app.state.bm25 = bm25
     app.state.numpy_index = numpy_idx
     app.state.id_to_text = dict(zip(all_ids, all_texts))
     app.state.centroids = topic_centroids
     app.state.id_to_topic = id_to_topic
     app.state.topic_intro_ids = topic_intro_ids
+
+    return {
+        "total_docs": len(qa_cache["qa_pairs"]),
+        "db_docs": len(db_sourced),
+        "seed_docs": seed_sourced,
+        "topics": dict(sorted(topic_counts.items())),
+        "embeddings_ready": bool(all_embeddings),
+    }
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # will run when the app starts and stops.
+    await _load_and_index(app, label="startup", include_db=False)
 
     yield  # app runs and answers questions for users.
 
@@ -199,6 +219,25 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(rag_router)
 
 
+@app.post("/admin/reload-from-db")
+async def admin_reload(request: Request) -> dict:
+    """Re-load seed + DB pairs and rebuild all indexes without restarting.
+    Requires X-Admin-Token header matching RAG_ADMIN_TOKEN env var."""
+    if not ADMIN_TOKEN or request.headers.get("X-Admin-Token") != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    print("[reload] triggered via /admin/reload-from-db")
+    summary = await _load_and_index(request.app, label="reload", include_db=True)
+    return {"status": "ok", **summary}
+app.state.load_and_index = _load_and_index
+
+
 @app.get("/healthz")
-def healthz():
-    return {"status": "ok", "qa_count": len(qa_cache["qa_pairs"])}
+def healthz(request: Request):
+    numpy_idx: NumpyIndex = request.app.state.numpy_index
+    bm25_idx: BM25Index = request.app.state.bm25
+    return {
+        "status": "ok",
+        "qa_count": len(qa_cache["qa_pairs"]),
+        "embeddings_ready": numpy_idx._matrix is not None,
+        "bm25_ready": bm25_idx._bm25 is not None,
+    }

@@ -22,7 +22,7 @@
 .settings-icon span {
   display: block;
   height: 2px;
-  background-color: var(--color-neutral-900);
+  background-color: black;
   margin: 2px 0;
   border-radius: 1px;
 }

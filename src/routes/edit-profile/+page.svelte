@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   export let data;
@@ -104,7 +103,9 @@
 
   <Input label="Interests" name="interests" placeholder="Interests" bind:value={interests} />
 
-  <Button label={loading ? 'Saving...' : 'Update'} type="button" onClick={handleUpdate} />
+  <button class="button primary" type="button" on:click={handleUpdate}>
+    {loading ? 'Saving...' : 'Update'}
+  </button>
 </div>
 </form>
 

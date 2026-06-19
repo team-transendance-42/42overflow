@@ -123,6 +123,30 @@
     ]
   },
   {
+    "question": "What is an AI agent and how does it differ from a regular LLM call?",
+    "answer": "An AI agent is a system that autonomously pursues a goal by repeatedly observing its environment, deciding on an action, executing it, and using the result to plan the next step. Unlike a one-shot LLM call (prompt → answer), an agent loops: it uses the LLM as a reasoning engine at each step and has access to tools — functions it can call to read files, write code, search the web, or query APIs. The four key properties: (1) Autonomy — the agent decides what to do next without human input per step. (2) Tool use — the agent can affect its environment, not just produce text. (3) Memory — conversation history grows as the agent iterates, providing context about what was already tried. (4) Error recovery — when a tool call fails, the agent reads the error and tries a different approach. Agent Smith implements all four: it reasons using an LLM, executes Python code in a sandbox, maintains full conversation history across iterations, and retries with error context when tests fail.",
+    "topic": "agent-smith",
+    "tags": ["concept", "AI-agent", "tool-use", "autonomy", "fundamentals"]
+  },
+  {
+    "question": "What is the ReAct pattern in AI agents?",
+    "answer": "ReAct (Reason + Act) is the architectural pattern where an agent alternates between a Thought step (the LLM reasons about what to do) and an Action step (the agent executes a tool), feeding the result back as an Observation. The full loop: Thought → Action → Observation → Thought → ... until the task completes or the budget is exhausted. ReAct is powerful because it lets the LLM break complex tasks into steps, use intermediate results to adjust its plan, and recover from errors by reasoning about what went wrong. Agent Smith implements ReAct as the Thought → Code → Observation loop: the LLM writes reasoning (Thought), the agent executes the Python code block in a sandbox (Action), and the stdout/stderr/test result is appended to history (Observation). Every LLM call receives the full conversation history including all previous Thought-Code-Observation triples, so the model can see and reason about its own prior work. Without the history, each step would be isolated and the agent could not make progress across iterations.",
+    "topic": "agent-smith",
+    "tags": ["concept", "ReAct", "thought-action-observation", "agent-pattern", "fundamentals"]
+  },
+  {
+    "question": "What is a context window in an LLM and why does it constrain agents?",
+    "answer": "The context window is the maximum number of tokens the LLM can process in a single forward pass. Everything counts against it: system prompt, conversation history, retrieved documents, tool results, and the current generation. When the total exceeds the limit, the API either silently truncates old content or returns an error. For agents this is critical: each iteration appends 300–800 tokens of Thought + Code + Observation to the history. By iteration 6–8 the cumulative history may hit the model's context limit. Agent Smith enforces a hard token budget (6000 input tokens for MBPP) before hitting the model limit. Context management strategies: rolling window (keep only the last N iterations, always keep the task description), summary compression (replace old observations with a one-line summary), and selective pruning (drop successful intermediate steps, keep failures so the model avoids repeating them). A 1500-token system prompt leaves only ~750 tokens per step average on a 6000-token budget — keep system prompts minimal.",
+    "topic": "agent-smith",
+    "tags": ["concept", "context-window", "tokens", "LLM", "fundamentals"]
+  },
+  {
+    "question": "What is sandboxing in code execution and why is it essential for AI agents?",
+    "answer": "Sandboxing restricts what code can do by limiting the resources, APIs, and system calls it can access. An AI agent executes LLM-generated code which may contain bugs, infinite loops, or attempts to access unauthorized resources. Without a sandbox: the agent could read /etc/passwd, execute system commands, delete files, or import network libraries and exfiltrate data. Agent Smith's sandbox works at three levels: (1) Import restriction — a custom __import__ function in the exec() globals allowlists only safe modules (math, json, re, collections, itertools); (2) Path restriction — file read/write tools call os.path.realpath() before any access and reject paths outside /testbed; (3) Execution timeout — test cases run with a 5-second timeout to prevent infinite loops from hanging the agent. The sandbox uses exec(code, restricted_globals) where restricted_globals contains the safe __import__ and only whitelisted builtins. AST-level blocking alone is insufficient because __import__('os') is a function call, not an import statement.",
+    "topic": "agent-smith",
+    "tags": ["concept", "sandboxing", "security", "exec", "isolation"]
+  },
+  {
     "question": "How does context management work in Agent Smith when switching between multiple API providers?",
     "answer": "When an API key returns HTTP 429 (rate limited) or HTTP 5xx (server error), the agent must rotate to the next provider without losing task state. Critical rules: (1) The retry must NOT count as a new iteration — only increment step count when the LLM actually generates a response. Use StepMetrics.retries to track failed API calls within a step. (2) The conversation history, sandbox state, current token totals, and task description must persist unchanged across the provider switch. (3) Different providers use different message formats (OpenAI vs Anthropic vs Ollama) — abstract the LLM API call behind a provider-agnostic function: def call_llm(messages, stop_sequences, max_tokens) → LLMResponse. Each provider implements this interface. (4) If all providers fail, write SolutionOutput(success=False, error='All providers exhausted') to disk and exit cleanly. (5) Log each rotation attempt with provider name, error code, and retry count for debugging.",
     "topic": "agent-smith",

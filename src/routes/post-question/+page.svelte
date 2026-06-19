@@ -2,7 +2,6 @@
   import { goto } from '$app/navigation'; 
   import Input from '$lib/components/Input.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
-  import Button from '$lib/components/Button.svelte';
 
   let projectname = "";
   let subject = "";
@@ -25,7 +24,7 @@
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify
-			({projectname, body})
+			({projectname, body}) // subject is not included — no DB column for it yet
 		});
 
 		if (res.ok) goto('/posts');
@@ -67,7 +66,9 @@
     rows={5}
   />
 
-  <Button label="Submit" type="button" onClick={submitQuestion}/>
+  <button class="button primary" type="button" on:click={submitQuestion}>
+    {submitting ? 'Submitting...' : 'Submit'}
+  </button>
 
 </div>
 

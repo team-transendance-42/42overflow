@@ -4,11 +4,11 @@
 </script>
 
 <header>
-	<div class="left">
+	<div class="left black-text">
    		<a href="/" >@42overflow</a>
 	</div>
 
-   <div class="right">
+   <div class="right black-text">
 
 		{#if !user}
     	<a href="/login">Log-In | </a>
@@ -19,7 +19,6 @@
 
 		<p> Welcome{user ? `, ${user.name}` : ''} </p>
 
-		
 	</div>
 	
 </header>
@@ -34,13 +33,13 @@
     font-size: var(--font-size-medium);
 	font-weight: bold;
     padding: var(--space-sm) var(--space-lg);
-   
+	border-bottom: 2px solid var(--color-neutral-100);
   }
 
-header .right {
-  font-size: 0.85rem; 
-  font-weight: normal;
-}
+  header .right {
+	font-size: 0.85rem; 
+	font-weight: normal;
+  }
 
   .settings-link {
     display: inline-flex;
@@ -51,8 +50,4 @@ header .right {
 	font-weight: bold;
 	
   }
-
-
 </style>
-
-

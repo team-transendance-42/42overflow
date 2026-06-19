@@ -29,6 +29,7 @@
 	gap: 1rem;
 	font-weight: bold;
 	font-size: 0.8rem;
+	border-right: 2px solid var(--color-neutral-100);
 }
 
 .top-links {

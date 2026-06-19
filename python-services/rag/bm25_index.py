@@ -66,18 +66,33 @@ class BM25Index:
             topic_filter: if given, only return docs with this topic.
                           If None, return docs from all topics.
 
-        Returns [] if index not built or no tokens match.
+        Returns [] if index not built or query has no vocabulary overlap.
+
+        Note — why no `score <= 0` early exit:
+            BM25+ adds a delta floor to every document, so scores are always
+            positive when any query token is in the vocabulary. A score<=0 break
+            would be unreachable for any in-vocabulary query. Instead we guard
+            upfront: empty tokenization and zero vocabulary overlap both return []
+            before scoring runs, which is the only case scores would be zero.
         """
         if self._bm25 is None:
             return []
 
-        scores = self._bm25.get_scores(_tokenize(query))
+        tokens = _tokenize(query)
+        if not tokens:
+            return []
+
+        # Return [] when no query token exists in the index vocabulary.
+        # BM25+ gives a positive floor score to every doc even with zero term
+        # overlap — returning those results would be semantically meaningless.
+        if not any(t in self._bm25.idf for t in tokens):
+            return []
+
+        scores = self._bm25.get_scores(tokens)
         ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
 
         results = []
         for idx, score in ranked:
-            if score <= 0:
-                break
             if topic_filter and self._topics[idx] != topic_filter:
                 continue
             results.append({"id": self._ids[idx], "score": float(score)})

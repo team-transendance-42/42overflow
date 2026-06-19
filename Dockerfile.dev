@@ -13,7 +13,8 @@ RUN apt-get update && \
 
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --prefer-offline
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --prefer-offline
 
 # Copy source
 COPY . .

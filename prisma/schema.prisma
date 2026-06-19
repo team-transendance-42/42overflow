@@ -184,3 +184,18 @@ model SubjectMember {
 
   @@unique([userId, subjectId])
 }
+
+// ─── RAG knowledge base ───────────────────────────────────────────────────────
+
+// source is not consumed by the RAG pipeline today — it is stored for future
+// admin tooling (e.g. "show all QA pairs added by users vs imported from seed").
+model QAPair {
+  id        Int      @id @default(autoincrement())
+  question  String   @unique
+  answer    String
+  topic     String
+  tags      String[]
+  source    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

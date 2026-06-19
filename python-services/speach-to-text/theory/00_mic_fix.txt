@@ -1,6 +1,0 @@
- SSH port-forward from your machine(having mic) — if your machine is reachable, the computer without mic runs:
-  ssh -L 8443:localhost:8443 youruser@yourmachine
-  1. Then opens https://localhost:8443 on their machine. Your mic on your machine does the recording.
-  2. Demo button with a pre-recorded clip — add a button in the UI that sends a bundled .wav file directly to /api/stt, bypassing the microphone
-  entirely. Clean for a demo.
-  3. Virtual mic — on macOS BlackHole, on Linux pulseaudio can create a virtual mic and pipe a .wav into it. More hacky.

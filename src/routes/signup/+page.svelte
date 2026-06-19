@@ -1,6 +1,5 @@
 <script lang="ts">
   import Input from '$lib/components/Input.svelte';
-  import Button from '$lib/components/Button.svelte';
   import { authClient } from '$lib/auth-client';
   import { goto } from '$app/navigation';
 
@@ -47,7 +46,9 @@
   <Input label="Email" name="email" placeholder="Enter email" bind:value={email} />
   <Input label="Password" name="password" placeholder="Enter password" type="password" bind:value={password} />
 
-  <Button label={loading ? 'Creating account...' : 'Sign Up'} type="button" onClick={handleSignup} />
+  <button class="button primary" type="button" on:click={handleSignup}>
+    {loading ? 'Creating account...' : 'Sign Up'}
+  </button>
 
   <p>Already have an account? <a href="/login"><strong>Log in</strong></a></p>
 </div>
