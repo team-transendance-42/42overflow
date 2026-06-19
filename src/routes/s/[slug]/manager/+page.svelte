@@ -8,19 +8,18 @@
 	
 	// let savingUserId = $state<string | null>(null);
 	
-	async function updateMemberRole(targetUserId: string, role: MemberRole) {
-		savingUserId = targetUserId;
-		try {
-			const res = await fetch(`/api/subjects/${data.subject.slug}/members`, {
-				method: 'PATCH',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ targetUserId, role })
-			});
-			if (!res.ok) throw new Error('Failed');
-			// optionally refresh data
-		} finally {
-			savingUserId = null;
-	}
+	// async function updateMemberRole(targetUserId: string, role: MemberRole) {
+	// 	try {
+	// 		const res = await fetch(`/api/subjects/${}/members`, {
+	// 			method: 'PATCH',
+	// 			headers: { 'content-type': 'application/json' },
+	// 			body: JSON.stringify({ targetUserId, role })
+	// 		});
+	// 		if (!res.ok) throw new Error('Failed');
+	// 		// optionally refresh data
+	// 	} finally {
+	// 		savingUserId = null;
+	// }
 	// }
 
 </script>

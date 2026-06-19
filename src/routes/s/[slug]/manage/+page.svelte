@@ -20,6 +20,7 @@
 
 	let roleOverrides = $state<Record<string, MemberRole>>({});
 	let savingUserId = $state<string | null>(null);
+	let isArchiving = $state(false);
 	let message = $state('');
 	let errorMessage = $state('');
 
@@ -71,6 +72,43 @@
 		}
 	}
 
+	async function archiveSubject() {
+		message = '';
+		errorMessage = '';
+
+		const isConfirmed = window.confirm(
+			`Are you sure you want to archive "${data.subject.name}"? This action cannot be undone.`
+		);
+
+		if (!isConfirmed) {
+			return;
+		}
+
+		isArchiving = true;
+
+		try {
+			const res = await fetch('/api/subjects/archive', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({ slug: data.subject.slug })
+			});
+
+			if (!res.ok) {
+				const text = await res.text();
+				errorMessage = text || `Failed to archive subject (${res.status})`;
+				return;
+			}
+
+			message = 'Subject archived successfully.';
+		} catch (err) {
+			errorMessage = 'Failed to archive subject';
+		} finally {
+			isArchiving = false;
+		}
+	}
+
 	onMount(async () => {
 		try {
 			const res = await fetch(`/api/subjects/${data.subject.slug}/members`);
@@ -88,12 +126,12 @@
 </script>
 
 <section class="manage-page">
-	<header class="manage-header">
+	<!-- <header class="manage-header">
 		<p class="eyebrow">Owner controls</p>
 		<h1>Manage {data.subject.name}</h1>
 		<p class="subhead">Promote members to curator or demote curators back to member.</p>
 		<p class="meta">Owners in this subject: {ownerCount}</p>
-	</header>
+	</header> -->
 
 	{#if message}
 		<p class="message success">{message}</p>
@@ -111,6 +149,15 @@
 				isSaving={savingUserId === member.userId}
 			/>
 		{/each}
+	</div>
+
+	<div>
+		<a href="/s/{data.subject.slug}/edit">Edit description</a>
+	</div>
+	<div>
+		<button on:click={archiveSubject} disabled={isArchiving}>
+			{isArchiving ? 'Archiving…' : 'Archive Subject'}
+		</button>
 	</div>
 </section>
 
