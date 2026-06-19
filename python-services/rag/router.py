@@ -43,7 +43,7 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
             top_k=4,
             topic_intro_ids=topic_intro_ids,
         )
-    except RuntimeError as exc:
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
     confidence = max((c["rrf_score"] for c in contexts), default=0.0)
