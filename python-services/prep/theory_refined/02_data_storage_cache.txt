@@ -1,0 +1,58 @@
+Where does ChromaDB run?
+
+  Server-side only. The browser never touches it. Your code uses chromadb.HttpClient — it connects to a separate ChromaDB Docker container
+  via HTTP. The RAG Python service talks to ChromaDB over the network; users' browsers talk to the RAG service.
+
+  ---
+  What does ChromaDB store per document?
+
+  Each entry in the qa_pairs collection has 4 fields:
+
+  ┌───────────┬────────────────────────────────────┬──────────────────────────────────────┐
+  │   Field   │              Content               │               Example                │
+  ├───────────┼────────────────────────────────────┼──────────────────────────────────────┤
+  │ id        │ SHA hash of the question           │ "a3f2c1..."                          │
+  ├───────────┼────────────────────────────────────┼──────────────────────────────────────┤
+  │ document  │ Full formatted text (Q + A + tags) │ "Q: How do I...\nA: You can..."      │
+  ├───────────┼────────────────────────────────────┼──────────────────────────────────────┤
+  │ embedding │ Vector — list of ~1536 floats      │ [0.021, -0.14, ...]                  │
+  ├───────────┼────────────────────────────────────┼──────────────────────────────────────┤
+  │ metadatas │ {topic, doc_hash}                  │ {"topic": "c", "doc_hash": "b9e..."} │
+  └───────────┴────────────────────────────────────┴──────────────────────────────────────┘
+
+  So yes — ChromaDB stores both the vectors AND the answer text.
+
+  ---
+  How long does it last?
+
+  As long as the Docker volume persists. It survives:
+  - App restarts
+  - RAG service restarts
+
+  It would be lost only if the ChromaDB container's volume is deleted (docker volume rm, docker compose down -v).
+
+  ---
+  How it's actually used (and the key optimization)
+
+  The flow at startup (main.py:122):
+
+  seed.json + Postgres DB
+          ↓
+     merge pairs
+          ↓
+     _sync_to_chroma()        ← only embeds NEW or CHANGED docs (doc_hash check)
+          ↓
+     get_embeddings()          ← load all vectors FROM ChromaDB into RAM
+          ↓
+     NumpyIndex.build()        ← build in-memory matrix from those vectors
+          ↓
+     BM25Index.build()         ← keyword index in RAM
+
+  At query time, ChromaDB is NOT queried. Search happens entirely in NumpyIndex (matrix multiply in RAM, ~0.05ms). ChromaDB's role is:
+
+  1. Avoid re-embedding unchanged docs — the doc_hash check (main.py:75-80) skips embedding if the Q+A hasn't changed. Embedding is slow
+  (external API call); this saves cost on every restart.
+  2. Persist vectors across restarts — without ChromaDB, you'd re-embed everything every time the app restarts.
+
+  prev v. code: query_dense in store.py had the old approach — directly querying ChromaDB for similarity (50-150ms per query). It
+  was replaced by NumpyIndex (0.05ms) because ChromaDB's network roundtrip was too slow for query-time use.

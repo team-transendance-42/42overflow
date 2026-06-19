@@ -106,7 +106,7 @@ services:
     expose:
       - "8090"
     env_file:
-      - ./llm-system-interface/.env
+      - ./python-services/rag/.env
     depends_on:
       ollama:
         condition: service_healthy
