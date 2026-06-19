@@ -36,7 +36,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     ? new Date().getTime() - new Date(profile.last_seen).getTime() < 5 * 60 * 1000
     : false;
 
-	
+  const posts = await db.post.findMany({
+	where: { userId: profile.id, deleted_at: null },
+	orderBy: { created_at: 'desc' },
+	include: {
+		subject: true,
+		_count: { select: { likes: true, comments: true } }
+	}
+});
 
   return {
     profile,
@@ -48,6 +55,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     followerCount,
     followingCount,
     isOnline,
+	posts,
     isOwnProfile: myProfile?.id === profile.id,
   };
 };
