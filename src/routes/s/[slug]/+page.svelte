@@ -3,6 +3,7 @@
 	import type { ComponentProps } from 'svelte';
 	import PostCard from '$lib/components/PostCard.svelte';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 
 	let { data } = $props();
 
@@ -48,6 +49,10 @@
 		content = '';
 	};
 
+	function makePost() {
+		goto(`/post-question?subject=${data.subject.name}`);
+	}
+
 	onMount(loadSubject);		
 
 </script>
@@ -86,25 +91,6 @@
 	</button>
 </div>
 
-
 <div>
-	<h1><strong>CREATE A POST</strong></h1>
-	<a href="/post-question?subject={data.subject.name}">Go to new page</a>
-
-	<form onsubmit={handleSubmit}>
-		<div>
-			<label>
-				<div>Title</div>
-				<input bind:value={title} required />
-			</label>
-		</div>
-		<div>
-			<label>
-				<div>Content</div>
-				<textarea bind:value={content} rows="3"></textarea>
-			</label>
-		</div>
-
-		<button type="submit">submit</button>
-	</form>
+	<button class="button primary" onclick={makePost}>Create Post</button>
 </div>
