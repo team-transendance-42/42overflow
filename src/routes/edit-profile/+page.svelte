@@ -65,6 +65,7 @@
   }
 
   success = true;
+  window.location.href = '/profile';
 }
 
 </script>

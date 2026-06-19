@@ -24,7 +24,7 @@
       return;
     }
 	await invalidateAll();
-    goto('/profile');
+    window.location.href = '/profile';
   }
 </script>
 

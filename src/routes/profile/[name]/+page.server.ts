@@ -36,6 +36,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     ? new Date().getTime() - new Date(profile.last_seen).getTime() < 5 * 60 * 1000
     : false;
 
+	
+
   return {
     profile,
     user: {

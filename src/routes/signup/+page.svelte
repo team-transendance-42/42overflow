@@ -31,7 +31,7 @@
       return;
     }
 
-    goto('/profile');
+    window.location.href = '/profile';
   }
 </script>
 
