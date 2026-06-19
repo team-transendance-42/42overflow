@@ -19,18 +19,21 @@
 	error = "";
 	submitting = true;
 	try {
-		const res = await fetch('/api/posts', 
+		const res = await fetch('/api/posts/create', 
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify
-			({projectname, body}) // subject is not included — no DB column for it yet
+			({projectname, subject, body})
 		});
 
 		if (res.ok) goto('/posts');
 		else if (res.status === 401) 
-		error = "You must be logged in to post a question.";
-		else error = "Something went wrong, please try again.";
+			error = "You must be logged in to post a question.";
+		else {
+			const data = await res.json();
+			error = data?.message || "An error occurred while submitting your question.";
+		}
 	}
 	finally {submitting = false;
 	}
