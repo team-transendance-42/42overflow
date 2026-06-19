@@ -176,7 +176,7 @@ func RateLimiter(next http.Handler) http.Handler {
 		now := time.Now().UTC()
 
 		// set base quota headers before any rejection so client always knows the limits
-		w.Header().Set("X-RateLimit-Minute", "2")
+		w.Header().Set("X-RateLimit-Minute", "5")
 		w.Header().Set("X-RateLimit-Day", strconv.Itoa(perStudentDailyMax))
 
 		mu.Lock()
@@ -201,7 +201,7 @@ func RateLimiter(next http.Handler) http.Handler {
 			w.Header().Set("X-RateLimit-Day-Remaining", strconv.Itoa(remaining))
 			w.Header().Set("Retry-After", "30")
 			mu.Unlock()
-			http.Error(w, "Rate limit exceeded (2/min)", http.StatusTooManyRequests)
+			http.Error(w, "Rate limit exceeded (5/min)", http.StatusTooManyRequests)
 			return
 		}
 

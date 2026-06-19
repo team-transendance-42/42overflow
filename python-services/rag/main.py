@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 
@@ -15,8 +16,6 @@ from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
 # Strengths:
 # Fast in-memory access to QA pairs for quick retrieval.
 # Persistent vector storage in ChromaDB for scalable similarity search.
-# Clear separation: text data in memory, vectors in a vector DB.
-# Easy to extend and debug.
 
 # Limitations for large-scale/production:
 # In-memory cache (qa_cache["qa_pairs"]) may not scale for millions of documents
@@ -114,7 +113,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
 """
 
 
-async def _load_and_index(app: FastAPI, label: str = "startup") -> dict:
+async def _load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True) -> dict:
     """Load seed + DB pairs, sync to Chroma, rebuild all indexes, update app.state.
     Returns a summary dict. Called at startup and by the /admin/reload endpoint."""
     from collections import Counter
@@ -122,7 +121,7 @@ async def _load_and_index(app: FastAPI, label: str = "startup") -> dict:
     seed_pairs = load_seed()
     print(f"[{label}] step 1 — {len(seed_pairs)} pairs from seed.json")
 
-    db_pairs = await load_db_pairs()
+    db_pairs = await load_db_pairs() if include_db else []
     qa_cache["qa_pairs"] = _merge(seed_pairs, db_pairs)
     print(f"[{label}] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
     topic_counts = Counter(p.get("topic", "unknown") for p in qa_cache["qa_pairs"])
@@ -204,7 +203,7 @@ async def _load_and_index(app: FastAPI, label: str = "startup") -> dict:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # will run when the app starts and stops.
-    await _load_and_index(app, label="startup")
+    await _load_and_index(app, label="startup", include_db=False)
 
     yield  # app runs and answers questions for users.
 
@@ -223,12 +222,11 @@ app.include_router(rag_router)
 @app.post("/admin/reload-from-db")
 async def admin_reload(request: Request) -> dict:
     """Re-load seed + DB pairs and rebuild all indexes without restarting.
-    Call this after inserting new rows into QAPair.
     Requires X-Admin-Token header matching RAG_ADMIN_TOKEN env var."""
     if not ADMIN_TOKEN or request.headers.get("X-Admin-Token") != ADMIN_TOKEN:
         raise HTTPException(status_code=403, detail="Forbidden")
     print("[reload] triggered via /admin/reload-from-db")
-    summary = await _load_and_index(request.app, label="reload")
+    summary = await _load_and_index(request.app, label="reload", include_db=True)
     return {"status": "ok", **summary}
 app.state.load_and_index = _load_and_index
 

@@ -125,10 +125,8 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 }
 
 // buildRAGPrompt builds the grounded prompt sent to Ollama.
-// Key constraints:
-//   - "ONLY from posts" stops the model using its own training data.
-//   - "do NOT include that sentence" prevents Gemma from appending the
-//     fallback phrase at the end of real answers (observed with Gemma 4B).
+// Strict rules prevent hallucination: the model must ONLY use the provided
+// context and must not fall back to its training knowledge or guess.
 func buildRAGPrompt(ctxStr, question string) string {
 	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
 		"STRICT RULES — follow exactly:\n" +
@@ -165,7 +163,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 
 	// Two-layer relevance gate — both must pass before Ollama is called.
 	//
-	// Layer 1 — RRF confidence (cheap keyword signal):
+	// Layer 1 — RRF confidence (keyword signal):
 	//   Pure-dense-only score (no BM25 term overlap) ≈ 1/60 = 0.0167.
 	//   Catches greetings and gibberish where BM25 finds nothing at all.
 	//
@@ -183,7 +181,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	)
 	noContext := func() (<-chan string, error) {
 		ch := make(chan string, 1)
-		ch <- "I don't have enough context from the community posts to answer this."
+		ch <- "Hi! I can only help with 42 School project questions — ask me about your projects and I'll look through what other students have shared."
 		close(ch)
 		return ch, nil
 	}

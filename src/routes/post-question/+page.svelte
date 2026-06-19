@@ -24,7 +24,7 @@
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify
-			({projectname, body})
+			({projectname, body}) // subject is not included — no DB column for it yet
 		});
 
 		if (res.ok) goto('/posts');

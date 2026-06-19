@@ -1,72 +1,132 @@
-rag db populate flow:
-Populate PostgreSQL
-  cat prisma/seed-qa-pairs.sql | docker compose exec -T postgres psql -U postgres transcendance_db
+# Docker Cheatsheet
 
- curl -X POST http://localhost:8090/admin/reload-from-db \
-    -H "X-Admin-Token: change-me-before-deploy"
-!!! nb: add cmds!! to show this todo!!
-===================================
-  docker system prune          # removes stopped containers, dangling
-  images, unused build cache
-  docker builder prune         # build cache only
-  docker system prune -a       # everything not currently in use
-  (aggressive)
-===================
-docker compose restart python-rag
-docker compose logs python-rag -f --since 0s
-====================
-docker compose up --build --force-recreate llm-server -d
-==========================================================
-!!!NB!!!
-docker system df -v // disk free
-get info on docker images, voluesm build cache
-=========================
-git push origin --delete 31-rag-improve  // delete remote branch
-============================
-git fetch origin
-git checkout remote-new-branch
-=====================================================
-for go we do need to recompile, didnt install an extra tool: 
-docker compose -d --build llm-server
-or:
-docker compose up -d llm-server
-==================================
-for debugg:
-docker compose logs -f app llm-server python-rag
-================================
-sudo systemctl start docker
-===
-sudo dockerd &
+---
 
-It manually starts the Docker daemon process in the background (& = background).
+## Inspect & Monitor
 
-The daemon is the service that actually runs containers — the docker CLI  installed is just a client that talks to it. Without the daemon running, the CLI can't do anything.
+```bash
+docker ps -a                        # list all containers
+docker images                       # list images
+docker volume ls                    # list volumes
+docker system df                    # disk usage (images, containers, volumes, build cache)
+docker system df -v                 # verbose disk usage breakdown
+docker compose logs -f app llm-server python-rag   # follow logs for services
+```
 
-====
-docker ps -a
-docker images
-docker volume ls
+---
 
-Remove all stopped containers:
-docker container prune
+## Cleanup — Targeted
 
-Remove unused images:
-docker image prune
-Remove unused volumes:
-docker volume prune
+```bash
+docker container prune              # remove stopped containers
+docker container prune -f           # same, no confirmation prompt
+docker image prune                  # remove dangling images
+docker image prune -a -f            # remove all unused images
+docker volume prune -f              # remove unused volumes
+docker network prune -f             # remove unused networks
+docker builder prune                # build cache only  ← best for reclaiming build cache (can grow 30GB+)
+```
 
-==============================
+## Cleanup — Aggressive
+
+```bash
+docker system prune                 # stopped containers, dangling images, unused build cache
+docker system prune -a              # everything not currently in use
+docker system prune -af --volumes   # everything including volumes (be careful!)
+```
+
+---
+
+## Build & Start
+
+```bash
+# Production stack
+docker compose up --build
+
+# Fresh build, no cache (use after prune)
+docker compose build --no-cache && docker compose up -d
+
+# Use --build only when you changed:
+#   - Dockerfile / base image
+#   - package.json or lockfile
+#   - Anything COPYed during image build (not from a live mount)
+```
+
+---
+
+## Rebuild Specific Services
+
+```bash
+# Go service (requires recompile — no live-reload tool installed)
+docker compose up -d --build --no-cache llm-server
+
+# Frontend / Caddy
+docker compose up -d --build caddy app
+```
+
+---
+
+## Docker Daemon (if not running)
+
+```bash
+sudo systemctl start docker         # preferred: start via systemd
+sudo dockerd &                      # fallback: start daemon manually in background
+```
+## Delete the stale collection
+	docker compose stop chromadb
+  docker volume rm 42overflow_chroma-data
+  docker compose up -d chromadb
+
+
+---
+
+## RAG — Sync & Populate
+
+
+**Files involved:**
+- `reload_rag.sh` — calls the RAG admin endpoint to reload from DB (run from project root)
+- `python-services/rag/dev_populate.py` — inserts fake users/posts/comments into Postgres for testing
+- `llm-system-interface/.env` — contains `RAG_ADMIN_TOKEN` (token is hardcoded in `reload_rag.sh`)
+- `python-services/rag/seed/` — static Q&A seed data loaded at RAG startup (not from DB)
+
+> **Note:** A post must have at least one comment to be picked up by the RAG.
+
+### 1. Reload RAG from real DB posts only
+
+```bash
+bash reload_rag.sh
+```
+
+### 2. Insert fake dev data (HappyFace22, Revolution12, Mystery User) then reload
+
+```bash
+# First time (or to add more posts without wiping existing ones):
+cd python-services/rag && uv run python dev_populate.py && cd ../..
+bash reload_rag.sh
+
+# Re-insert clean (wipes all fake posts first, then re-inserts):
+cd python-services/rag && uv run python dev_populate.py --clean && cd ../..
+bash reload_rag.sh
+```
+
+`dev_populate.py` connects to Postgres on **localhost:5433** (the host-mapped port).
+The stack must be running. Run it from the host, not inside a container.
+
+---
+
+## Ollama / LLM Model Management
+
+```bash
+# List models in Ollama container
 docker exec 42overflow-ollama-1 ollama list
-// shows the models currently available in the Ollama container
-==================
- =================
- replace llm
- ================= 
-  # 1. Remove old model
-  docker exec 42overflow-ollama-1 ollama rm gemma3:1b
 
-  # 2. Pull new model
-  docker exec 42overflow-ollama-1 ollama pull gemma3:4b
+# Switch model (example: gemma3:1b → gemma3:4b)
+docker exec 42overflow-ollama-1 ollama rm gemma3:1b
+docker exec 42overflow-ollama-1 ollama pull gemma3:4b
+docker exec 42overflow-ollama-1 ollama list   # verify
 
-  After that, verify it's there:
-  docker exec 42overflow-ollama-1 ollama list
+# Pull a specific tag (check registry if tag is broken — try :latest as fallback)
+docker pull ollama/ollama:latest
+```
+
+---

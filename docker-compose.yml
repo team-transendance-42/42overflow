@@ -123,7 +123,7 @@ services:
 
   python-stt:
     build:
-      context: ./python-services/speach-to-text
+      context: ./python-services/speech-to-text
     restart: unless-stopped
     volumes:
       - whisper-model-cache:/root/.cache/whisper

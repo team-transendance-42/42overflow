@@ -1,26 +1,18 @@
 """
-DB integration end-to-end test.
+DB integration end-to-end test for Posts+Comments data source.
 
 What it proves:
-  1. QAPair rows inserted into Postgres are picked up by python-rag on startup.
-  2. /rag/retrieve returns those DB-sourced docs as context.
-  3. Doc IDs from DB have the "db-" prefix (set in db.py) — distinguishable from seeds.
+  1. Post + Comment rows in Postgres are picked up by /admin/reload-from-db.
+  2. /rag/retrieve returns those DB-sourced docs with the "db-post-" prefix.
+  3. The answer text comes from the comments, not the post body.
 
-How to run (stack must be up, python-rag restarted after DB rows inserted):
-  python tests/test_db_integration.py --seed         # inserts rows into DB
-  python tests/test_db_integration.py --test         # queries RAG and checks results
-  python tests/test_db_integration.py --seed --test  # both
+How to run (stack must be up):
+  python tests/test_db_integration.py --seed         # insert test Post+Comment rows
+  python tests/test_db_integration.py --reload       # call /admin/reload-from-db
+  python tests/test_db_integration.py --test         # query RAG and verify results
+  python tests/test_db_integration.py --seed --reload --test  # full flow
 
-Requirements:
-  pip install asyncpg httpx
-
-Edge cases:
-  - If python-rag was NOT restarted after seeding, DB pairs are not indexed yet.
-    The test will fail with "no db- prefixed context" — restart and retry.
-  - If DATABASE_URL is not set in python-rag env, load_db_pairs() returns [] silently.
-    Verify: docker compose logs python-rag | grep '[db]'
-  - Questions must be specific enough that BM25/dense search retrieves the DB doc
-    and not a seed doc. Generic questions may match existing seed content instead.
+Requirements: uv (or pip install asyncpg httpx)
 """
 
 import argparse
@@ -30,147 +22,113 @@ import sys
 import asyncpg
 import httpx
 
-# --- config -------------------------------------------------------------------
 DB_URL = "postgresql://postgres:postgres@localhost:5433/transcendance_db"
-RAG_URL = "http://localhost:8090"
+RAG_URL = "http://localhost:8090"   # only reachable via docker compose exec (no ports mapping)
+RAG_ADMIN_TOKEN = ""  # fill in from llm-system-interface/.env before running
 
-# QA pairs NOT in any seed file. Topics: push_swap, minishell, webserv.
-DB_TEST_PAIRS = [
+# Test data — topics not in any seed file
+DB_TEST_POSTS = [
     {
-        "question": "What sorting algorithm does push_swap use for large stacks and why is it optimal for that range?",
-        "answer": (
+        "title": "push_swap",
+        "content": "What sorting algorithm does push_swap use for large stacks and why is it optimal?",
+        "comments": [
             "push_swap uses a chunk-based approach for large stacks (100 or 500 elements). "
-            "The stack is divided into value-range chunks; elements in the current chunk are "
-            "pushed to stack B in roughly sorted order using ra/rb rotations to find the cheapest "
-            "target position. Chunk size is tuned experimentally — chunks of 30-40 elements "
-            "minimise total move count. For 100 elements the moulinette requires under 700 "
-            "operations; for 500 elements under 5500. Pure insertion sort is O(n^2) and fails "
-            "these limits above ~20 elements. The chunk approach achieves O(n log n) equivalent "
-            "move counts."
-        ),
-        "topic": "push_swap",
-        "source": "db-test",
-        "tags": ["sorting", "chunk-sort", "optimization", "large-stack", "moulinette"],
+            "The stack is divided into value-range chunks pushed to stack B in sorted order. "
+            "Chunk size of 30-40 elements minimises total move count. "
+            "For 100 elements the moulinette requires under 700 operations.",
+        ],
+        "expected_keyword": "chunk",
     },
     {
-        "question": "In push_swap with exactly 3 elements, what is the maximum number of operations needed and what are the cases?",
-        "answer": (
-            "Sorting 3 elements [a, b, c] where a<b<c requires at most 2 operations. "
-            "The 6 orderings: [a,b,c] already sorted — 0 ops. [b,a,c] — sa, 1 op. "
-            "[a,c,b] — rra, 1 op. [c,a,b] — ra, 1 op. [b,c,a] — ra then ra, 2 ops. "
-            "[c,b,a] — sa then rra, 2 ops. Worst case is always 2 operations. "
-            "The moulinette tests 3-element sort with this exact limit."
-        ),
-        "topic": "push_swap",
-        "source": "db-test",
-        "tags": ["3-elements", "small-stack", "cases", "optimal", "moulinette"],
-    },
-    {
-        "question": "How does minishell handle heredoc and why must it fork before reading heredoc input?",
-        "answer": (
-            "A heredoc (<< DELIMITER) reads lines from stdin until a line matching DELIMITER "
-            "appears, then makes that content the command stdin. Minishell must fork before "
-            "reading heredoc input for two reasons: (1) the parent shell must not block on "
-            "readline — Ctrl+C during heredoc input should kill only the reader, not the shell; "
-            "(2) SIGINT during heredoc reading should cancel only the heredoc. Correct "
-            "implementation: fork a child that reads lines into a pipe write-end, parent "
-            "waitpid; if child is killed by SIGINT (WIFSIGNALED && WTERMSIG==SIGINT), abandon "
-            "the heredoc and print a newline, matching bash behavior."
-        ),
-        "topic": "minishell",
-        "source": "db-test",
-        "tags": ["heredoc", "fork", "SIGINT", "pipe", "signal-handling"],
-    },
-    {
-        "question": "What is CGI in webserv and how does the server pass environment variables to the CGI process?",
-        "answer": (
-            "CGI (Common Gateway Interface) lets a web server execute an external program and "
-            "use its stdout as the HTTP response. In webserv, when a request matches a CGI "
-            "location (*.py, *.php), the server: (1) forks a child; (2) sets env vars via "
-            "execve envp — REQUEST_METHOD, QUERY_STRING, CONTENT_TYPE, CONTENT_LENGTH, "
-            "PATH_INFO, SCRIPT_FILENAME; (3) pipes the request body to child stdin; (4) reads "
-            "child stdout as the response. The server must enforce a timeout — kill child after "
-            "N seconds and return 504 Gateway Timeout. Close all listening sockets in the child "
-            "before execve."
-        ),
-        "topic": "webserv",
-        "source": "db-test",
-        "tags": ["CGI", "fork", "execve", "environment-variables", "timeout", "504"],
+        "title": "minishell",
+        "content": "Why does minishell fork before reading heredoc input?",
+        "comments": [
+            "A heredoc reads lines until a DELIMITER line appears. Minishell must fork before "
+            "reading heredoc input so that Ctrl+C during heredoc reading kills only the reader "
+            "child, not the shell itself. SIGINT during heredoc should cancel only the heredoc.",
+        ],
+        "expected_keyword": "heredoc",
     },
 ]
 
 TEST_QUERIES = [
     {
-        "question": "What sorting algorithm does push_swap use for large stacks and why is it optimal?",
-        "expected_topic": "push_swap",
+        "question": "What sorting algorithm does push_swap use for large stacks?",
         "expected_keyword": "chunk",
-    },
-    {
-        "question": "How many operations does push_swap need for 3 elements?",
         "expected_topic": "push_swap",
-        "expected_keyword": "moulinette",
     },
     {
-        "question": "Why does minishell fork before reading heredoc input?",
-        "expected_topic": "minishell",
+        "question": "Why does minishell fork before reading heredoc?",
         "expected_keyword": "heredoc",
-    },
-    {
-        "question": "How does webserv pass environment variables to a CGI process?",
-        "expected_topic": "webserv",
-        "expected_keyword": "CGI",
+        "expected_topic": "minishell",
     },
 ]
 
+TEST_USER_ID = "rag-integration-test-user"
+TEST_USER_EMAIL = "rag-test@test.local"
 
-# --- seed ---------------------------------------------------------------------
+
 
 async def seed_db():
     print(f"[seed] connecting to {DB_URL}")
     conn = await asyncpg.connect(DB_URL)
 
-    exists = await conn.fetchval(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
-        "WHERE table_schema='public' AND table_name='QAPair')"
+    # Ensure a test user exists (Post.userId FK requires a valid User)
+    await conn.execute(
+        'INSERT INTO "User" (id, email, "emailVerified", "createdAt", "updatedAt") '
+        "VALUES ($1, $2, false, NOW(), NOW()) ON CONFLICT (id) DO NOTHING",
+        TEST_USER_ID, TEST_USER_EMAIL,
     )
-    if not exists:
-        print("[seed] ERROR: QAPair table does not exist.")
-        print("       Run: docker compose up app  (it runs prisma db push on start)")
-        await conn.close()
-        return False
+    print(f"[seed] test user ensured: {TEST_USER_EMAIL}")
 
-    inserted = 0
-    skipped = 0
-    for pair in DB_TEST_PAIRS:
+    for post_data in DB_TEST_POSTS:
         existing = await conn.fetchval(
-            'SELECT id FROM "QAPair" WHERE question = $1', pair["question"]
+            'SELECT id FROM "Post" WHERE title = $1 AND "userId" = $2',
+            post_data["title"], TEST_USER_ID,
         )
         if existing:
-            print(f"[seed] skip (exists): {pair['question'][:60]}...")
-            skipped += 1
+            print(f"[seed] skip (exists): Post title={post_data['title']!r}")
             continue
 
-        await conn.execute(
-            'INSERT INTO "QAPair" (question, answer, topic, tags, source, "createdAt", "updatedAt") '
-            "VALUES ($1, $2, $3, $4, $5, NOW(), NOW())",
-            pair["question"],
-            pair["answer"],
-            pair["topic"],
-            pair["tags"],
-            pair.get("source"),
+        post_id = await conn.fetchval(
+            'INSERT INTO "Post" (title, content, "userId", created_at, updated_at) '
+            "VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id",
+            post_data["title"], post_data["content"], TEST_USER_ID,
         )
-        print(f"[seed] inserted: {pair['question'][:60]}...")
-        inserted += 1
+        print(f"[seed] inserted Post id={post_id} title={post_data['title']!r}")
+
+        for comment_text in post_data["comments"]:
+            await conn.execute(
+                'INSERT INTO "Comment" (content, "postId", "userId", created_at, updated_at) '
+                "VALUES ($1, $2, $3, NOW(), NOW())",
+                comment_text, post_id, TEST_USER_ID,
+            )
+        print(f"[seed] inserted {len(post_data['comments'])} comment(s) for post {post_id}")
 
     await conn.close()
-    print(f"\n[seed] done — {inserted} inserted, {skipped} already existed")
-    print("\nNext step: restart python-rag to pick up the new rows:")
-    print("  docker compose restart python-rag")
-    print("  docker compose logs python-rag -f   # wait for 'ChromaDB sync complete'")
-    return True
+    print("\n[seed] done. Next: run --reload to sync into RAG.")
 
 
-# --- test ---------------------------------------------------------------------
+def reload_rag():
+    print(f"[reload] calling /admin/reload-from-db on {RAG_URL}")
+    print("         NOTE: this URL is only reachable inside docker network.")
+    print("         From host, use: docker compose exec python-rag curl -s -X POST")
+    print(f"           http://localhost:8090/admin/reload-from-db -H 'X-Admin-Token: <token>'")
+    if not RAG_ADMIN_TOKEN:
+        print("[reload] RAG_ADMIN_TOKEN not set in this script — skipping HTTP call.")
+        print("         Set it at the top of this file or call the endpoint manually.")
+        return
+    with httpx.Client(base_url=RAG_URL, timeout=60) as client:
+        resp = client.post(
+            "/admin/reload-from-db",
+            headers={"X-Admin-Token": RAG_ADMIN_TOKEN},
+        )
+        if resp.status_code == 200:
+            print(f"[reload] OK: {resp.json()}")
+        else:
+            print(f"[reload] FAIL HTTP {resp.status_code}: {resp.text[:200]}")
+
+
 
 def test_rag(verbose: bool = False):
     passed = 0
@@ -178,16 +136,11 @@ def test_rag(verbose: bool = False):
 
     with httpx.Client(base_url=RAG_URL, timeout=30) as client:
         health = client.get("/healthz").json()
-        seed_only_count = 123  # known seed count without DB
-        print(f"[test] python-rag reports {health['qa_count']} total docs")
-        if health["qa_count"] <= seed_only_count:
-            print(f"[test] WARNING: qa_count <= {seed_only_count} (seed-only).")
-            print("       DB pairs may not be loaded. Check:")
-            print("       docker compose logs python-rag | grep '[db]'")
-        print()
+        print(f"[test] python-rag: {health['qa_count']} total docs, "
+              f"embeddings_ready={health['embeddings_ready']}")
 
         for q in TEST_QUERIES:
-            print(f"[test] Q: {q['question'][:70]}...")
+            print(f"\n[test] Q: {q['question'][:70]}...")
             resp = client.post("/rag/retrieve", json={"question": q["question"]})
 
             if resp.status_code != 200:
@@ -197,61 +150,50 @@ def test_rag(verbose: bool = False):
 
             data = resp.json()
             contexts = data["contexts"]
-            confidence = data["confidence"]
-            best_sim = data["best_similarity"]
 
             if verbose:
-                print(f"       confidence={confidence:.4f}  best_similarity={best_sim:.4f}")
+                print(f"       confidence={data['confidence']:.4f}  best_sim={data['best_similarity']:.4f}")
                 for i, ctx in enumerate(contexts):
                     print(f"       [{i}] id={ctx['id']}  topic={ctx['topic']}  rrf={ctx['rrf_score']:.6f}")
 
-            if not contexts:
-                print("       FAIL — no contexts returned (off-topic gate triggered)")
-                failed += 1
-                continue
-
-            db_contexts = [c for c in contexts if c["id"].startswith("db-")]
+            db_contexts = [c for c in contexts if c["id"].startswith("db-post-")]
             if not db_contexts:
                 ids = [c["id"] for c in contexts]
-                print(f"       FAIL — no DB-sourced context. ids={ids}")
-                print("              python-rag may not have been restarted after seeding.")
+                print(f"       FAIL — no db-post- context found. ids={ids}")
+                print("              Did you run --reload after --seed?")
                 failed += 1
                 continue
 
-            top_db = db_contexts[0]
             keyword = q["expected_keyword"]
             keyword_found = any(keyword.lower() in c["text"].lower() for c in db_contexts)
             if not keyword_found:
-                print(f"       FAIL — keyword '{keyword}' not found in DB context text")
+                print(f"       FAIL — keyword '{keyword}' not in any db-post context")
                 failed += 1
                 continue
 
-            topic_ok = top_db["topic"] == q["expected_topic"]
-            topic_note = "" if topic_ok else f" (expected topic '{q['expected_topic']}', got '{top_db['topic']}')"
-            print(f"       PASS — DB doc retrieved (id={top_db['id']}, topic={top_db['topic']}){topic_note}")
+            print(f"       PASS — db-post context retrieved, keyword '{keyword}' found")
             passed += 1
 
     print(f"\nResults: {passed} passed, {failed} failed out of {len(TEST_QUERIES)} queries")
     return failed == 0
 
 
-# --- main ---------------------------------------------------------------------
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", action="store_true", help="Insert test rows into DB")
-    parser.add_argument("--test", action="store_true", help="Query RAG and verify DB docs returned")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show all context IDs and scores")
+    parser.add_argument("--seed", action="store_true", help="Insert test Post+Comment rows")
+    parser.add_argument("--reload", action="store_true", help="Call /admin/reload-from-db")
+    parser.add_argument("--test", action="store_true", help="Query RAG and verify db-post- docs")
+    parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
-    if not args.seed and not args.test:
+    if not any([args.seed, args.reload, args.test]):
         parser.print_help()
         sys.exit(0)
 
     if args.seed:
-        ok = asyncio.run(seed_db())
-        if not ok:
-            sys.exit(1)
+        asyncio.run(seed_db())
+    if args.reload:
+        reload_rag()
 
     if args.test:
         ok = test_rag(verbose=args.verbose)

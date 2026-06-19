@@ -83,7 +83,7 @@ async def hybrid_search(
     #     Topic-filtered searches inflate scores within a narrow doc set.
     #     We need the absolute best match across everything to judge relevance.
     #     n=20 instead of n=1: same matrix multiply cost, but the results are
-    #     reused as dense_hits when no topic filter is applied
+    #     reused as dense_hits when no topic filter is applied.
     full_hits = numpy_index.search(question_embedding, n=20)
     has_embeddings = len(full_hits) > 0
     best_similarity = round(1.0 - full_hits[0]["distance"], 4) if has_embeddings else 0.0

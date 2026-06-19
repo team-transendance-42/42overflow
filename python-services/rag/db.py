@@ -1,34 +1,68 @@
 """
-Reads QAPair rows from PostgreSQL.
-Returns an empty list (never crashes) if the DB is unreachable or the table
-doesn't exist yet — the service falls back to seed-only mode gracefully.
+Reads Post + Comment rows from PostgreSQL and maps them to the RAG pair format.
+Returns an empty list (never crashes) if the DB is unreachable or tables don't
+exist — the service falls back to seed-only mode gracefully.
+
+Only posts that have at least one non-deleted top-level comment are returned.
+A post with no answer has no knowledge to offer the LLM.
 """
 
 from config import DB_URL
-import asyncpg  # async Postgres client library — more modern than psycopg, works well with FastAPI
-"""
-Allows Python code to connect to, query, and interact with a PostgreSQL database
-using async/await syntax. Enables non-blocking database operations, which is
-important for high-performance web servers and APIs.
-"""
+import asyncpg
 
 
-# Expected columns in the QAPair table.
-# Matches the Prisma model proposed in the design.
+def _normalize_topic(title: str) -> str:
+    """Lower-case and hyphenate a project name for use as RAG topic/tag.
+    'A-Maze-ing' -> 'a-maze-ing', 'Agent Smith' -> 'agent-smith'
+    """
+    return title.lower().strip().replace(" ", "-")
+
+
+def _row_to_pair(row) -> dict:
+    """Map one asyncpg Row (from the JOIN query) to a RAG pair dict."""
+    topic = _normalize_topic(row["project_name"])
+    return {
+        "id": f"db-post-{row['id']}",
+        "question": row["question"],
+        "answer": row["answers"] or "",
+        "topic": topic,
+        "tags": [topic],   # project name as the only tag — improves BM25 keyword matching
+        "source": "db-post",
+    }
+
+
+# Fetch all posts that have at least one non-deleted top-level comment.
+# JOIN (not LEFT JOIN) — posts with zero qualifying comments are excluded.
+# Nested thread replies (parentId IS NOT NULL) excluded to avoid noise.
 _QUERY = """
-    SELECT id, question, answer, topic, tags, source
-    FROM "QAPair"
-    ORDER BY id
+    SELECT
+        p.id,
+        p.title                                     AS project_name,
+        p.content                                   AS question,
+        string_agg(
+            c.content,
+            E'\\n\\n'
+            ORDER BY c.created_at ASC
+        ) FILTER (
+            WHERE c.deleted_at IS NULL
+              AND c."parentId" IS NULL    -- nested thread replies excluded to avoid noise
+        )                                           AS answers
+    FROM "Post" p
+    JOIN "Comment" c
+        ON  c."postId"   = p.id
+        AND c.deleted_at IS NULL
+        AND c."parentId" IS NULL          -- nested thread replies excluded to avoid noise
+    WHERE p.deleted_at IS NULL
+      AND p.content     IS NOT NULL
+      AND p.content     <> ''
+    GROUP BY p.id, p.title, p.content
 """
 
-_TABLE_EXISTS_QUERY = """
-    SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'QAPair'
-    )
+_TABLES_READY_QUERY = """
+    SELECT COUNT(*) FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name IN ('Post', 'Comment')
 """
-
-# todo: need to adjust values: what are the real fields and real table name etc
 
 
 async def load_db_pairs() -> list[dict]:
@@ -48,9 +82,9 @@ async def load_db_pairs() -> list[dict]:
         return []
 
     try:
-        exists = await conn.fetchval(_TABLE_EXISTS_QUERY)
-        print(f'[db] QAPair table exists: {exists}')
-        if not exists:
+        ready = await conn.fetchval(_TABLES_READY_QUERY)
+        print(f"[db] Post+Comment tables present: {ready == 2}")
+        if ready < 2:
             # Show what tables ARE in the public schema to help diagnose naming issues
             tables = await conn.fetch(
                 "SELECT table_name FROM information_schema.tables "
@@ -58,23 +92,13 @@ async def load_db_pairs() -> list[dict]:
             )
             names = [r["table_name"] for r in tables]
             print(f"[db] tables in public schema: {names}")
-            print("[db] QAPair table not found — skipping DB sync (schema not migrated yet)")
+            print("[db] Post or Comment table missing — skipping DB sync (schema not migrated yet)")
             return []
 
         rows = await conn.fetch(_QUERY)
-        print(f"[db] fetched {len(rows)} rows from QAPair")
+        print(f"[db] fetched {len(rows)} posts with at least one comment")
 
-        pairs = [
-            {
-                "id": f"db-{row['id']}",
-                "question": row["question"],
-                "answer": row["answer"],
-                "topic": row["topic"],
-                "tags": list(row["tags"] or []),
-                "source": row["source"] or "db",
-            }
-            for row in rows
-        ]
+        pairs = [_row_to_pair(row) for row in rows]
 
         # Log topic breakdown so we can see what came from DB
         from collections import Counter
@@ -85,10 +109,11 @@ async def load_db_pairs() -> list[dict]:
         for p in pairs[:3]:
             print(f"[db]   sample: topic={p['topic']!r}  q={p['question'][:70]!r}")
 
+
         return pairs
 
     except Exception as exc:
-        print(f"[db] error reading QAPair rows: {exc}")
+        print(f"[db] error reading Post+Comment rows: {exc}")
         return []
 
     finally:

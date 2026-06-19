@@ -25,7 +25,7 @@ Why single-text only, not batch:
 Pros:
   - Repeated questions: ~0ms (cache hit) vs ~100-300ms (CPU embed)
   - No new dependency — functools is stdlib
-  - 512 slots × 768 floats × 4 bytes ≈ 1.5MB RAM (negligible)
+  - 512 slots x 768 floats x 4 bytes ≈ 1.5MB RAM (negligible)
 
 Cons:
   - Cache is process-local; cleared on restart, not shared between workers
@@ -54,7 +54,7 @@ from config import EMBED_MODEL
 #   nomic-ai/nomic-embed-text-v1.5 — 768-dim, ~2 GB RAM  (school computers)
 _model = TextEmbedding(EMBED_MODEL)
 
-# LRU cache size: 512 slots × dim × 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
+# LRU cache size: 512 slots x dim x 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
 # 512 is generous for a 42-school context — covers the most common questions.
 _CACHE_SIZE = 512
 
