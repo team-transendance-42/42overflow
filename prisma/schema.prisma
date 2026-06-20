@@ -115,6 +115,7 @@ model Post {
 
   userId    String
   subjectId Int
+  isEdited  Boolean @default(false)
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
@@ -147,6 +148,7 @@ model Comment {
   parentId Int?
   postId   Int
   userId   String
+  isEdited  Boolean @default(false)
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt

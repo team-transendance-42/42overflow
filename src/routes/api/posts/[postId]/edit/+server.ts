@@ -47,7 +47,8 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 			where: { id: postId },
 			data: {
 				title: data.title,
-				content: data.content
+				content: data.content,
+				isEdited: true
 			}
 		});
 

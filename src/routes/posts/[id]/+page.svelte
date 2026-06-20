@@ -70,10 +70,6 @@
 	});
 
 	let postId = $derived(post?.id ?? 0);
-
-	function openProfile() {
-        goto(`/profile/${post?.user.name}`);
-    }
 </script>
 
 <!-- Post with Comments -->

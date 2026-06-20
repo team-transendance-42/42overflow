@@ -49,7 +49,7 @@
         onclick={openPostPage}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { openPostPage(); } }}
     >
-		{#if post.created_at != post.updated_at}
+		{#if post.isEdited}
 			<div class="break-all line-clamp-1"><em>[Edited]</em></div>
 		{/if}
         <div class="break-all line-clamp-1"><strong>Project:</strong> {post.title}</div>
