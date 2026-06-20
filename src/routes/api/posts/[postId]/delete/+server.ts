@@ -17,18 +17,33 @@ export const POST = async ({ locals, params }: RequestEvent) => {
 			throw error(400, 'Invalid Post ID');
 		}
 
-		// Get the post to verify ownership
 		const post = await db.post.findUnique({
 			where: { id: postId }
 		});
-
 		if (!post) {
 			throw error(404, 'Post not found');
 		}
 
-		// Check if the user owns the post
-		if (post.userId !== locals.user.id) {
-			throw error(403, 'You can only delete your own posts');
+		// Check user's subject membership role
+		const memberships = await db.subjectMember.findMany({
+			where: {
+				subjectId: post.subjectId,
+				userId: locals.user.id
+			},
+			select: { role: true }
+		});
+		const subjectRole = memberships[0]?.role;
+
+		// Check if the user has permission to delete the post
+		if (locals.user.role !== 'ADMIN'
+			&& locals.user.role !== 'MODERATOR'
+			&& subjectRole !== 'OWNER'
+			&& subjectRole !== 'CURATOR')
+		{
+			// Check if the user owns the post
+			if (post.userId !== locals.user.id) {
+				throw error(403, 'You can only delete your own posts');
+			}
 		}
 
 		// (soft-)Delete the post

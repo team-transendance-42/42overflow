@@ -10,7 +10,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.user = session?.user ?? null;
   event.locals.session = session?.session ?? null;
 
-   if (session?.user) {
+  if (session?.user) {
     await db.user.update({
       where: { id: session.user.id },
       data: { last_seen: new Date() },
