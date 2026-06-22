@@ -9,6 +9,7 @@ A post with no answer has no knowledge to offer the LLM.
 
 from config import DB_URL
 import asyncpg
+from asyncpg import Record # a high-performance PostgreSQL client library for Python, built specifically for use with asyncio (Python's async/await framework)
 
 
 def _normalize_topic(title: str) -> str:
@@ -18,7 +19,7 @@ def _normalize_topic(title: str) -> str:
     return title.lower().strip().replace(" ", "-")
 
 
-def _row_to_pair(row) -> dict:
+def _row_to_pair(row: Record) -> dict: # exact, documents what actually gets passed in.
     """Map one asyncpg Row (from the JOIN query) to a RAG pair dict."""
     topic = _normalize_topic(row["project_name"])
     return {
@@ -35,6 +36,8 @@ def _row_to_pair(row) -> dict:
 # JOIN (not LEFT JOIN) — posts with zero qualifying comments are excluded.
 # Nested thread replies (parentId IS NOT NULL) excluded to avoid noise.
 # Subject JOIN provides the canonical slug used as topic/tag.
+# || concat symbol is used to combine title + content into a single question string.
+# str_agg() turn many rows into one string
 _QUERY = """
     SELECT
         p.id,

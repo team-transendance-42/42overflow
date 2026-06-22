@@ -62,10 +62,6 @@ def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
     )
 
 
-def ensure_collection(name: str = _DEFAULT_COLLECTION) -> None:
-    """No-op stub — collection is created lazily on first use. Kept for call-site compatibility."""
-
-
 def get_embeddings(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict[str, list[float]]:
     """Fetch stored embeddings from ChromaDB for the given IDs. Returns id → embedding."""
     try:

@@ -50,8 +50,12 @@ class SeedRequest(BaseModel):
     clean: bool = False
 
 
-async def _sync_to_chroma(pairs: list[dict]) -> None:
-    """Sync question-answer pairs to ChromaDB — only embeds new or changed docs."""
+async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
+    """Sync question-answer pairs to ChromaDB — only embeds new or changed docs.
+
+    Returns {doc_id: embedding} for every doc that was freshly embedded this
+    call. Empty dict when nothing changed or embedding failed. The caller uses
+    this to avoid a redundant GET for docs whose vectors are already in memory."""
     augmented = [
         {
             **p,
@@ -70,7 +74,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
 
     if not to_update:
         print(f"[chroma] all {len(augmented)} docs already up to date — skipping embed")
-        return
+        return {}
 
     skip = len(augmented) - len(to_update)
     print(f"[chroma] embedding {len(to_update)} new/changed docs (skipping {skip} unchanged)")
@@ -80,7 +84,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
     except Exception as exc:
         print(f"[chroma] ERROR: embedding failed for batch of {len(to_update)} docs — "
               f"skipping upsert, ChromaDB will be stale until next reload. Reason: {exc}")
-        return
+        return {}
 
     upsert(
         ids=[p["_id"] for p in to_update],
@@ -95,17 +99,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
         ],
     )
     print(f"[chroma] upserted {len(to_update)} docs")
-
-
-"""
-@asynccontextmanager
-• decorator from contextlib for writing async context managers.
-• Lets you manage setup and cleanup logic for resources (e.g., DB connections,
-  caches) asynchronously.
-• Code before 'yield' runs at startup (setup), code after 'yield' runs at
-  shutdown (cleanup).
-• Used by FastAPI for lifespan events (app startup/shutdown).
-"""
+    return {p["_id"]: emb for p, emb in zip(to_update, embeddings)}
 
 
 async def _load_pairs(include_db: bool, label: str) -> list[dict]:
@@ -175,15 +169,17 @@ async def _fetch_embeddings(
     Returns ([], {}) on any ChromaDB or embedding failure so the caller can
     continue in degraded/BM25-only mode without crashing the startup path."""
     try:
-        await _sync_to_chroma(pairs)
-        print(f"[{label}] step 3 — ChromaDB sync complete")
+        fresh = await _sync_to_chroma(pairs)
+        print(f"[{label}] step 3 — ChromaDB sync complete ({len(fresh)} freshly embedded)")
     except Exception as exc:
         print(f"[{label}] WARNING: ChromaDB sync failed — serving from memory only. Reason: {exc}")
         return [], {}
 
     try:
-        stored = get_embeddings(all_ids)
-        all_embeddings = [stored[id_] for id_ in all_ids if id_ in stored]
+        stale_ids = [id_ for id_ in all_ids if id_ not in fresh]
+        stored = get_embeddings(stale_ids) if stale_ids else {}
+        merged = {**stored, **fresh}
+        all_embeddings = [merged[id_] for id_ in all_ids if id_ in merged]
         if len(all_embeddings) != len(all_ids):
             raise ValueError(f"ChromaDB returned {len(all_embeddings)}/{len(all_ids)} embeddings")
         topic_centroids = build_topic_centroids(pairs, all_embeddings)
