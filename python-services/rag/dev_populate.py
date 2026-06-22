@@ -13,9 +13,8 @@ Usage (stack must be up, run from python-services/rag/):
   uv run python dev_populate.py --clean   # delete bot posts first, re-insert
 
 After running, trigger RAG sync (from project root):
-  docker compose exec python-rag \\
-    curl -s -X POST http://localhost:8090/admin/reload-from-db \\
-    -H "X-Admin-Token: My!Favourite#RAG\\$Token&Is%Longer^Than*Your(Entire)Codebase~42overflow<3"
+  bash reload_rag.sh
+  # or: docker compose exec python-rag curl -s -X POST http://localhost:8090/admin/sync-chroma -H "X-Admin-Token: <token>"
 
 Then visit https://localhost:8443/posts to see the posts in the browser.
 """

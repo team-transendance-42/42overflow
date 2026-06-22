@@ -111,6 +111,138 @@ async def test_lifespan_does_not_call_load_db_pairs():
     mock_db.assert_not_called()
 
 
+# ── _load_pairs ──────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_load_pairs_rejects_missing_question_key():
+    """_load_pairs must raise ValueError if any pair lacks 'question'."""
+    from main import _load_pairs
+    with patch("main.load_seed", return_value=[{"answer": "A1", "topic": "c", "tags": []}]):
+        with pytest.raises(ValueError, match="missing required"):
+            await _load_pairs(include_db=False, label="test")
+
+
+@pytest.mark.asyncio
+async def test_load_pairs_rejects_missing_answer_key():
+    """_load_pairs must raise ValueError if any pair lacks 'answer'."""
+    from main import _load_pairs
+    with patch("main.load_seed", return_value=[{"question": "Q1", "topic": "c", "tags": []}]):
+        with pytest.raises(ValueError, match="missing required"):
+            await _load_pairs(include_db=False, label="test")
+
+
+@pytest.mark.asyncio
+async def test_load_pairs_skips_db_when_include_db_false():
+    """_load_pairs with include_db=False must not call load_db_pairs."""
+    from main import _load_pairs
+    seed = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": []}]
+    mock_db = AsyncMock(return_value=[])
+    with patch("main.load_seed", return_value=seed), \
+         patch("main.load_db_pairs", mock_db):
+        pairs = await _load_pairs(include_db=False, label="test")
+    assert len(pairs) == 1
+    mock_db.assert_not_called()
+
+
+# ── _prepare_corpus ───────────────────────────────────────────────────────────
+
+def test_prepare_corpus_builds_all_fields():
+    """_prepare_corpus must populate all six keys from a pair list."""
+    from main import _prepare_corpus
+    pairs = [
+        {"question": "Q1", "answer": "A1", "topic": "c",  "tags": ["intro"]},
+        {"question": "Q2", "answer": "A2", "topic": "go", "tags": []},
+    ]
+    corpus = _prepare_corpus(pairs, label="test")
+    assert len(corpus["all_texts"]) == 2
+    assert len(corpus["all_ids"]) == 2
+    assert corpus["all_topics"] == ["c", "go"]
+    assert "c" in corpus["topic_intro_ids"]
+    assert "go" not in corpus["topic_intro_ids"]
+    assert len(corpus["id_to_text"]) == 2
+    assert len(corpus["id_to_topic"]) == 2
+
+
+def test_prepare_corpus_duplicate_intro_keeps_first():
+    """Duplicate intro tags for the same topic must keep the first, ignore the second."""
+    from main import _prepare_corpus
+    from embedder import make_doc_id
+    pairs = [
+        {"question": "Q1", "answer": "A1", "topic": "c", "tags": ["intro"]},
+        {"question": "Q2", "answer": "A2", "topic": "c", "tags": ["intro"]},
+    ]
+    corpus = _prepare_corpus(pairs, label="test")
+    assert corpus["topic_intro_ids"]["c"] == make_doc_id("Q1")
+
+
+# ── _fetch_embeddings ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fetch_embeddings_returns_empty_on_sync_failure():
+    """_fetch_embeddings must return ([], {}) if ChromaDB sync raises."""
+    from main import _fetch_embeddings
+    pairs = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": []}]
+    with patch("main._sync_to_chroma", new_callable=AsyncMock,
+               side_effect=RuntimeError("ChromaDB down")):
+        emb, centroids = await _fetch_embeddings(pairs, ["id-1"], label="test")
+    assert emb == [] and centroids == {}
+
+
+@pytest.mark.asyncio
+async def test_fetch_embeddings_returns_empty_on_get_embeddings_failure():
+    """_fetch_embeddings must return ([], {}) if fetching stored embeddings raises."""
+    from main import _fetch_embeddings
+    pairs = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": []}]
+    with patch("main._sync_to_chroma", new_callable=AsyncMock), \
+         patch("main.get_embeddings", side_effect=RuntimeError("Chroma timeout")):
+        emb, centroids = await _fetch_embeddings(pairs, ["id-1"], label="test")
+    assert emb == [] and centroids == {}
+
+
+# ── admin_seed_postgres error paths ──────────────────────────────────────────
+
+def test_seed_postgres_connect_failure_returns_503():
+    """Postgres connection failure must return 503 with a diagnostic message."""
+    from main import app
+    import main as m
+    original_token = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "test-token"
+    try:
+        with patch("main.asyncpg.connect", new_callable=AsyncMock,
+                   side_effect=OSError("Connection refused")), \
+             patch("main.DB_URL", "postgresql://fake/testdb"):
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post("/admin/seed-postgres", json={},
+                               headers={"X-Admin-Token": "test-token"})
+        assert resp.status_code == 503
+        assert "Postgres" in resp.json()["detail"]
+    finally:
+        m.ADMIN_TOKEN = original_token
+
+
+def test_seed_postgres_operation_failure_returns_500():
+    """DB operation failure must return 500 with the exception text as detail."""
+    from main import app
+    import main as m
+    original_token = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "test-token"
+    try:
+        with patch("main.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
+             patch("main.DB_URL", "postgresql://fake/testdb"), \
+             patch("main.ensure_users", new_callable=AsyncMock,
+                   side_effect=RuntimeError("relation \"User\" does not exist")):
+            mock_connect.return_value = AsyncMock()
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post("/admin/seed-postgres", json={},
+                               headers={"X-Admin-Token": "test-token"})
+        assert resp.status_code == 500
+        assert "User" in resp.json()["detail"]
+    finally:
+        m.ADMIN_TOKEN = original_token
+
+
+# ── existing endpoint tests ───────────────────────────────────────────────────
+
 def test_seed_postgres_missing_token_returns_403():
     from main import app
     client = TestClient(app, raise_server_exceptions=False)
