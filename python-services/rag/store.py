@@ -27,21 +27,33 @@ def _make_client() -> chromadb.HttpClient:
     )
 
 
-# Single persistent client — reuses the TCP connection across all calls.
-# Previously _client() was called inside every function, opening a new
-# connection on every ChromaDB operation (~50-100ms overhead each time).
-_client = _make_client()
-
-# Lazily initialised — fetched on first use so a slow/down Chroma at import
-# time doesn't crash the process before FastAPI can start in degraded mode.
+# Both client and collection are lazily initialised so that a ChromaDB container
+# that is slow to start (or temporarily down) does not crash the import and does
+# not prevent FastAPI from starting in degraded/seed-only mode.
+# chromadb.HttpClient() performs a heartbeat HTTP request in its constructor, so
+# calling _make_client() at module level would fail if ChromaDB is unreachable.
+_client = None
 _collection = None
+
+
+def _get_client() -> chromadb.HttpClient:
+    global _client
+    if _client is None:
+        _client = _make_client()
+    return _client
 
 
 def _get_collection():
     global _collection
     if _collection is None:
-        _collection = _client.get_or_create_collection(_DEFAULT_COLLECTION)
+        _collection = _get_client().get_or_create_collection(_DEFAULT_COLLECTION)
     return _collection
+
+
+def _invalidate_collection() -> None:
+    """Reset cached collection after a ChromaDB error so the next call re-connects."""
+    global _collection
+    _collection = None
 
 
 def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
@@ -50,11 +62,16 @@ def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
     )
 
 
+def ensure_collection(name: str = _DEFAULT_COLLECTION) -> None:
+    """No-op stub — collection is created lazily on first use. Kept for call-site compatibility."""
+
+
 def get_embeddings(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict[str, list[float]]:
     """Fetch stored embeddings from ChromaDB for the given IDs. Returns id → embedding."""
     try:
         result = _get_collection().get(ids=ids, include=["embeddings"])
     except Exception as exc:
+        _invalidate_collection()
         raise _chroma_error("get_embeddings", exc) from exc
     return {
         doc_id: emb
@@ -66,6 +83,7 @@ def get_existing_hashes(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict
     try:
         result = _get_collection().get(ids=ids, include=["metadatas"])
     except Exception as exc:
+        _invalidate_collection()
         raise _chroma_error("get_existing_hashes", exc) from exc
     return {
         doc_id: meta["doc_hash"]
@@ -82,8 +100,11 @@ def upsert(
     name: str = _DEFAULT_COLLECTION,
 ) -> None:
     try:
-        _get_collection().upsert(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
+        _get_collection().upsert(
+            ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas
+        )
     except Exception as exc:
+        _invalidate_collection()
         raise _chroma_error("upsert", exc) from exc
 
 
@@ -94,9 +115,10 @@ def upsert(
 # def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
 #     """Fetch documents, embeddings, and metadatas for the given IDs from ChromaDB."""
 #     try:
-#         col = _client.get_or_create_collection(name)
+#         col = _get_collection()
 #         return col.get(ids=ids, include=["embeddings", "documents", "metadatas"])
 #     except Exception as exc:
+#         _invalidate_collection()
 #         raise _chroma_error("retrieve", exc) from exc
 
 
@@ -111,14 +133,8 @@ def upsert(
 #     topic_filter: str | None = None,
 #     name:         str = _DEFAULT_COLLECTION,
 # ) -> list[dict]:
-#     """
-#     Find the n nearest neighbours to embedding in the collection.
-#     Uses ChromaDB’s HNSW index (approximate, O(log n)).
-#     topic_filter restricts to docs where metadata topic == topic_filter.
-#     Returns: [{"id": ..., "document": ..., "distance": ...}] sorted by distance.
-#     """
 #     try:
-#         col   = _client.get_or_create_collection(name)
+#         col   = _get_collection()
 #         where = {"topic": topic_filter} if topic_filter else None
 #         safe_n = min(n, col.count())
 #         if safe_n == 0:
@@ -130,6 +146,7 @@ def upsert(
 #             include=["documents", "distances"],
 #         )
 #     except Exception as exc:
+#         _invalidate_collection()
 #         raise _chroma_error("query_dense", exc) from exc
 #     ids       = result["ids"][0]
 #     documents = result["documents"][0]
