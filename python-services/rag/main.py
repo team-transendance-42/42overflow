@@ -1,89 +1,79 @@
+import asyncio
 import os
+from collections import Counter
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel
+import asyncpg
 
 from bm25_index import BM25Index
-from config import ADMIN_TOKEN
+from config import ADMIN_TOKEN, DB_URL
 from db import load_db_pairs
 from detector import build_topic_centroids
+from dev_populate import clean_posts, ensure_subjects, ensure_users, insert_posts
 from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
 from numpy_index import NumpyIndex
 from router import router as rag_router
 from seed import load_seed
-from store import ensure_collection, get_embeddings, get_existing_hashes, upsert
+from store import get_embeddings, get_existing_hashes, upsert
 
-# qa_cache shared across requests — populated at startup
+# qa_cache shared across requests — populated at startup in ram from initial seed load in chromadb
 # Strengths:
 # Fast in-memory access to QA pairs for quick retrieval.
-# Persistent vector storage in ChromaDB for scalable similarity search.
+# Persistent vector storage in ChromaDB for scalable similarity search.(on start up or manual reload once we want to sync with DB(postgres) updates)
 
 # Limitations for large-scale/production:
 # In-memory cache (qa_cache["qa_pairs"]) may not scale for millions of documents
 # or distributed systems.
-# No real-time sync between memory and DB if data changes after startup.
-# No advanced retrieval (e.g., hybrid search, filtering, sharding).
-# Lacks user/session management, security, and distributed cache.
+# No real-time sync between memory and DB: needs to be done manually via /admin/sync-chroma endpoint, which may lead to stale data if DB updates are frequent.
+# No advanced retrieval (e.g., hybrid search, filtering, sharding).: todo: check it out
+# Lacks user/session management, security, and distributed cache: todo -> how vulnarable is: checkout
 # Best practices for production RAG:
 
 # Use a scalable vector DB (like ChromaDB, Pinecone, Weaviate, etc.) as the single
 # source of truth.
 # Implement efficient retrieval pipelines (possibly with hybrid search: vectors +
-# metadata filters).
+# metadata filters).todo: we already have it?
 # Use distributed caching (e.g., Redis) if you need fast access to frequently used data.
 # Keep your in-memory cache in sync with DB updates, or use the DB directly for retrieval.
-# Add monitoring, logging, and error handling for robustness.
+# Add monitoring, logging, and error handling for robustness. todo
 qa_cache: dict = {"qa_pairs": []}
+_sync_lock = asyncio.Lock()
 
 
-def _merge(seed_pairs: list[dict], db_pairs: list[dict]) -> list[dict]:
-    """Seed is the baseline. DB pairs are additive; DB wins on duplicate questions."""
-    try:
-        merged: dict[str, dict] = {p["question"]: p for p in seed_pairs}
-    except KeyError as ex:
-        raise ValueError(f"Seed pair missing 'question' field: {ex}") from ex
+def require_admin(x_admin_token: str | None = Header(None)) -> None:
+    """FastAPI dependency — raises 403 if X-Admin-Token header is missing or wrong."""
+    if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
-    added = 0
-    overwritten = 0
-    for p in db_pairs:
-        try:
-            if p["question"] in merged:
-                overwritten += 1
-            else:
-                added += 1
-            merged[p["question"]] = p
-        except KeyError as ex:
-            raise ValueError(f"DB pair missing 'question' field: {ex}") from ex
 
-    print(f"[merge] seed={len(seed_pairs)}  db={len(db_pairs)}  "
-          f"new={added}  overwritten={overwritten}  total={len(merged)}")
-    return list(merged.values())
+class SeedRequest(BaseModel):
+    clean: bool = False
 
 
 async def _sync_to_chroma(pairs: list[dict]) -> None:
-    '''Syncs the given question-answer pairs to ChromaDB. generates unique IDs and
-    hashes for each pair and checks which pairs are new or changed compared to
-    existing entries in ChromaDB. Only new or changed pairs are embedded and
-    upserted to ChromaDB, optimizing performance by avoiding unnecessary
-    operations on unchanged data.'''
-    for p in pairs:
-        p["_id"] = make_doc_id(p["question"])
-        p["_hash"] = make_doc_hash(p["question"], p["answer"])
-        p["_text"] = format_doc(p["question"], p["answer"], p.get("tags", []))
-
-    # has try/catch for connection issues, will raise RuntimeError if ChromaDB is unreachable
-    ensure_collection()
-    existing = get_existing_hashes([p["_id"] for p in pairs])
+    """Sync question-answer pairs to ChromaDB — only embeds new or changed docs."""
+    augmented = [
+        {
+            **p,
+            "_id":   make_doc_id(p["question"]),
+            "_hash": make_doc_hash(p["question"], p["answer"]),
+            "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
+        }
+        for p in pairs
+    ]
+    existing = get_existing_hashes([p["_id"] for p in augmented])
 
     to_update = [
-        p for p in pairs
+        p for p in augmented
         if p["_id"] not in existing or existing[p["_id"]] != p["_hash"]
     ]
 
     if not to_update:
-        print(f"[chroma] all {len(pairs)} docs already up to date — skipping embed")
+        print(f"[chroma] all {len(augmented)} docs already up to date — skipping embed")
         return
 
-    skip = len(pairs) - len(to_update)
+    skip = len(augmented) - len(to_update)
     print(f"[chroma] embedding {len(to_update)} new/changed docs (skipping {skip} unchanged)")
 
     try:
@@ -121,20 +111,18 @@ async def _sync_to_chroma(pairs: list[dict]) -> None:
 
 async def _load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True) -> dict:
     """Load seed + DB pairs, sync to Chroma, rebuild all indexes, update app.state.
-    Returns a summary dict. Called at startup and by the /admin/reload endpoint."""
-    from collections import Counter
-
+    Returns a summary dict. Called at startup and by /admin/sync-chroma."""
     seed_pairs = load_seed()
     print(f"[{label}] step 1 — {len(seed_pairs)} pairs from seed.json")
 
     db_pairs = await load_db_pairs() if include_db else []
-    qa_cache["qa_pairs"] = _merge(seed_pairs, db_pairs)
-    print(f"[{label}] step 2 — {len(qa_cache['qa_pairs'])} pairs total after merge")
+    qa_cache["qa_pairs"] = seed_pairs + db_pairs
+    print(f"[{label}] step 2 — {len(qa_cache['qa_pairs'])} pairs total (seed={len(seed_pairs)} db={len(db_pairs)})")
     topic_counts = Counter(p.get("topic", "unknown") for p in qa_cache["qa_pairs"])
     print(f"[{label}] topics in corpus: {dict(sorted(topic_counts.items()))}")
-    db_sourced = [p for p in qa_cache["qa_pairs"] if p.get("source", "").startswith("db") or p.get("id", "").startswith("db-")]
+    db_sourced = [p for p in qa_cache["qa_pairs"] if p.get("source") == "db-post"]
     seed_sourced = len(qa_cache["qa_pairs"]) - len(db_sourced)
-    print(f"[{label}] DB-sourced pairs in merged corpus: {len(db_sourced)}")
+    print(f"[{label}] DB-sourced pairs: {len(db_sourced)}")
 
     try:
         await _sync_to_chroma(qa_cache["qa_pairs"])
@@ -231,16 +219,38 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(rag_router)
 
 
-@app.post("/admin/reload-from-db")
-async def admin_reload(request: Request) -> dict:
-    """Re-load seed + DB pairs and rebuild all indexes without restarting.
-    Requires X-Admin-Token header matching RAG_ADMIN_TOKEN env var."""
-    if not ADMIN_TOKEN or request.headers.get("X-Admin-Token") != ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    print("[reload] triggered via /admin/reload-from-db")
-    summary = await _load_and_index(request.app, label="reload", include_db=True)
-    return {"status": "ok", **summary}
-app.state.load_and_index = _load_and_index
+@app.post("/admin/sync-chroma")
+async def admin_sync_chroma(request: Request, _: None = Depends(require_admin)) -> dict:
+    """Read all Postgres posts, sync to ChromaDB, rebuild indexes — no restart needed."""
+    if _sync_lock.locked():
+        return {"status": "already running"}
+    async with _sync_lock:
+        print("[sync] triggered via /admin/sync-chroma")
+        summary = await _load_and_index(request.app, label="sync", include_db=True)
+        return {"status": "ok", **summary}
+
+
+@app.post("/admin/seed-postgres")
+async def admin_seed_postgres(body: SeedRequest, _: None = Depends(require_admin)) -> dict:
+    """Insert fake test users/subjects/posts/comments into Postgres.
+    Does NOT touch ChromaDB — call /admin/sync-chroma afterwards.
+    Safe to call multiple times (idempotent). Pass {"clean": true} to wipe and re-insert."""
+    if not DB_URL:
+        raise HTTPException(status_code=503, detail="DATABASE_URL not set — cannot seed")
+
+    print(f"[seed] connecting to Postgres (clean={body.clean})")
+    conn = await asyncpg.connect(DB_URL, timeout=10.0)
+    try:
+        await ensure_users(conn)
+        subject_map = await ensure_subjects(conn)
+        if body.clean:
+            await clean_posts(conn)
+        inserted, skipped = await insert_posts(conn, subject_map)
+    finally:
+        await conn.close()
+
+    print(f"[seed] done — inserted={inserted} skipped={skipped}")
+    return {"status": "ok", "inserted": inserted, "skipped": skipped}
 
 
 @app.get("/healthz")

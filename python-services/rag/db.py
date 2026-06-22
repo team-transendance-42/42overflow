@@ -77,7 +77,7 @@ async def load_db_pairs() -> list[dict]:
         return []
 
     try:
-        conn = await asyncpg.connect(DB_URL)
+        conn = await asyncpg.connect(DB_URL, timeout=10.0)
         print("[db] connected to Postgres OK")
     except Exception as exc:
         print(f"[db] could not connect to Postgres: {exc}")

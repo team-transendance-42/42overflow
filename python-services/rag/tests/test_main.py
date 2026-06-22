@@ -5,35 +5,8 @@ No live services needed — all external calls are mocked.
 """
 import pytest
 from unittest.mock import AsyncMock, patch
+from fastapi.testclient import TestClient
 
-
-def test_merge_db_overwrites_seed():
-    from main import _merge
-
-    seed = [{"question": "Q1", "answer": "seed"}]
-    db = [{"question": "Q1", "answer": "db"}, {"question": "Q2", "answer": "only-db"}]
-    result = _merge(seed, db)
-
-    by_q = {r["question"]: r for r in result}
-    assert by_q["Q1"]["answer"] == "db"
-    assert "Q2" in by_q
-
-
-def test_merge_empty_db():
-    from main import _merge
-
-    seed = [{"question": "Q1", "answer": "seed"}]
-    result = _merge(seed, [])
-    assert len(result) == 1
-    assert result[0]["answer"] == "seed"
-
-
-def test_merge_bad_pair_raises():
-    from main import _merge
-
-    seed = [{"answer": "no question key here"}]  # missing "question"
-    with pytest.raises(ValueError, match="missing 'question'"):
-        _merge(seed, [])
 
 
 @pytest.mark.asyncio
@@ -136,3 +109,130 @@ async def test_lifespan_does_not_call_load_db_pairs():
             pass
 
     mock_db.assert_not_called()
+
+
+def test_seed_postgres_missing_token_returns_403():
+    from main import app
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/admin/seed-postgres")
+    assert resp.status_code == 403
+
+
+def test_seed_postgres_wrong_token_returns_403():
+    from main import app
+    import main as m
+    original = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "correct-token"
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/admin/seed-postgres", headers={"X-Admin-Token": "wrong"})
+        assert resp.status_code == 403
+    finally:
+        m.ADMIN_TOKEN = original
+
+
+def test_seed_postgres_happy_path():
+    from main import app
+    import main as m
+
+    original_token = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "test-token"
+
+    try:
+        with patch("main.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
+             patch("main.DB_URL", "postgresql://fake/testdb"), \
+             patch("main.ensure_users", new_callable=AsyncMock), \
+             patch("main.ensure_subjects", new_callable=AsyncMock, return_value={"push_swap": 1}), \
+             patch("main.clean_posts", new_callable=AsyncMock), \
+             patch("main.insert_posts", new_callable=AsyncMock, return_value=(3, 0)):
+            mock_conn = AsyncMock()
+            mock_connect.return_value = mock_conn
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post(
+                "/admin/seed-postgres",
+                json={},
+                headers={"X-Admin-Token": "test-token"},
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["status"] == "ok"
+            assert body["inserted"] == 3
+            assert body["skipped"] == 0
+    finally:
+        m.ADMIN_TOKEN = original_token
+
+
+def test_seed_postgres_clean_param_calls_clean_posts():
+    from main import app
+    import main as m
+
+    original_token = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "test-token"
+
+    try:
+        with patch("main.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
+             patch("main.DB_URL", "postgresql://fake/testdb"), \
+             patch("main.ensure_users", new_callable=AsyncMock), \
+             patch("main.ensure_subjects", new_callable=AsyncMock, return_value={}), \
+             patch("main.clean_posts", new_callable=AsyncMock) as mock_clean, \
+             patch("main.insert_posts", new_callable=AsyncMock, return_value=(0, 0)):
+            mock_connect.return_value = AsyncMock()
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post(
+                "/admin/seed-postgres",
+                json={"clean": True},
+                headers={"X-Admin-Token": "test-token"},
+            )
+            assert resp.status_code == 200
+            mock_clean.assert_called_once()
+    finally:
+        m.ADMIN_TOKEN = original_token
+
+
+def test_sync_chroma_missing_token_returns_403():
+    from main import app
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/admin/sync-chroma")
+    assert resp.status_code == 403
+
+
+def test_sync_chroma_wrong_token_returns_403():
+    from main import app
+    import main as m
+    original = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "correct-token"
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/admin/sync-chroma", headers={"X-Admin-Token": "wrong"})
+        assert resp.status_code == 403
+    finally:
+        m.ADMIN_TOKEN = original
+
+
+def test_sync_chroma_happy_path():
+    from main import app
+    import main as m
+
+    original_token = m.ADMIN_TOKEN
+    m.ADMIN_TOKEN = "test-token"
+
+    seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
+
+    try:
+        with patch("chromadb.HttpClient"), \
+             patch("main.load_seed", return_value=seed_data), \
+             patch("main.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
+             patch("main._sync_to_chroma", new_callable=AsyncMock), \
+             patch("main.get_embeddings", side_effect=lambda ids: {i: [0.1] * 768 for i in ids}):
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post(
+                "/admin/sync-chroma",
+                headers={"X-Admin-Token": "test-token"},
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["status"] == "ok"
+            assert "total_docs" in body
+            assert "embeddings_ready" in body
+    finally:
+        m.ADMIN_TOKEN = original_token

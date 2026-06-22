@@ -4,5 +4,5 @@
 # See docdev.md "RAG — Sync & Populate" for full instructions.
 
 docker compose exec python-rag curl -s -X POST \
-  http://localhost:8090/admin/reload-from-db \
+  http://localhost:8090/admin/sync-chroma \
   -H "X-Admin-Token: traLala-naRozden&Den&Ela!"

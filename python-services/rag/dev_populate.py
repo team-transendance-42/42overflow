@@ -22,10 +22,9 @@ Then visit https://localhost:8443/posts to see the posts in the browser.
 
 import argparse
 import asyncio
+import os
 
 import asyncpg
-
-DB_URL = "postgresql://postgres:postgres@localhost:5433/transcendance_db"
 
 USERS = [
     {"id": "fake-user-happyface22",    "email": "happyface22@overflow.local",    "name": "HappyFace22"},
@@ -261,6 +260,35 @@ async def ensure_users(conn) -> None:
     print(f"[users] ready: {names}")
 
 
+async def ensure_subjects(conn) -> dict[str, int]:
+    """For each unique title in POSTS: use existing Subject or create one.
+    Returns {title: subject_id} map for use in insert_posts."""
+    unique_titles = list(dict.fromkeys(entry["title"] for entry in POSTS))
+    subject_map: dict[str, int] = {}
+
+    for title in unique_titles:
+        slug = title.lower().strip().replace(" ", "-")
+        existing_id = await conn.fetchval(
+            'SELECT id FROM "Subject" WHERE slug = $1', slug
+        )
+        if existing_id is not None:
+            subject_map[title] = existing_id
+            print(f"[subjects] using existing: {title!r} → id={existing_id}")
+        else:
+            new_id = await conn.fetchval(
+                """
+                INSERT INTO "Subject" (name, slug, created_at, updated_at)
+                VALUES ($1, $2, NOW(), NOW())
+                RETURNING id
+                """,
+                title, slug,
+            )
+            subject_map[title] = new_id
+            print(f"[subjects] created: {title!r} → id={new_id}")
+
+    return subject_map
+
+
 async def clean_posts(conn) -> None:
     ids = [u["id"] for u in USERS]
     comment_count = await conn.fetchval(
@@ -274,11 +302,12 @@ async def clean_posts(conn) -> None:
     print(f"[clean] deleted {post_count} posts and {comment_count} comments")
 
 
-async def insert_posts(conn) -> tuple[int, int]:
+async def insert_posts(conn, subject_map: dict[str, int]) -> tuple[int, int]:
     inserted = 0
     skipped = 0
 
     for entry in POSTS:
+        subject_id = subject_map[entry["title"]]
         existing = await conn.fetchval(
             'SELECT id FROM "Post" WHERE "userId" = $1 AND title = $2 AND content = $3',
             entry["author"], entry["title"], entry["content"],
@@ -289,10 +318,10 @@ async def insert_posts(conn) -> tuple[int, int]:
 
         post_id = await conn.fetchval(
             """
-            INSERT INTO "Post" (title, content, "userId", created_at, updated_at)
-            VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id
+            INSERT INTO "Post" (title, content, "userId", "subjectId", created_at, updated_at)
+            VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id
             """,
-            entry["title"], entry["content"], entry["author"],
+            entry["title"], entry["content"], entry["author"], subject_id,
         )
 
         for comment in entry["comments"]:
@@ -312,18 +341,19 @@ async def insert_posts(conn) -> tuple[int, int]:
 
 
 async def main(clean: bool) -> None:
-    print(f"[db] connecting to {DB_URL.split('@')[1]}")
-    conn = await asyncpg.connect(DB_URL)
+    db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/transcendance_db")
+    print(f"[db] connecting to {db_url.split('@')[-1]}")
+    conn = await asyncpg.connect(db_url)
     try:
         await ensure_users(conn)
+        subject_map = await ensure_subjects(conn)
         if clean:
             await clean_posts(conn)
-        inserted, skipped = await insert_posts(conn)
+        inserted, skipped = await insert_posts(conn, subject_map)
         print(f"\n[done] inserted={inserted}  skipped={skipped}  total={len(POSTS)} posts")
 
         if inserted > 0:
-            print("\nNext: run 'bash reload_rag.sh' from the project root to sync.")
-            print("Then open https://localhost:8443/posts to see the posts.")
+            print("\nNext: call POST /admin/seed-postgres, then POST /admin/sync-chroma.")
     finally:
         await conn.close()
 
