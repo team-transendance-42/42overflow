@@ -127,10 +127,13 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 // buildRAGPrompt builds the grounded prompt sent to Ollama.
 // Strict rules prevent hallucination: the model must ONLY use the provided
 // context and must not fall back to its training knowledge or guess.
+//
+// Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
+// interpret "answer clearly" as "be concise" and return only the first sentence.
 func buildRAGPrompt(ctxStr, question string) string {
 	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
 		"STRICT RULES — follow exactly:\n" +
-		"1. If the context directly covers the question: answer clearly using ONLY what is written there.\n" +
+		"1. If the context directly covers the question: reproduce the COMPLETE answer from the context word for word. Do NOT summarize or shorten it.\n" +
 		"2. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
 		"   \"I don't have enough context to answer this.\"\n" +
 		"3. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
@@ -149,17 +152,21 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	}
 
 	if cached, ok := ragCacheGet(question); ok {
+		log.Printf("[RAG] cache HIT for %q — len=%d", question, len(cached))
 		ch := make(chan string, 1)
 		ch <- cached
 		close(ch)
 		return ch, nil
 	}
+	log.Printf("[RAG] cache MISS for %q — calling python-rag", question)
 
 	var retrieved models.RagRetrieveResponse
 	if err := doJSONWithRetry(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
 		map[string]any{"question": question}, &retrieved); err != nil {
 		return nil, fmt.Errorf("retrieve contexts: %w", err)
 	}
+	log.Printf("[RAG] retrieved %d contexts, confidence=%.4f, best_similarity=%.4f, has_embeddings=%v",
+		len(retrieved.Contexts), retrieved.Confidence, retrieved.BestSimilarity, retrieved.HasEmbeddings)
 
 	// Two-layer relevance gate — both must pass before Ollama is called.
 	//
@@ -200,7 +207,9 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	// extractAnswer strips the "Q: ..." prefix (retrieval metadata, redundant here).
 	blocks := make([]string, len(retrieved.Contexts))
 	for i, c := range retrieved.Contexts {
-		blocks[i] = fmt.Sprintf("[%d] %s", i+1, extractAnswer(c.Text))
+		extracted := extractAnswer(c.Text)
+		log.Printf("[RAG] context[%d] raw_len=%d extracted_len=%d", i+1, len(c.Text), len(extracted))
+		blocks[i] = fmt.Sprintf("[%d] %s", i+1, extracted)
 	}
 
 	ctxStr := "(no context retrieved)"
@@ -209,6 +218,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	}
 
 	prompt := buildRAGPrompt(ctxStr, question)
+	log.Printf("[RAG] prompt total_len=%d, sending to ollama model=%s", len(prompt), chatModelName())
 
 	body, err := json.Marshal(map[string]any{
 		"model":      chatModelName(),
@@ -253,7 +263,11 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		// Only cache when the stream completed naturally. If ctx was cancelled
 		// (client disconnected), rawCh closes early with a partial answer —
 		// caching it would serve a truncated response to the next N users for 1h.
-		if ctx.Err() == nil {
+		// Also skip "no info" responses so a /admin/sync-chroma that adds the
+		// relevant data is not blocked by a stale cache entry for up to 1h.
+		log.Printf("[RAG] ollama final answer len=%d: %q", sb.Len(), sb.String())
+		const noInfoMarker = "I don't have enough context to answer this"
+		if ctx.Err() == nil && !strings.Contains(sb.String(), noInfoMarker) {
 			ragCacheSet(question, sb.String())
 		}
 	}()
