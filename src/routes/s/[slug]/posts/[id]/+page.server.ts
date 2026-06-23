@@ -51,8 +51,19 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			return ({ post: null });
 		}
 
+		const subject = await db.subject.findUnique({
+			where: { slug: slug }
+		});
+
+		if (!subject) {
+			throw (new Error('Subject not found'));
+		}
+
 		const postwithcomments = await db.post.findUnique({
-			where: { id: postIdNum },
+			where: { 
+				id: postIdNum,
+				subjectId: subject.id
+			},
 			include: {
 				comments: {
 					include: { user: true }
