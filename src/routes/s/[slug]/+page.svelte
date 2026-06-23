@@ -37,7 +37,6 @@
 		const res = await fetch(`/api/subjects/${$page.params.slug}/post?page=${currentPage}&limit=${limit}`);
 		const json = await res.json();
 
-		console.log('response status: ', res.status);
 		if (!res.ok) {
 			error = json.error || 'An error occurred while loading posts.';
 			return;
