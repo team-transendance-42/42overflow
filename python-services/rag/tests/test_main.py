@@ -17,7 +17,7 @@ async def test_lifespan_seed_failure_is_fatal():
 
     app = FastAPI()
     with patch("chromadb.HttpClient"), \
-            patch("main.load_seed", side_effect=RuntimeError("Seed file not found")):
+            patch("indexer.load_seed", side_effect=RuntimeError("Seed file not found")):
         with pytest.raises(RuntimeError, match="Seed file not found"):
             async with lifespan(app):
                 pass
@@ -26,18 +26,19 @@ async def test_lifespan_seed_failure_is_fatal():
 @pytest.mark.asyncio
 async def test_lifespan_chroma_failure_is_non_fatal():
     """If _sync_to_chroma raises, lifespan must still yield — app starts in degraded mode."""
-    from main import lifespan, qa_cache
+    from main import lifespan
+    from indexer import qa_cache
     from fastapi import FastAPI
 
     seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
     app = FastAPI()
 
     with patch("chromadb.HttpClient"), \
-            patch("main.load_seed", return_value=seed_data), \
-            patch("main.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
-            patch("main._sync_to_chroma", new_callable=AsyncMock,
+            patch("indexer.load_seed", return_value=seed_data), \
+            patch("indexer.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
+            patch("indexer._sync_to_chroma", new_callable=AsyncMock,
                   side_effect=RuntimeError("ChromaDB down")), \
-            patch("main.get_embeddings", side_effect=RuntimeError("ChromaDB down")):
+            patch("indexer.get_embeddings", side_effect=RuntimeError("ChromaDB down")):
         async with lifespan(app):
             assert len(qa_cache["qa_pairs"]) == 1
 
@@ -45,17 +46,18 @@ async def test_lifespan_chroma_failure_is_non_fatal():
 @pytest.mark.asyncio
 async def test_lifespan_happy_path():
     """Full successful startup populates qa_cache."""
-    from main import lifespan, qa_cache
+    from main import lifespan
+    from indexer import qa_cache
     from fastapi import FastAPI
 
     seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
     app = FastAPI()
 
     with patch("chromadb.HttpClient"), \
-            patch("main.load_seed", return_value=seed_data), \
-            patch("main.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
-            patch("main._sync_to_chroma", new_callable=AsyncMock), \
-            patch("main.get_embeddings", side_effect=lambda ids: {id_: [0.1] * 768 for id_ in ids}):
+            patch("indexer.load_seed", return_value=seed_data), \
+            patch("indexer.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
+            patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
+            patch("indexer.get_embeddings", side_effect=lambda ids: {id_: [0.1] * 768 for id_ in ids}):
         async with lifespan(app):
             assert len(qa_cache["qa_pairs"]) == 1
         assert qa_cache["qa_pairs"] == []
@@ -73,17 +75,17 @@ async def test_lifespan_sets_app_state():
     ]
     app = FastAPI()
     with patch("chromadb.HttpClient"), \
-        patch("main.load_seed", return_value=seed_data), \
-        patch("main.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
-        patch("main._sync_to_chroma", new_callable=AsyncMock), \
-        patch("main.get_embeddings",
+        patch("indexer.load_seed", return_value=seed_data), \
+        patch("indexer.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
+        patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
+        patch("indexer.get_embeddings",
               side_effect=lambda ids: {id_: [0.1 * (i + 1)] * 768 for i, id_ in enumerate(ids)}):
         async with lifespan(app):
             assert hasattr(app.state, "bm25")
             assert hasattr(app.state, "id_to_text")
             assert hasattr(app.state, "centroids")
             assert hasattr(app.state, "id_to_topic")
-            assert hasattr(app.state, "numpy_index")   # added in Step 2 perf optimisation
+            assert hasattr(app.state, "numpy_index")
             assert "codexion" in app.state.centroids
             assert "fly-in" in app.state.centroids
             assert len(app.state.centroids["codexion"]) == 768
@@ -101,10 +103,10 @@ async def test_lifespan_does_not_call_load_db_pairs():
     app = FastAPI()
 
     with patch("chromadb.HttpClient"), \
-            patch("main.load_seed", return_value=seed_data), \
-            patch("main.load_db_pairs", mock_db), \
-            patch("main._sync_to_chroma", new_callable=AsyncMock), \
-            patch("main.get_embeddings", side_effect=lambda ids: {id_: [0.1] * 768 for id_ in ids}):
+            patch("indexer.load_seed", return_value=seed_data), \
+            patch("indexer.load_db_pairs", mock_db), \
+            patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
+            patch("indexer.get_embeddings", side_effect=lambda ids: {id_: [0.1] * 768 for id_ in ids}):
         async with lifespan(app):
             pass
 
@@ -116,8 +118,8 @@ async def test_lifespan_does_not_call_load_db_pairs():
 @pytest.mark.asyncio
 async def test_load_pairs_rejects_missing_question_key():
     """_load_pairs must raise ValueError if any pair lacks 'question'."""
-    from main import _load_pairs
-    with patch("main.load_seed", return_value=[{"answer": "A1", "topic": "c", "tags": []}]):
+    from indexer import _load_pairs
+    with patch("indexer.load_seed", return_value=[{"answer": "A1", "topic": "c", "tags": []}]):
         with pytest.raises(ValueError, match="missing required"):
             await _load_pairs(include_db=False, label="test")
 
@@ -125,8 +127,8 @@ async def test_load_pairs_rejects_missing_question_key():
 @pytest.mark.asyncio
 async def test_load_pairs_rejects_missing_answer_key():
     """_load_pairs must raise ValueError if any pair lacks 'answer'."""
-    from main import _load_pairs
-    with patch("main.load_seed", return_value=[{"question": "Q1", "topic": "c", "tags": []}]):
+    from indexer import _load_pairs
+    with patch("indexer.load_seed", return_value=[{"question": "Q1", "topic": "c", "tags": []}]):
         with pytest.raises(ValueError, match="missing required"):
             await _load_pairs(include_db=False, label="test")
 
@@ -134,11 +136,11 @@ async def test_load_pairs_rejects_missing_answer_key():
 @pytest.mark.asyncio
 async def test_load_pairs_skips_db_when_include_db_false():
     """_load_pairs with include_db=False must not call load_db_pairs."""
-    from main import _load_pairs
+    from indexer import _load_pairs
     seed = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": []}]
     mock_db = AsyncMock(return_value=[])
-    with patch("main.load_seed", return_value=seed), \
-         patch("main.load_db_pairs", mock_db):
+    with patch("indexer.load_seed", return_value=seed), \
+         patch("indexer.load_db_pairs", mock_db):
         pairs = await _load_pairs(include_db=False, label="test")
     assert len(pairs) == 1
     mock_db.assert_not_called()
@@ -148,7 +150,7 @@ async def test_load_pairs_skips_db_when_include_db_false():
 
 def test_prepare_corpus_builds_all_fields():
     """_prepare_corpus must populate all six keys from a pair list."""
-    from main import _prepare_corpus
+    from indexer import _prepare_corpus
     pairs = [
         {"question": "Q1", "answer": "A1", "topic": "c",  "tags": ["intro"]},
         {"question": "Q2", "answer": "A2", "topic": "go", "tags": []},
@@ -165,7 +167,7 @@ def test_prepare_corpus_builds_all_fields():
 
 def test_prepare_corpus_duplicate_intro_keeps_first():
     """Duplicate intro tags for the same topic must keep the first, ignore the second."""
-    from main import _prepare_corpus
+    from indexer import _prepare_corpus
     from embedder import make_doc_id
     pairs = [
         {"question": "Q1", "answer": "A1", "topic": "c", "tags": ["intro"]},
@@ -180,9 +182,9 @@ def test_prepare_corpus_duplicate_intro_keeps_first():
 @pytest.mark.asyncio
 async def test_fetch_embeddings_returns_empty_on_sync_failure():
     """_fetch_embeddings must return ([], {}) if ChromaDB sync raises."""
-    from main import _fetch_embeddings
+    from indexer import _fetch_embeddings
     pairs = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": []}]
-    with patch("main._sync_to_chroma", new_callable=AsyncMock,
+    with patch("indexer._sync_to_chroma", new_callable=AsyncMock,
                side_effect=RuntimeError("ChromaDB down")):
         emb, centroids = await _fetch_embeddings(pairs, ["id-1"], label="test")
     assert emb == [] and centroids == {}
@@ -191,10 +193,10 @@ async def test_fetch_embeddings_returns_empty_on_sync_failure():
 @pytest.mark.asyncio
 async def test_fetch_embeddings_returns_empty_on_get_embeddings_failure():
     """_fetch_embeddings must return ([], {}) if fetching stored embeddings raises."""
-    from main import _fetch_embeddings
+    from indexer import _fetch_embeddings
     pairs = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": []}]
-    with patch("main._sync_to_chroma", new_callable=AsyncMock), \
-         patch("main.get_embeddings", side_effect=RuntimeError("Chroma timeout")):
+    with patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
+         patch("indexer.get_embeddings", side_effect=RuntimeError("Chroma timeout")):
         emb, centroids = await _fetch_embeddings(pairs, ["id-1"], label="test")
     assert emb == [] and centroids == {}
 
@@ -204,41 +206,41 @@ async def test_fetch_embeddings_returns_empty_on_get_embeddings_failure():
 def test_seed_postgres_connect_failure_returns_503():
     """Postgres connection failure must return 503 with a diagnostic message."""
     from main import app
-    import main as m
-    original_token = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "test-token"
+    import admin_router as ar
+    original_token = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "test-token"
     try:
-        with patch("main.asyncpg.connect", new_callable=AsyncMock,
+        with patch("admin_router.asyncpg.connect", new_callable=AsyncMock,
                    side_effect=OSError("Connection refused")), \
-             patch("main.DB_URL", "postgresql://fake/testdb"):
+             patch("admin_router.DB_URL", "postgresql://fake/testdb"):
             client = TestClient(app, raise_server_exceptions=False)
-            resp = client.post("/admin/seed-postgres", json={},
+            resp = client.post("/admin/seed-postgres",
                                headers={"X-Admin-Token": "test-token"})
         assert resp.status_code == 503
         assert "Postgres" in resp.json()["detail"]
     finally:
-        m.ADMIN_TOKEN = original_token
+        ar.ADMIN_TOKEN = original_token
 
 
 def test_seed_postgres_operation_failure_returns_500():
     """DB operation failure must return 500 with the exception text as detail."""
     from main import app
-    import main as m
-    original_token = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "test-token"
+    import admin_router as ar
+    original_token = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "test-token"
     try:
-        with patch("main.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
-             patch("main.DB_URL", "postgresql://fake/testdb"), \
-             patch("main.ensure_users", new_callable=AsyncMock,
+        with patch("admin_router.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
+             patch("admin_router.DB_URL", "postgresql://fake/testdb"), \
+             patch("admin_router.ensure_users", new_callable=AsyncMock,
                    side_effect=RuntimeError("relation \"User\" does not exist")):
             mock_connect.return_value = AsyncMock()
             client = TestClient(app, raise_server_exceptions=False)
-            resp = client.post("/admin/seed-postgres", json={},
+            resp = client.post("/admin/seed-postgres",
                                headers={"X-Admin-Token": "test-token"})
         assert resp.status_code == 500
         assert "User" in resp.json()["detail"]
     finally:
-        m.ADMIN_TOKEN = original_token
+        ar.ADMIN_TOKEN = original_token
 
 
 # ── existing endpoint tests ───────────────────────────────────────────────────
@@ -252,37 +254,36 @@ def test_seed_postgres_missing_token_returns_403():
 
 def test_seed_postgres_wrong_token_returns_403():
     from main import app
-    import main as m
-    original = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "correct-token"
+    import admin_router as ar
+    original = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "correct-token"
     try:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.post("/admin/seed-postgres", headers={"X-Admin-Token": "wrong"})
         assert resp.status_code == 403
     finally:
-        m.ADMIN_TOKEN = original
+        ar.ADMIN_TOKEN = original
 
 
 def test_seed_postgres_happy_path():
     from main import app
-    import main as m
+    import admin_router as ar
 
-    original_token = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "test-token"
+    original_token = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "test-token"
 
     try:
-        with patch("main.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
-             patch("main.DB_URL", "postgresql://fake/testdb"), \
-             patch("main.ensure_users", new_callable=AsyncMock), \
-             patch("main.ensure_subjects", new_callable=AsyncMock, return_value={"push_swap": 1}), \
-             patch("main.clean_posts", new_callable=AsyncMock), \
-             patch("main.insert_posts", new_callable=AsyncMock, return_value=(3, 0)):
+        with patch("admin_router.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
+             patch("admin_router.DB_URL", "postgresql://fake/testdb"), \
+             patch("admin_router.ensure_users", new_callable=AsyncMock), \
+             patch("admin_router.ensure_subjects", new_callable=AsyncMock, return_value={"push_swap": 1}), \
+             patch("admin_router.clean_posts", new_callable=AsyncMock), \
+             patch("admin_router.insert_posts", new_callable=AsyncMock, return_value=(3, 0)):
             mock_conn = AsyncMock()
             mock_connect.return_value = mock_conn
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/admin/seed-postgres",
-                json={},
                 headers={"X-Admin-Token": "test-token"},
             )
             assert resp.status_code == 200
@@ -291,34 +292,34 @@ def test_seed_postgres_happy_path():
             assert body["inserted"] == 3
             assert body["skipped"] == 0
     finally:
-        m.ADMIN_TOKEN = original_token
+        ar.ADMIN_TOKEN = original_token
 
 
 def test_seed_postgres_clean_param_calls_clean_posts():
     from main import app
-    import main as m
+    import admin_router as ar
 
-    original_token = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "test-token"
+    original_token = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "test-token"
 
     try:
-        with patch("main.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
-             patch("main.DB_URL", "postgresql://fake/testdb"), \
-             patch("main.ensure_users", new_callable=AsyncMock), \
-             patch("main.ensure_subjects", new_callable=AsyncMock, return_value={}), \
-             patch("main.clean_posts", new_callable=AsyncMock) as mock_clean, \
-             patch("main.insert_posts", new_callable=AsyncMock, return_value=(0, 0)):
+        with patch("admin_router.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
+             patch("admin_router.DB_URL", "postgresql://fake/testdb"), \
+             patch("admin_router.ensure_users", new_callable=AsyncMock), \
+             patch("admin_router.ensure_subjects", new_callable=AsyncMock, return_value={}), \
+             patch("admin_router.clean_posts", new_callable=AsyncMock) as mock_clean, \
+             patch("admin_router.insert_posts", new_callable=AsyncMock, return_value=(0, 0)):
             mock_connect.return_value = AsyncMock()
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/admin/seed-postgres",
-                json={"clean": True},
+                params={"clean": True},
                 headers={"X-Admin-Token": "test-token"},
             )
             assert resp.status_code == 200
             mock_clean.assert_called_once()
     finally:
-        m.ADMIN_TOKEN = original_token
+        ar.ADMIN_TOKEN = original_token
 
 
 def test_sync_chroma_missing_token_returns_403():
@@ -330,32 +331,32 @@ def test_sync_chroma_missing_token_returns_403():
 
 def test_sync_chroma_wrong_token_returns_403():
     from main import app
-    import main as m
-    original = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "correct-token"
+    import admin_router as ar
+    original = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "correct-token"
     try:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.post("/admin/sync-chroma", headers={"X-Admin-Token": "wrong"})
         assert resp.status_code == 403
     finally:
-        m.ADMIN_TOKEN = original
+        ar.ADMIN_TOKEN = original
 
 
 def test_sync_chroma_happy_path():
     from main import app
-    import main as m
+    import admin_router as ar
 
-    original_token = m.ADMIN_TOKEN
-    m.ADMIN_TOKEN = "test-token"
+    original_token = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "test-token"
 
     seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
 
     try:
         with patch("chromadb.HttpClient"), \
-             patch("main.load_seed", return_value=seed_data), \
-             patch("main.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
-             patch("main._sync_to_chroma", new_callable=AsyncMock), \
-             patch("main.get_embeddings", side_effect=lambda ids: {i: [0.1] * 768 for i in ids}):
+             patch("indexer.load_seed", return_value=seed_data), \
+             patch("indexer.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
+             patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
+             patch("indexer.get_embeddings", side_effect=lambda ids: {i: [0.1] * 768 for i in ids}):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/admin/sync-chroma",
@@ -367,4 +368,58 @@ def test_sync_chroma_happy_path():
             assert "total_docs" in body
             assert "embeddings_ready" in body
     finally:
-        m.ADMIN_TOKEN = original_token
+        ar.ADMIN_TOKEN = original_token
+
+
+# ── metrics ──────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_lifespan_initialises_metrics():
+    """lifespan must set app.state.metrics before yielding."""
+    from main import lifespan
+    from fastapi import FastAPI
+
+    seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
+    app = FastAPI()
+    with patch("chromadb.HttpClient"), \
+            patch("indexer.load_seed", return_value=seed_data), \
+            patch("indexer.load_db_pairs", new_callable=AsyncMock, return_value=[]), \
+            patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
+            patch("indexer.get_embeddings", side_effect=lambda ids: {i: [0.1] * 768 for i in ids}):
+        async with lifespan(app):
+            assert hasattr(app.state, "metrics")
+            assert app.state.metrics.corpus_size == 1
+            assert app.state.metrics.last_sync_at is not None
+
+
+def test_metrics_endpoint_returns_expected_fields():
+    """GET /admin/metrics must return all keys and require auth."""
+    from main import app
+    from metrics import Metrics
+    import admin_router as ar
+
+    original = ar.ADMIN_TOKEN
+    ar.ADMIN_TOKEN = "test-token"
+
+    try:
+        app.state.metrics = Metrics()
+        app.state.metrics.retrieve_total = 3
+        app.state.metrics.retrieve_errors = 1
+        app.state.metrics.bm25_only_fallbacks = 0
+        app.state.metrics.corpus_size = 42
+
+        client = TestClient(app, raise_server_exceptions=False)
+
+        assert client.get("/admin/metrics").status_code == 403
+
+        resp = client.get("/admin/metrics", headers={"X-Admin-Token": "test-token"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["retrieve_total"] == 3
+        assert data["retrieve_errors"] == 1
+        assert data["bm25_only_fallbacks"] == 0
+        assert data["corpus_size"] == 42
+        assert "uptime_seconds" in data
+        assert "last_sync_at" in data
+    finally:
+        ar.ADMIN_TOKEN = original

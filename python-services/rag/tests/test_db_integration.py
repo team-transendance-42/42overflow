@@ -3,7 +3,7 @@ DB integration end-to-end test for Posts+Comments data source.
 
 What it proves:
   1. Post + Comment rows in Postgres are picked up by /admin/reload-from-db.
-  2. /rag/retrieve returns those DB-sourced docs with the "db-post-" prefix.
+  2. /rag/retrieve returns those DB-sourced docs with the "db-comment-" prefix.
   3. The answer text comes from the comments, not the post body.
 
 How to run (stack must be up):
@@ -156,10 +156,10 @@ def test_rag(verbose: bool = False):
                 for i, ctx in enumerate(contexts):
                     print(f"       [{i}] id={ctx['id']}  topic={ctx['topic']}  rrf={ctx['rrf_score']:.6f}")
 
-            db_contexts = [c for c in contexts if c["id"].startswith("db-post-")]
+            db_contexts = [c for c in contexts if c["id"].startswith("db-comment-")]
             if not db_contexts:
                 ids = [c["id"] for c in contexts]
-                print(f"       FAIL — no db-post- context found. ids={ids}")
+                print(f"       FAIL — no db-comment- context found. ids={ids}")
                 print("              Did you run --reload after --seed?")
                 failed += 1
                 continue
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", action="store_true", help="Insert test Post+Comment rows")
     parser.add_argument("--reload", action="store_true", help="Call /admin/reload-from-db")
-    parser.add_argument("--test", action="store_true", help="Query RAG and verify db-post- docs")
+    parser.add_argument("--test", action="store_true", help="Query RAG and verify db-comment- docs")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 

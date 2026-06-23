@@ -19,48 +19,101 @@ def _normalize_topic(title: str) -> str:
     return title.lower().strip().replace(" ", "-")
 
 
-def _row_to_pair(row: Record) -> dict: # exact, documents what actually gets passed in.
-    """Map one asyncpg Row (from the JOIN query) to a RAG pair dict."""
+# ── OLD _row_to_pair (per-post, kept for comparison) ─────────────────────────
+# def _row_to_pair(row: Record) -> dict: # exact, documents what actually gets passed in.
+#     """Map one asyncpg Row (from the JOIN query) to a RAG pair dict."""
+#     topic = _normalize_topic(row["project_name"])
+#     return {
+#         "id": f"db-post-{row['id']}",
+#         "question": row["question"],
+#         "answer": row["answers"] or "",
+#         "topic": topic,
+#         "tags": [topic],   # project name as the only tag — improves BM25 keyword matching
+#         "source": "db-post",
+#     }
+# ── END OLD _row_to_pair ──────────────────────────────────────────────────────
+
+def _row_to_pair(row: Record) -> dict:
+    """Map one asyncpg Row (one comment) to a RAG pair dict."""
     topic = _normalize_topic(row["project_name"])
     return {
-        "id": f"db-post-{row['id']}",
+        "id": f"db-comment-{row['comment_id']}",
         "question": row["question"],
-        "answer": row["answers"] or "",
+        "answer": row["answer"] or "",
         "topic": topic,
-        "tags": [topic],   # project name as the only tag — improves BM25 keyword matching
-        "source": "db-post",
+        "tags": [topic],
+        "source": "db-comment",
     }
 
 
+# ── OLD per-post query (kept for comparison) ──────────────────────────────────
 # Fetch all posts that have at least one non-deleted top-level comment.
 # JOIN (not LEFT JOIN) — posts with zero qualifying comments are excluded.
 # Nested thread replies (parentId IS NOT NULL) excluded to avoid noise.
 # Subject JOIN provides the canonical slug used as topic/tag.
 # || concat symbol is used to combine title + content into a single question string.
 # str_agg() turn many rows into one string
+# _QUERY = """
+#     SELECT
+#         p.id,
+#         s.slug                                              AS project_name,
+#         p.title || E'\\n\\n' || p.content                  AS question,
+#         string_agg(
+#             c.content,
+#             E'\\n\\n'
+#             ORDER BY c.created_at ASC
+#         ) FILTER (
+#             WHERE c.deleted_at IS NULL
+#               AND c."parentId" IS NULL
+#         )                                                   AS answers
+#     FROM "Post" p
+#     JOIN "Subject" s ON s.id = p."subjectId"
+#     JOIN "Comment" c
+#         ON  c."postId"   = p.id
+#         AND c.deleted_at IS NULL
+#         AND c."parentId" IS NULL
+#     WHERE p.deleted_at IS NULL
+#       AND p.content     IS NOT NULL
+#       AND p.content     <> ''
+#     GROUP BY p.id, s.slug, p.title, p.content
+# """
+# ── END OLD query ─────────────────────────────────────────────────────────────
+
+# Per-comment query: each comment becomes its own RAG document (capped at 15
+# newest per post after byte-identical dedup).
 _QUERY = """
+    WITH deduped AS (
+        SELECT DISTINCT ON (c."postId", c.content)
+            c.id          AS comment_id,
+            c.content     AS comment_content,
+            c."postId",
+            c.created_at
+        FROM "Comment" c
+        WHERE c.deleted_at  IS NULL
+          AND c."parentId"  IS NULL
+        ORDER BY c."postId", c.content, c.created_at ASC
+    ),
+    ranked AS (
+        SELECT *,
+            ROW_NUMBER() OVER (
+                PARTITION BY "postId"
+                ORDER BY created_at DESC
+            ) AS rn
+        FROM deduped
+    )
     SELECT
         p.id,
-        s.slug                                              AS project_name,
-        p.title || E'\\n\\n' || p.content                  AS question,
-        string_agg(
-            c.content,
-            E'\\n\\n'
-            ORDER BY c.created_at ASC
-        ) FILTER (
-            WHERE c.deleted_at IS NULL
-              AND c."parentId" IS NULL
-        )                                                   AS answers
+        s.slug                              AS project_name,
+        p.title || E'\\n\\n' || p.content  AS question,
+        r.comment_content                   AS answer,
+        r.comment_id
     FROM "Post" p
     JOIN "Subject" s ON s.id = p."subjectId"
-    JOIN "Comment" c
-        ON  c."postId"   = p.id
-        AND c.deleted_at IS NULL
-        AND c."parentId" IS NULL
+    JOIN ranked r    ON r."postId" = p.id
     WHERE p.deleted_at IS NULL
-      AND p.content     IS NOT NULL
-      AND p.content     <> ''
-    GROUP BY p.id, s.slug, p.title, p.content
+      AND p.content    IS NOT NULL
+      AND p.content    <> ''
+      AND r.rn         <= 15
 """
 
 _TABLES_READY_QUERY = """

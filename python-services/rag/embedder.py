@@ -136,7 +136,8 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         key = texts[0].lower().strip()
         # asyncio.to_thread handles both cache miss (CPU-bound embed)
         # and cache hit (O(1) lookup — thread overhead ~0.01ms, acceptable).
-        result_tuple = await asyncio.to_thread(_embed_one_cached, key)
+        result_tuple = await asyncio.to_thread(_embed_one_cached, key) #  Without asyncio.to_thread, FastEmbed would freeze the event loop for 100–300ms — no other request could be answered during that time. With it, the loop stays free while the CPU crunches numbers on a separate thread.
+
         return [list(result_tuple)]
 
     # Batch path: startup embeds all docs at once — bypass cache.

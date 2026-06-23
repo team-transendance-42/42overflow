@@ -56,6 +56,20 @@ def _invalidate_collection() -> None:
     _collection = None
 
 
+def clear_collection(name: str = _DEFAULT_COLLECTION) -> int:
+    """Delete all documents from the ChromaDB collection. Returns count deleted."""
+    try:
+        col = _get_collection()
+        count = col.count()
+        if count > 0:
+            all_ids = col.get(include=[])["ids"]
+            col.delete(ids=all_ids)
+        return count
+    except Exception as exc:
+        _invalidate_collection()
+        raise _chroma_error("clear_collection", exc) from exc
+
+
 def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
     return RuntimeError(
         f"Could not connect to ChromaDB during '{operation}' (url={CHROMA_URL}): {exc}"

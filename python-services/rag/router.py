@@ -32,8 +32,12 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
     id_to_topic = request.app.state.id_to_topic
     centroids = request.app.state.centroids
     topic_intro_ids = getattr(request.app.state, "topic_intro_ids", {})
+    metrics = request.app.state.metrics
+
+    metrics.retrieve_total += 1
 
     if bm25_index is None:
+        metrics.retrieve_errors += 1
         raise HTTPException(status_code=503, detail="RAG index not ready — try again shortly")
 
     try:
@@ -44,7 +48,11 @@ async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
             topic_intro_ids=topic_intro_ids,
         )
     except Exception as exc:
+        metrics.retrieve_errors += 1
         raise HTTPException(status_code=502, detail=str(exc))
+
+    if not has_embeddings:
+        metrics.bm25_only_fallbacks += 1
 
     confidence = max((c["rrf_score"] for c in contexts), default=0.0)
     return RetrieveResponse(
