@@ -212,6 +212,12 @@
 	color: white;
 }
 
+.button.manage {
+	z-index: 3;
+	background-color: white;
+	color: black;
+}
+
 .button.postcard {
 	font-size: var(--font-size-small);
 	background-color: var(--color-neutral-900);

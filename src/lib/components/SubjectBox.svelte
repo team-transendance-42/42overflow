@@ -90,7 +90,7 @@
 		{/if}
 
 		{#if isOwner}
-			<a class="action edit" href={`/s/${subject.slug}/manage`}>Manage</a>
+			<a class="button manage" href={`/s/${subject.slug}/manage`}>Manage</a>
 		{/if}
 	</div>
 </div>
