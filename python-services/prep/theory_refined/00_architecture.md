@@ -23,6 +23,6 @@ Network travel is negligible.
 
   The network between Go and Python adds maybe 300ms total to the 25s — you'd never notice it.
   =======================
-  current flow: Browser → [Go: rate limiter → queue → cache check → RAG retrieve → relevance gates → Ollama stream → cache write → SSE] → Browser
+  current flow: Browser → [Go: rate limiter → queue → cache check → RAG retrieve → relevance gates → Ollama stream → cache write → SSE → Browser
   =======================
 

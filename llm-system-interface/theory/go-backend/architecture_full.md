@@ -34,7 +34,7 @@ validateTextReq → chains:
 decodeAndSanitize — JSON decode + trim prompt
 normalizeMessages — if no messages array, wraps prompt into one
 validateMessageSize — rejects if total chars > 20k
-GenerateText — handles POST /api/ai-assist → calls services.StreamLLM → pipes to streamSSE
+GenerateGeminiText — handles POST /api/ai-assist → calls services.StreamLLM → pipes to streamSSE
 GenerateImage — stubbed out, commented
 handlers/ollama_handler.go
 
@@ -46,7 +46,7 @@ RagIndex — handles POST /api/rag/index → calls services.IndexDocuments → r
 RagAsk — handles POST /api/rag/ask → calls services.AskRag → returns JSON {answer, contexts}
 handlers/stream.go
 
-streamSSE — shared by both GenerateText and GenerateOllamaText; reads from channel, writes each chunk as SSE data: lines, flushes immediately, sends event: end when channel closes
+streamSSE — shared by both GenerateGeminiText and GenerateOllamaText; reads from channel, writes each chunk as SSE data: lines, flushes immediately, sends event: end when channel closes
 =================================================
                 Services
 =================================================

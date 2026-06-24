@@ -10,7 +10,7 @@ from metrics import Metrics
 from store import clear_collection
 
 router = APIRouter()
-_sync_lock = asyncio.Lock()
+_sync_lock = asyncio.Lock()  # asyncio.Lock: async mutex; `async with _sync_lock` lets only one coroutine enter the block at a time — prevents two concurrent /admin/sync-chroma calls from rebuilding indexes simultaneously
 
 
 def require_admin(x_admin_token: str | None = Header(None)) -> None:
@@ -21,7 +21,7 @@ def require_admin(x_admin_token: str | None = Header(None)) -> None:
 
 # docker compose exec python-rag curl -H "X-Admin-Token: $ADMIN_TOKEN" http://localhost:8000/admin/sync-chroma
 @router.post("/admin/sync-chroma")
-async def admin_sync_chroma(request: Request, _: None = Depends(require_admin)) -> dict:
+async def admin_sync_chroma(request: Request, _: None = Depends(require_admin)) -> dict:  # Depends(require_admin): FastAPI dependency injection — runs require_admin() before the handler; raises 403 if token is invalid, so the handler body never executes
     """Read all Postgres posts, sync to ChromaDB, rebuild indexes — no restart needed."""
     if _sync_lock.locked():
         return {"status": "already running"}

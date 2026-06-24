@@ -33,7 +33,7 @@ func main() {
 	router.Use(middleware.RateLimiter)
 
 	// url: what client calls
-	router.HandleFunc("/api/ai-assist", handlers.GenerateText).Methods("POST")
+	router.HandleFunc("/api/ai-assist", handlers.GenerateGeminiText).Methods("POST")
 	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST")
 	router.HandleFunc("/api/community", handlers.RagAskStreaming).Methods("POST")
 

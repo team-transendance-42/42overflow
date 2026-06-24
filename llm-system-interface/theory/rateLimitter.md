@@ -43,7 +43,7 @@ Data PrivacyUsed for TrainingIn the Free Tier, Google may use your inputs/output
 main -> router -> middleware -> handler -> llm.callGeminiWithRetry
 main() only wires routes + middleware
 RateLimiter does checks before Gemini
-GenerateText calls llm.callGeminiWithRetry(...)
+GenerateGeminiText calls llm.callGeminiWithRetry(...)
 after Gemini returns, handler records token usage
 
 ========================================
@@ -570,7 +570,7 @@ Vite proxy (rewrites /api → localhost:8081)
 Middleware chain:
   1. ErrorRecovery
   2. RateLimiter    ← Applies to OPTIONS too!
-  3. Handler (GenerateText)
+  3. Handler (GenerateGeminiText)
   -------------------------------
 Browser: OPTIONS /api/ai-assist (preflight)
   ↓ (vite proxy: /api/ai-assist → localhost:8081/api/ai-assist)

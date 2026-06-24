@@ -2,8 +2,8 @@
 #Creates the web application.
 from fastapi import FastAPI, Request, Header, Depends
 
-# to run: 1. pip install fastapi uvicorn
-# 2. uvicorn 10_fastapi:app --reload // start the server, 10_fastapi is the file name, rmv .py
+# to run: 1. pip install fastapi uvicorn but from python-rag dir!!
+# 2. uvicorn 10_fastapi:app --reload // from python-rag, start the server, 10_fastapi is the file name, rmv .py
 # 3. Open browser: http://127.0.0.1:8000/
 # 4. http://127.0.0.1:8000/req
 # 5. http://127.0.0.1:8000/profile

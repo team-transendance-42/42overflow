@@ -8,8 +8,9 @@ router = APIRouter()
 
 
 # docker compose exec python-rag curl http://localhost:8000/healthz
-@router.get("/healthz")
+@router.get("/healthz")  # @router.get: registers a synchronous GET handler; FastAPI runs it in a thread pool so it won't block the event loop
 def healthz(request: Request):
+    """Return index readiness flags — used by docker-compose healthcheck and the Go service."""
     numpy_idx: NumpyIndex = request.app.state.numpy_index
     bm25_idx: BM25Index = request.app.state.bm25
     return {
