@@ -61,9 +61,11 @@
 
 <div style="margin-left: {depth * 20}px;">
 	<div class="postbox clickable relative">
-		{#if comment.created_at != comment.updated_at}
+		{comment.isEdited}
+		{#if comment.isEdited}
 			<div class="break-all line-clamp-1"><em>[Edited]</em></div>
 		{/if}
+
 		<!-- Comment Content -->
 		<div class="break-all">{comment.content}</div>
 
