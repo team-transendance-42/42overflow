@@ -5,6 +5,8 @@
 
   export let data: PageData;
 
+  let errorMessage = '';
+
   function hrefFor(pageNum: number) {
     const params = new URLSearchParams($page.url.searchParams as any);
     params.set('page', String(pageNum));

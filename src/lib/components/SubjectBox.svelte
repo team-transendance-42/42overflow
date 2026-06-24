@@ -15,6 +15,8 @@
 	export let isLoggedIn = false;
 	export let isOwner = false;
 	let isMember = subject.isMember;
+	
+	let errorMessage = '';
 
 	const formatDate = (date: Date) => {
 		return new Date(date).toLocaleDateString('en-US', {
@@ -32,6 +34,8 @@
     });
 
     if (!res.ok) {
+      const data = await res.json();
+	  errorMessage = data.error || 'An error occurred while subscribing.';
       console.error('Subscribe failed');
       return;
     }
@@ -47,6 +51,8 @@
     });
 
     if (!res.ok) {
+      const data = await res.json();
+	  errorMessage = data.message || 'An error occurred while unsubscribing.';
       console.error('Unsubscribe failed');
       return;
 	}
@@ -93,9 +99,22 @@
 			<a class="action edit" href={`/s/${subject.slug}/manage`}>Manage</a>
 		{/if}
 	</div>
+	{#if errorMessage}
+		<p class="error-message">{errorMessage}</p>
+	{/if}
 </div>
 
 <style>
+
+	.error-message {
+		color: red;
+		font-size: 0.9rem;
+		margin-top: 0.5rem;
+		border: 1px solid red;
+		padding: 0.5rem;
+		border-radius: 4px;
+		background-color: #ffe6e6;
+	}
 	.actions {
 		display: flex;
 		gap: 0.5rem;
