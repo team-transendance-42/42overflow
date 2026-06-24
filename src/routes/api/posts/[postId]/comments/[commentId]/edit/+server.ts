@@ -49,6 +49,7 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 			postId: postId,
             parentId: parentIdValue ? parseInt(parentIdValue as string) : null,
 			content: formData.get('content') as string,
+            isEdited: true
 		}
 
 		const data = CommentSchema.parse(commentData);

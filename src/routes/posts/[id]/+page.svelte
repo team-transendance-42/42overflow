@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import CommentCard from '$lib/components/CommentCard.svelte';
 	import CreateComment from '$lib/components/CreateComment.svelte';
+	import PostCard from '$lib/components/PostCard.svelte';
 
 	// Define types for post and comments
 	type Comment = {
@@ -18,7 +19,7 @@
 		id: number;
 		title: string;
 		content: string;
-		user: { name: string; };
+		user: { name: string; id: string; };
 		comments?: Comment[];
 	};
 
@@ -69,30 +70,12 @@
 	});
 
 	let postId = $derived(post?.id ?? 0);
-
-	function openProfile() {
-        goto(`/profile/${post?.user.name}`);
-    }
 </script>
 
 <!-- Post with Comments -->
 <div>
 	{#if post}
-		<div class="postbox white-text">
-			<div class="break-all line-clamp-1"><strong>Project:</strong> {post.title}</div>
-			<div class="break-all"><strong>Question:</strong> {post.content}</div>
-
-			<!-- View Profile Button -->
-			<button
-				class="button postcard clickable absolute bottom-2 left-2"
-				onclick={openProfile}
-				aria-label="View {post.user.name}'s profile'"
-			>
-				<p class="author">
-					Author: <em>{post.user.name}</em>
-				</p>
-			</button>
-		</div>
+		<PostCard {post} />
 
 		<!-- Create Comment under Post -->
 		<CreateComment {postId} />

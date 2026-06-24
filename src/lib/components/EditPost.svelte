@@ -1,29 +1,22 @@
 <script lang=ts>
-    import { CommentSchema } from '$lib/zodTypes.js';
-    import type { CommentInput } from '$lib/zodTypes.js';
+    import { PostSchema } from '$lib/zodTypes.js';
+    import type { PostInput } from '$lib/zodTypes.js';
     import { z } from 'zod';
 
     let showPopover = $state(false);
 
     interface Props {
         postId: number;
-        parentId?: number;
-        comment: any;
+        post: any;
     }
 
-    let { postId, parentId, comment }: Props = $props();
+    let { postId, post }: Props = $props();
     let derivedPostId = $derived(postId);
-    let derivedParentId = $derived(parentId ?? undefined);
-    let removeImage = $state(false);
     let popover: HTMLDivElement;
 
-    type CommentFormInput = CommentInput & {
-        image?: File;
-    };
-
-    let formData = $state<CommentFormInput>({
+    let formData = $state<PostInput>({
         postId: 0,
-        parentId: undefined,
+        title: '',
         content: '',
     });
 
@@ -31,40 +24,19 @@
 
     $effect(() => {
         formData.postId = derivedPostId;
-        formData.parentId = derivedParentId;
-        formData.content = comment.content;
-        previewUrl = (comment.image ?? '');
+        formData.title = post.title;
+        formData.content = post.content;
     });
 
     let errors = $state({} as Record<string, string[]>);
     let isSubmitting = $state(false);
 
-    function handleImageSelect(event: Event) {
-        const target = event.target as HTMLInputElement;
-        const file = target.files?.[0];
-
-        if (file) {
-            formData.image = file;
-
-            // Create preview
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                previewUrl = e.target?.result as string;
-            };
-            reader.readAsDataURL(file);
-
-            // Clear any previous image errors
-            delete errors.image;
-            errors = { ...errors };
-        }
-    }
-
     // Real-time validation on single input field
-    function handleInput<K extends keyof CommentInput>(field: K, value: CommentInput[K]) {
+    function handleInput<K extends keyof PostInput>(field: K, value: PostInput[K]) {
         // update the reactive $state object in-place instead of replacing it
         (formData as any)[field] = value;
         try {
-            CommentSchema.pick({ [field]: true } as any).parse({ [field]: value } as any);
+            PostSchema.pick({ [field]: true } as any).parse({ [field]: value } as any);
             const key = field as string;
             if (errors[key]) {
                 delete errors[key];
@@ -85,25 +57,18 @@
         errors = {};
 
         try {
-            // Validate form data (excluding image)
-            const { image, ...commentData } = formData;
-            CommentSchema.parse(commentData);
-
-            // Create FormData for file upload
-            const formDataToSend = new FormData();
-            Object.entries(commentData).forEach(([key, value]) => {
+            // Validate form data
+            const { ...postData } = formData;
+            PostSchema.parse(postData);
+			
+			const formDataToSend = new FormData();
+            Object.entries(postData).forEach(([key, value]) => {
                 if (value !== undefined && value !== null) {
                     formDataToSend.append(key, value.toString());
                 }
             });
 
-            if (image) {
-                formDataToSend.append('image', image);
-            } else if (removeImage) {
-                formDataToSend.append('removeImage', 'true');
-            }
-
-            const response = await fetch(`/api/posts/${formData.postId}/comments/${comment.id}/edit`, {
+            const response = await fetch(`/api/posts/${formData.postId}/edit`, {
                 method: 'POST',
                 body: formDataToSend
             });
@@ -111,10 +76,10 @@
             if (response.ok) {
                 showPopover = false;
                 previewUrl = '';
-                // Refresh page to show updated comment
+                // Refresh page to show updated post
                 location.reload();
             } else {
-                alert('An error occurred while editing the comment. Please try again.');
+                alert('An error occurred while editing the post. Please try again.');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -156,6 +121,20 @@
             bind:this={popover}
         >
             <form onsubmit={handleSubmit}>
+				<!-- Title -->
+                <div class="textarea-group">
+                    <label for="title">Title:</label>
+                    <textarea
+                        id="title"
+                        bind:value={formData.title}
+                        oninput={(event) => handleInput('title', (event.target as HTMLTextAreaElement).value)}
+                        required
+                    ></textarea>
+                    {#if errors.title}
+                        <p class="error">{errors.title[0]}</p>
+                    {/if}
+                </div>
+
                 <!-- Content -->
                 <div class="textarea-group">
                     <label for="content">Content:</label>
@@ -170,27 +149,13 @@
                     {/if}
                 </div>
 
-                <!-- Image Upload -->
-                <div class="input-group">
-                    <label for="image">Image (optional):</label>
-                    <input
-                        type="file"
-                        id="image"
-                        class="small-input"
-                        accept="image/jpeg, image/png, image/gif, image/webp"
-                        onchange={handleImageSelect}
-                    />
-                    {#if previewUrl}
-                        <div>
-                            <img src={previewUrl} alt="Preview" class="w-100"/>
-                        </div>
-                    {/if}
-                    {#if errors.image}
-                        <p class="error">{errors.image[0]}</p>
-                    {/if}
-                </div>
-
-                <button class="button secondary" onclick={() => showPopover = false}>
+                <button
+					class="button secondary"
+					onclick={(event) => {
+						event.stopPropagation();
+						showPopover = false;
+					}}
+				>
                     Cancel
                 </button>
 
@@ -199,7 +164,10 @@
                         Submitting...
                     </button>
                 {:else}
-                    <button type="submit" class="button confirm">
+                    <button
+						type="submit"
+						class="button confirm"
+					>
                         Confirm
                     </button>
                 {/if}
