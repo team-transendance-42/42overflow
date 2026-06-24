@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { Actions, PageServerLoad } from './$types';
-import { error } from 'console';
+import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals }) => 
 {

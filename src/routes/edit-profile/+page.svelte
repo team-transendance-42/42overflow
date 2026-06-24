@@ -95,8 +95,8 @@
   </div>
 
   <div class="name-row">
-    <Input label="First Name" name="firstname" placeholder="First" bind:value={firstname} />
-    <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
+  <Input label="First Name" name="firstname" placeholder="First" bind:value={firstname} />
+  <Input label="Last Name" name="lastname" placeholder="Last" bind:value={lastname} />
   </div>
   <Input label="User name" name="username" placeholder="User name" bind:value={username} />
 

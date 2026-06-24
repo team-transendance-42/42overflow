@@ -7,6 +7,7 @@
   export let data;
 
   $: ({ profile, user, isFollowing, followerCount, followingCount, isOnline, isOwnProfile, posts } = data);
+  
 </script>
 
 <div class="profile-page">
@@ -53,12 +54,6 @@
     </div>
   {/if}
 
-  <!-- {#if profile?.login}
-    <div class="section">
-      <span class="label">Intra</span>
-      <p>{profile.login}</p>
-    </div>
-  {/if} -->
 
   {#if posts?.length}
   <div class="section">

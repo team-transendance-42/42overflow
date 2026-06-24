@@ -3,7 +3,6 @@
 
   export let data;
   const user = data.user;
-  //const profile = data.profile;
 
 </script>
 
@@ -13,7 +12,7 @@
   </div>
 
 
-  <h1><strong>Name: </strong> {user?.first_name ?? 'No name set'} {user?.last_name ?? 'No name set'} </h1>
+  <h1><strong>Name: </strong> {user?.first_name ?? 'First name'} {user?.last_name ?? 'Last name'} </h1>
  
   {#if user?.name}
     <p class="username"><strong>Username: </strong> {user.name}</p>
@@ -29,7 +28,7 @@
 
 
     {#if user?.followers?.length > 0}
-    <div class="interests">
+    <div class="following-section">
       <span class="label"><strong>Following:</strong></span>
       {#each user.followers as f}
 	    <div class="following-row">
@@ -58,7 +57,7 @@
 	margin: 1rem 0;  }
 
 
-  .interests { 
+  .following-section { 
 	margin: 0.75rem 0; }
 
   .label { 
