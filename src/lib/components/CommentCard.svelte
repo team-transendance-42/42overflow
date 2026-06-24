@@ -59,81 +59,80 @@
     }
 </script>
 
-<div style="margin-left: {depth * 20}px;">
-	<div class="postbox clickable relative">
-		{#if comment.created_at != comment.updated_at}
-			<div class="break-all line-clamp-1"><em>[Edited]</em></div>
-		{/if}
-		<!-- Comment Content -->
-		<div class="break-all">{comment.content}</div>
-
-		<!-- Comment Image (Optional) -->
-		{#if comment.image}
-			<img
-                src={comment.image || `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`}
-                onerror={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`; }}
-				alt="Comment attachment"
-                class="card-img"
-            />
-		{/if}
-
-		<!-- Buttons -->
-		<div class="comment-actions">
-			<!-- View Profile Button -->
-			{#if comment.deleted_at == null}
-				<button
-					class="button postcard clickable"
-					onclick={openProfile}
-					aria-label="View {comment.user.name}'s profile'"
-				>
-					<p class="author">
-						Author: <em>{comment.user.name}</em>
-					</p>
-				</button>
-			{:else}
-				<div class="button postcard">
-					<p class="author">
-						<em>[anonymous]</em>
-					</p>
-				</div>
-			{/if}
-
-			<!-- Reply to Comment -->
-			{#if comment.deleted_at == null}
-				<CreateComment {postId} {parentId} />
-			{/if}
-
-			<!-- Edit Comment -->
-			{#if isOwn && comment.deleted_at == null}
-				<EditComment {postId} {comment} />
-			{/if}
-
-			<!-- Delete Comment -->
-			{#if isOwn && comment.deleted_at == null}
-				<button
-					class="button postcard delete clickable"
-					onclick={deleteComment}
-					aria-label="Delete comment"
-				>
-					Delete
-				</button>
-			{/if}
-
-			<!-- Like Button -->
-			<button
-				class="button postcard like clickable"
-				onclick={likeComment}
-				aria-label="Like comment"
-			>
-				{(comment.userLiked ? '♥ ' : '♡ ') + (comment.likeCount ?? 0)}
-			</button>
-		</div>
-	</div>
-
-	<!-- Render nested children/replies -->
-	{#if comment.children && comment.children.length > 0}
-		{#each comment.children as child}
-			<CommentCard comment={child} depth={depth + 1} />
-		{/each}
+<div class="commentbox clickable relative" style="margin-left: {depth * 30}px; width: calc(100% - {depth * 30}px);">
+	{#if comment.isEdited}
+		<div class="break-all line-clamp-1"><em>[Edited]</em></div>
 	{/if}
+
+	<!-- Comment Content -->
+	<div class="break-all">{comment.content}</div>
+
+	<!-- Comment Image (Optional) -->
+	{#if comment.image}
+		<img
+			src={comment.image || `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`}
+			onerror={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`; }}
+			alt="Comment attachment"
+			class="card-img"
+		/>
+	{/if}
+
+	<!-- Buttons -->
+	<div class="comment-actions">
+		<!-- View Profile Button -->
+		{#if comment.deleted_at == null}
+			<button
+				class="button postcard clickable"
+				onclick={openProfile}
+				aria-label="View {comment.user.name}'s profile'"
+			>
+				<p class="author">
+					Author: <em>{comment.user.name}</em>
+				</p>
+			</button>
+		{:else}
+			<div class="button postcard">
+				<p class="author">
+					<em>[anonymous]</em>
+				</p>
+			</div>
+		{/if}
+
+		<!-- Reply to Comment -->
+		{#if comment.deleted_at == null}
+			<CreateComment {postId} {parentId} />
+		{/if}
+
+		<!-- Edit Comment -->
+		{#if isOwn && comment.deleted_at == null}
+			<EditComment {postId} {comment} />
+		{/if}
+
+		<!-- Delete Comment -->
+		{#if isOwn && comment.deleted_at == null}
+			<button
+				class="button postcard delete clickable"
+				onclick={deleteComment}
+				aria-label="Delete comment"
+			>
+				Delete
+			</button>
+		{/if}
+
+		<!-- Like Button -->
+		<button
+			class="button postcard like clickable"
+			onclick={likeComment}
+			aria-label="Like comment"
+		>
+			{(comment.userLiked ? '♥ ' : '♡ ') + (comment.likeCount ?? 0)}
+		</button>
+	</div>
 </div>
+
+<!-- Render nested children/replies -->
+{#if comment.children && comment.children.length > 0}
+	{#each comment.children as child}
+		<CommentCard comment={child} depth={depth + 1} />
+	{/each}
+{/if}

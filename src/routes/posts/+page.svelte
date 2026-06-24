@@ -19,39 +19,36 @@
 	};
 
 	onMount(loadQuestions);
-	
 </script>
 
 <!-- Posts -->
-<div>
-	<h1><strong>
-		NEWEST QUESTIONS
-	</strong></h1>
+<div class=posts-page>
+	<h1><strong>All Posts (Total: {total})</strong></h1>
 
 	{#each questions as post}
 		<PostCard {post} />
 	{/each}
-</div>
 
-<!-- Pagination -->
-<div>
-	<button on:click={() => {
-		if (page > 1) {
-			page--;
-			loadQuestions();
-		}
-	}}>
-	Prev
-	</button>
+	<!-- Pagination -->
+	<div>
+		<button on:click={() => {
+			if (page > 1) {
+				page--;
+				loadQuestions();
+			}
+		}}>
+		Prev
+		</button>
 
-	<span> - Page {page} -</span>
+		<span> - Page {page} -</span>
 
-	<button on:click={() => {
-		if (page * limit < total) {
-			page++;
-			loadQuestions();
-		}
-	}}>
-	Next
-	</button>
+		<button on:click={() => {
+			if (page * limit < total) {
+				page++;
+				loadQuestions();
+			}
+		}}>
+		Next
+		</button>
+	</div>
 </div>
