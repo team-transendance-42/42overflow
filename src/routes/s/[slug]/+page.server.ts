@@ -10,10 +10,10 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	const subject = await db.subject.findUnique({
 		where: { slug },
-		select: { name: true, slug: true, deleted_at: true }
+		select: { name: true, slug: true, description: true, deleted_at: true }
 	});
-	
+
 	if (!subject || subject.deleted_at) throw error(404, 'Subject not found');
-	
+
 	return { subject };
 };

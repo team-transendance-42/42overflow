@@ -10,6 +10,7 @@
 	let post = data.post;
 	let comments = $state<Comment[]>([]);
 	let isOwn = $derived.by(() => page.data.user?.id === post?.user.id);
+	let hasPermission = data.hasPermission;
 
 	onMount(() => {
 		if (!post?.id) return;
@@ -115,7 +116,7 @@
 				{/if}
 
 				<!-- Delete Post -->
-				{#if isOwn && post.deleted_at == null}
+				{#if (isOwn || hasPermission) && post.deleted_at == null}
 					<button
 						class="button postcard delete clickable"
 						onclick={(event) => {
@@ -135,7 +136,7 @@
 
 		<!-- Show all Comments -->
 		{#each comments as comment (comment.id)}
-			<CommentCard {comment} />
+			<CommentCard {comment} {hasPermission} />
 		{/each}
 	{/if}
 </div>

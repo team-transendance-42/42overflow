@@ -3,10 +3,11 @@
 	import { page } from '$app/state';
 	import EditPost from './EditPost.svelte';
 
-	let rawProps = $props() as { post: any };
+	let rawProps = $props() as { post: any, hasPermission: boolean };
     let post = $derived(rawProps.post);
 	let postId = $derived(post.id);
 	let isOwn = $derived.by(() => page.data.user?.id === post.user.id);
+	let hasPermission = $derived(rawProps.hasPermission);
 
     function openPostPage() {
         goto(`/s/${post.subject.slug}/posts/${post.id}`);
@@ -40,7 +41,6 @@
 </script>
 
 <div class="postbox clickable white-text relative">
-
     <!-- Clickable area (nav to post page) -->
     <div
         class="invisible-button clickable"
@@ -84,7 +84,7 @@
         {/if}
 
         <!-- Delete Post -->
-        {#if isOwn && post.deleted_at == null}
+        {#if (isOwn || hasPermission) && post.deleted_at == null}
             <button
                 class="button postcard delete clickable"
                 onclick={(event) => {
