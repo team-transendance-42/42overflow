@@ -8,9 +8,10 @@
 	interface Props {
 		comment: any;
 		depth?: number;
+		hasPermission?: boolean;
 	}
 
-	let { comment, depth = 0 }: Props = $props();
+	let { comment, depth = 0, hasPermission }: Props = $props();
 
 	// Derive postId and parentId for creating replies to this comment
 	const postId = comment.postId;
@@ -109,7 +110,7 @@
 		{/if}
 
 		<!-- Delete Comment -->
-		{#if isOwn && comment.deleted_at == null}
+		{#if (isOwn || hasPermission) && comment.deleted_at == null}
 			<button
 				class="button postcard delete clickable"
 				onclick={deleteComment}

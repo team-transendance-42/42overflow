@@ -26,18 +26,37 @@ export const POST = async ({ locals, params }: RequestEvent) => {
 			throw error(400, 'Invalid Comment ID');
 		}
 
-		// Get the comment to verify ownership
 		const comment = await db.comment.findUnique({
-			where: { id: commentId }
+			where: { id: commentId },
+			include: {
+				post: true,
+				select: { subjectId: true },
+			}
 		});
-
 		if (!comment) {
 			throw error(404, 'Comment not found');
 		}
 
-		// Check if the user owns the comment
-		if (comment.userId !== locals.user.id) {
-			throw error(403, 'You can only delete your own comments');
+		// Check user's subject membership role
+		const memberships = await db.subjectMember.findMany({
+			where: {
+				subjectId: comment.post.subjectId,
+				userId: locals.user.id
+			},
+			select: { role: true }
+		});
+		const subjectRole = memberships[0]?.role;
+
+		// Check if the user has permission to delete the comment
+		if (locals.user.role !== 'ADMIN'
+			&& locals.user.role !== 'MODERATOR'
+			&& subjectRole !== 'OWNER'
+			&& subjectRole !== 'CURATOR')
+		{
+			// Check if the user owns the comment
+			if (comment.userId !== locals.user.id) {
+				throw error(403, 'You can only delete your own comments');
+			}
 		}
 
 		// (soft-)Delete the comment

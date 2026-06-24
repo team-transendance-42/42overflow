@@ -9,29 +9,11 @@
 
 	type Post = ComponentProps<typeof PostCard>['post'];
 
-	let title = $state('');
-	let content = $state('');
-	let message = '';
-	let error = '';
-
 	let questions: Post[] = $state([]);
 	let currentPage = $state(1);
 	let limit = 5;
 	let total = 0;
-
-	async function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		message = '';
-		error = '';
-
-		const res = await fetch(`/api/subjects/${$page.params.slug}/post`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ title, content })
-		});
-
-		await loadSubject();
-	}
+	let hasPermission: boolean = data.hasPermission ? true : false;
 
 	async function loadSubject() {
 		const res = await fetch(`/api/subjects/${$page.params.slug}/post?page=${currentPage}&limit=${limit}`);
@@ -44,8 +26,6 @@
 
 		questions = (json.data ?? []) as Post[];
 		total = json.total;
-		title = '';
-		content = '';
 	};
 
 	function makePost() {
@@ -64,7 +44,7 @@
 
 	<!-- Posts -->
 	{#each questions as post}
-		<PostCard {post} />
+		<PostCard {post} {hasPermission} />
 	{/each}
 
 	<div class="mb-4">
