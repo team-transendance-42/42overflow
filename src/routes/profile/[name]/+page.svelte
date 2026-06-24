@@ -3,9 +3,11 @@
   import { enhance } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
 
+
   export let data;
 
-  $: ({ profile, user, isFollowing, followerCount, followingCount, isOnline, isOwnProfile } = data);
+  $: ({ profile, user, isFollowing, followerCount, followingCount, isOnline, isOwnProfile, posts } = data);
+  
 </script>
 
 <div class="profile-page">
@@ -52,12 +54,25 @@
     </div>
   {/if}
 
-  {#if profile?.login}
-    <div class="section">
-      <span class="label">Intra</span>
-      <p>{profile.login}</p>
-    </div>
-  {/if}
+
+  {#if posts?.length}
+  <div class="section">
+    <span class="label">Posts</span>
+    {#each posts as post}
+      <a href="/posts/{post.id}" class="post-card">
+        <p class="post-title">{post.title}</p>
+        <p class="post-content">{post.content}</p>
+      </a>
+    {/each}
+  </div>
+{:else}
+  <div class="section">
+    <span class="label">Posts</span>
+    <p class="no-posts">No posts yet.</p>
+  </div>
+{/if}
+
+ 
 </div>
 
 <style>
@@ -106,4 +121,11 @@
     text-decoration: none;
     color: var(--color-text-primary);
   }
-</style>
+
+.label { display: block; margin-bottom: 0.5rem; }
+.post-card {display: block; text-decoration: none; color: var(--color-neutral-100); border: 1px solid var(--color-neutral-900); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; max-width: 420px;}
+.post-title { font-weight: 600; font-size: 0.95rem; }
+.post-content { font-size: 0.875rem; color: var(--color-text-secondary); }
+.no-posts { color: var(--color-text-secondary); }
+
+</style> 
