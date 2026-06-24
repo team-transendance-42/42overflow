@@ -179,7 +179,6 @@
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-	margin-bottom: 1rem;
 }
 
 .button:hover {
@@ -198,6 +197,18 @@
 
 .button.confirm {
 	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button.subscribe {
+	z-index: 3;
+	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button.unsubscribe {
+	z-index: 3;
+	background-color: var(--color-error-250);
 	color: white;
 }
 
