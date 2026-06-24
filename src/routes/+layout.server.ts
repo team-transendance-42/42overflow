@@ -16,6 +16,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		},
 		select: {
 			name: true,
+			image: true,
 			role: true,
 			memberships: {
 				select: {
@@ -34,6 +35,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
         user: {
             id: locals.user.id,
 			name: dbUser?.name,
+			image: dbUser?.image,
 			memberships: dbUser?.memberships ?? []
         },
         userRole: dbUser?.role ?? null
