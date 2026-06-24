@@ -57,6 +57,10 @@
 		max-width: 400px;
 	}
 
+	input, textarea {
+		color: black;
+	}
+
 	label {
 		display: flex;
 		flex-direction: column;

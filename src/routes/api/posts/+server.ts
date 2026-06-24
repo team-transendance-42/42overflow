@@ -11,9 +11,12 @@ export const GET: RequestHandler = async ({ url }) => {
 	  skip: (page - 1) * limit,
 	  take: limit,
 	  orderBy: { created_at: 'desc' },
-	  where: { deleted_at: null },
+	  where: { deleted_at: null,
+			subject: { deleted_at: null }
+	   },
 	  include: {
-		user: { select: { name: true, id: true } }
+		user: { select: { name: true, id: true } },
+		subject: { select: { slug: true } }
 	  }
 	}),
 	db.post.count({ where: { deleted_at: null } })

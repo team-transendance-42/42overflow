@@ -9,7 +9,7 @@
 	let isOwn = $derived.by(() => page.data.user?.id === post.user.id);
 
     function openPostPage() {
-        goto(`/posts/${post.id}`);
+        goto(`/s/${post.subject.slug}/posts/${post.id}`);
     }
 
 	async function deletePost() {
