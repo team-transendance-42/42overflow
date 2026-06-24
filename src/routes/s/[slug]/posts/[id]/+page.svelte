@@ -75,8 +75,8 @@
     }
 </script>
 
-<!-- Post with Comments -->
-<div>
+<div class=posts-page>
+	<!-- Post with Comments -->
 	{#if post}
 		<div class="postbox white-text relative">
 

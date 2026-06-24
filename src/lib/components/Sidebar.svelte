@@ -1,7 +1,6 @@
 <script lang="ts">
     import { page } from '$app/state';
 
-    export let width = "140px";
     export let userRole: 'USER' | 'MODERATOR' | 'ADMIN' | null = null;
 	export let memberships: { subject: { name: string; slug: string } }[] = [];
 
@@ -19,7 +18,7 @@
 </script>
 
 
-<aside class="sidebar" style="width: {width};">
+<aside class="sidebar">
 	<slot />
 	<div class="top-links">
 		<a href="/posts" class="sidebar-link" class:active={isActive('/posts')}>Posts</a>
