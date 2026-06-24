@@ -8,7 +8,7 @@
 	let { data } = $props();
 
 	type Post = ComponentProps<typeof PostCard>['post'];
-	
+
 	let title = $state('');
 	let content = $state('');
 	let message = '';
@@ -52,44 +52,45 @@
 		goto(`/post-question?subject=${data.subject.name}`);
 	}
 
-	onMount(loadSubject);		
+	onMount(loadSubject);
 
 </script>
 
-<!-- Posts -->
-<div>
-	<h1><strong>
-		NEWEST QUESTIONS
-	</strong></h1>
+<div class=posts-page>
+	<div class="subject-header">
+		<h1><strong>{data.subject.name}</strong></h1>
+		<p>{data.subject.description ? data.subject.description : 'No description available.'}</p>
+	</div>
 
+	<!-- Posts -->
 	{#each questions as post}
 		<PostCard {post} />
 	{/each}
-</div>
 
-<!-- Pagination -->
-<div>
-	<button onclick={() => {
-		if (currentPage > 1) {
-			currentPage--;
-			loadSubject();
-		}
-	}}>
-	Prev
-	</button>
+	<div class="mb-4">
+		<button class="button primary" onclick={makePost}>Create Post</button>
+	</div>
 
-	<span> - Page {currentPage} -</span>
+	<!-- Pagination -->
+	<div>
+		<button onclick={() => {
+			if (currentPage > 1) {
+				currentPage--;
+				loadSubject();
+			}
+		}}>
+			Prev
+		</button>
 
-	<button onclick={() => {
-		if (currentPage * limit < total) {
-			currentPage++;
-			loadSubject();
-		}
-	}}>
-	Next
-	</button>
-</div>
+		<span> - Page {currentPage} -</span>
 
-<div>
-	<button class="button primary" onclick={makePost}>Create Post</button>
+		<button onclick={() => {
+			if (currentPage * limit < total) {
+				currentPage++;
+				loadSubject();
+			}
+		}}>
+			Next
+		</button>
+	</div>
 </div>

@@ -20,12 +20,91 @@
 	text-shadow: rgb(230, 230, 230) 0px 0px 2px;
 }
 
+/* Sidebar */
+.sidebar {
+	background-color: var(--color-neutral-200);
+	color: rgb(0, 0, 0, 0.5);
+	width: 140px;
+	padding: 1.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	font-weight: bold;
+	font-size: 0.8rem;
+	border-right: 2px solid var(--color-neutral-100);
+}
+
+.subjects-row {
+    display: flex;
+    align-items: center;
+}
+
+.subjects-row .sidebar-link {
+    flex: 1;
+}
+
+.dropdown-btn {
+    width: auto;
+    padding: 0 0.5rem;
+}
+
+.sidebar a, .dropdown-btn {
+	color: #818181;
+	display: block;
+	border: none;
+	width:100%;
+	text-align: left;
+	cursor: pointer;
+	outline: none;
+}
+
+.dropdown-container {
+	padding-left: 8px;
+}
+
+.sidebar-link.active {
+	color: black;
+}
+
+.dropdown-btn.active {
+	color: black;
+}
+
+.top-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Subject Header */
+.subject-header {
+	color: black;
+	background-color: var(--color-neutral-200);
+	min-width: 300px;
+	width: 50%;
+	padding: 1rem;
+	border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+/* Posts Page */
+.posts-page {
+	width: 70vw;
+	position: relative;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
 /* Posts */
-.postbox {
+.postbox, .commentbox {
 	position: relative;
 
 	box-sizing: border-box;
 	width: 100%;
+	min-width: 400px;
 	min-height: 150px;
 	background-color: var(--color-neutral-100);
 	border: 1px solid var(--color-neutral-500);
@@ -38,6 +117,10 @@
 	font-family: var(--font-family-base);
 }
 
+.commentbox {
+	background-color: var(--color-neutral-300);
+}
+
 .postbox.clickable:hover {
 	z-index: 10;
 
@@ -48,7 +131,7 @@
 .questions-page {
 	width: 100%;
 	max-width: 3400px;
-	margin: 100 auto;
+	margin: 100px auto;
 }
 
 .questions-page h1 {
@@ -67,7 +150,7 @@
 /* Comment Actions */
 .comment-actions {
 	position: absolute;
-	bottom: 0px;
+	bottom: 0.5rem;
 	left: 0.5rem;
 	display: flex;
 	align-items: center;
@@ -124,7 +207,6 @@
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-	margin-bottom: 1rem;
 }
 
 .button:hover {
@@ -144,6 +226,24 @@
 .button.confirm {
 	background-color: var(--color-success-150);
 	color: white;
+}
+
+.button.subscribe {
+	z-index: 3;
+	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button.unsubscribe {
+	z-index: 3;
+	background-color: var(--color-error-250);
+	color: white;
+}
+
+.button.manage {
+	z-index: 3;
+	background-color: white;
+	color: black;
 }
 
 .button.postcard {

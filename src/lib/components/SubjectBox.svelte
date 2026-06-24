@@ -90,13 +90,13 @@
 		{#if !isLoggedIn}
 			<a class="action subscribe" href="/login">Subscribe</a>
 		{:else if isMember}
-			<button class="action unsubscribe" on:click={unsubscribe}>Unsubscribe</button>
+			<button class="button unsubscribe" on:click={unsubscribe}>Unsubscribe</button>
 		{:else}
-			<button class="action subscribe" on:click={subscribe}>Subscribe</button>
+			<button class="button subscribe" on:click={subscribe}>Subscribe</button>
 		{/if}
 
 		{#if isOwner}
-			<a class="action edit" href={`/s/${subject.slug}/manage`}>Manage</a>
+			<a class="button manage" href={`/s/${subject.slug}/manage`}>Manage</a>
 		{/if}
 	</div>
 	{#if errorMessage}
@@ -186,20 +186,5 @@
 
 	.value {
 		font-weight: 600;
-	}
-
-	.action {
-		position: relative;
-		z-index: 3;
-		display: inline-flex;
-		width: fit-content;
-		align-self: flex-start;
-	}
-	.action.subscribe {
-		background-color: green;
-	}
-
-	.action.unsubscribe {
-		background-color: red;
 	}
 </style>

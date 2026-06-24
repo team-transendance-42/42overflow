@@ -25,7 +25,7 @@
 <Header user={data.user} />
 
 <div class="content">
-	<Sidebar userRole={data.userRole} />
+	<Sidebar userRole={data.userRole} memberships={data.user?.memberships} />
 
 	<main>
 		{@render children()}

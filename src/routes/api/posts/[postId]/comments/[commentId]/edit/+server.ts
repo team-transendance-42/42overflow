@@ -49,7 +49,6 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 			postId: postId,
             parentId: parentIdValue ? parseInt(parentIdValue as string) : null,
 			content: formData.get('content') as string,
-            isEdited: true
 		}
 
 		const data = CommentSchema.parse(commentData);
@@ -69,6 +68,7 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 
         let toUpdateData: any = {
             content: data.content.trim(),
+			isEdited: true,
         };
 
         // Don't update image if no new image is provided (imageUrl is null)
