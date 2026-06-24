@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			subject: { deleted_at: null }
 	   },
 	  include: {
-		user: { select: { name: true } },
+		user: { select: { name: true, id: true } },
 		subject: { select: { slug: true } }
 	  }
 	}),
