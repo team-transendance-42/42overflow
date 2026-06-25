@@ -70,7 +70,9 @@ Users can update their profile information. Users can upload an avatar (with a d
 Justification: This is a user friendly web application geared towards a user that would return to the site for information/content, etc. The behavior implies a log-in, profile, and additional information. This is a relevant part of our web app. Implementation: This tied in nicely with the custom-made design system, and each page was built separately (SvelteKit makes this simple with a route to the page and then consistent ways to code the FE and BE functionality for each page), e.g. log-in, sign-up, profile page, settings for logging out, and editing of the profile, etc. In addition, there was design/UX/UI elements to be considered for the user in addition to the coding. 
 
 MAJOR (2PT): Advanced permissions system (EA)
-MAJOR (2PT): An organzation system (EA)
+The app has three site wide roles: USER, MODERATOR, and ADMIN, set on each user account. ADMINs can view, edit, and delete any user and change user roles. MODERATORs can view users and moderate content by deleting posts and comments. USER is the default role for authenticated users. Permission checks are enforced in server side layout loads, API route handlers, and form actions throughout the app, ensuring consistent access control at every level.
+MAJOR (2PT): An organization system (EA)
+Users can create, edit, and delete organizations (called "Subjects" in the codebase) that act as group spaces. Each organization has MEMBER, CURATOR, and OWNER roles. Owners can edit the organization, manage members, and archive it. CURATORs can view member lists. Any authenticated user can discover, join, or create organizations and interact with posts within them. The system uses the Prisma Subject model with a SubjectMember join table for memberships, slug based URLs for clean linking, and permission checks in both layout loads and API routes.
 MAJOR (2PT): Implement a complete RAG (PK)
 MAJOR (2PT): Implement a complete LLM system interface (PK)
 MINOR (1PT): Voice/speech integration for accessibility or interaction (PK)
