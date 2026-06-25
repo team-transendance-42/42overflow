@@ -3,8 +3,12 @@
   import { goto } from '$app/navigation';
 
   async function handleLogout() {
-    await authClient.signOut();
-    goto('/login');
+	try {
+    	await authClient.signOut();
+    	goto('/login');
+  	} catch (err) {
+	  console.error('Error logging out:', err);
+  	}
   }
 
 </script>
