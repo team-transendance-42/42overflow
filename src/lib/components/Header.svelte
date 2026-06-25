@@ -52,7 +52,7 @@
 				</button>
 
 				{#if dropdownOpen}
-					<div class="dropdown-container">
+					<div class="header dropdown-container">
 						<a href="/settings" class="sidebar-link" class:active={isActive('/settings')}>Settings</a>
 						<a href="/login" class="sidebar-link" on:click={handleLogout}>
 							Log out
