@@ -1,9 +1,9 @@
 """
 Text embedding using fastembed (model controlled by EMBED_MODEL env var).
 
-LRU cache on single-text embedding:
+LRU(least recently used) cache on single-text embedding:
   At query time, embed_texts is called with one question. The same questions
-  repeat across users (42 students ask similar things). An LRU cache avoids
+  repeat across users (students ask similar things). An LRU cache avoids
   re-running the CPU-bound fastembed model for repeated questions.
 
 Theory — lru_cache:

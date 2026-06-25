@@ -12,7 +12,6 @@ from numpy_index import NumpyIndex
 from seed import load_seed
 from store import get_embeddings, get_existing_hashes, upsert
 
-qa_cache: dict = {"qa_pairs": []}
 
 
 async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
@@ -200,7 +199,7 @@ async def load_and_index(app: FastAPI, label: str = "startup", include_db: bool 
     """Orchestrate: load pairs → sync Chroma → build indexes → apply to app.state.
     Returns a summary dict. Called at startup and by /admin/sync-chroma."""
     pairs = await _load_pairs(include_db, label)
-    qa_cache["qa_pairs"] = pairs
+    app.state.qa_pairs = pairs
 
     topic_counts = Counter(p.get("topic", "unknown") for p in pairs)
     db_sourced = [p for p in pairs if p.get("source") == "db-post"]

@@ -13,11 +13,13 @@ docker compose exec python-rag curl -s -X POST \
     -H 'X-Admin-Token: Tra-la-la'
 
 // delete info from postgres(subjects, posts, comments)
-  curl -X POST http://localhost:8090/admin/wipe -H "X-Admin-Token: Tra-la-la"
+  docker compose exec python-rag curl -X POST http://localhost:8090/admin/wipe -H "X-Admin-Token: Tra-la-la"
 
 //	smoke-test once Docker is running:
   docker compose exec python-rag curl -s http://localhost:8090/metrics | python3 -m json.tool
 
   docker compose logs -f python-rag
+
+  How does poll() work and why is non-blocking I/O required for webserv?
 
 

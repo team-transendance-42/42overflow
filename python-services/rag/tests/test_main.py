@@ -27,7 +27,6 @@ async def test_lifespan_seed_failure_is_fatal():
 async def test_lifespan_chroma_failure_is_non_fatal():
     """If _sync_to_chroma raises, lifespan must still yield — app starts in degraded mode."""
     from main import lifespan
-    from indexer import qa_cache
     from fastapi import FastAPI
 
     seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
@@ -40,14 +39,13 @@ async def test_lifespan_chroma_failure_is_non_fatal():
                   side_effect=RuntimeError("ChromaDB down")), \
             patch("indexer.get_embeddings", side_effect=RuntimeError("ChromaDB down")):
         async with lifespan(app):
-            assert len(qa_cache["qa_pairs"]) == 1
+            assert len(app.state.qa_pairs) == 1
 
 
 @pytest.mark.asyncio
 async def test_lifespan_happy_path():
-    """Full successful startup populates qa_cache."""
+    """Full successful startup populates app.state.qa_pairs."""
     from main import lifespan
-    from indexer import qa_cache
     from fastapi import FastAPI
 
     seed_data = [{"question": "Q1", "answer": "A1", "topic": "c", "tags": ["c"]}]
@@ -59,8 +57,8 @@ async def test_lifespan_happy_path():
             patch("indexer._sync_to_chroma", new_callable=AsyncMock), \
             patch("indexer.get_embeddings", side_effect=lambda ids: {id_: [0.1] * 768 for id_ in ids}):
         async with lifespan(app):
-            assert len(qa_cache["qa_pairs"]) == 1
-        assert qa_cache["qa_pairs"] == []
+            assert len(app.state.qa_pairs) == 1
+        assert app.state.qa_pairs == []
 
 
 @pytest.mark.asyncio

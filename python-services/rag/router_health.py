@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request
 
 from bm25_index import BM25Index
-from indexer import qa_cache
 from numpy_index import NumpyIndex
 
 router = APIRouter()
@@ -15,7 +14,7 @@ def healthz(request: Request):
     bm25_idx: BM25Index = request.app.state.bm25
     return {
         "status": "ok",
-        "qa_count": len(qa_cache["qa_pairs"]),
+        "qa_count": len(getattr(request.app.state, "qa_pairs", [])),
         "embeddings_ready": numpy_idx._matrix is not None,
         "bm25_ready": bm25_idx._bm25 is not None,
     }
