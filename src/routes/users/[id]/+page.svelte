@@ -71,91 +71,90 @@
 	{/if}
 	
 	{#if data.role === 'ADMIN'}
-	<section class="card">
-		<form method="POST" action="?/updateUserCore" class="form-grid">			
-			<label>
-				First name
-				<input name="firstName" value={data.user.first_name ?? ''} />
-			</label>
+		<section class="card">
+			<form method="POST" action="?/updateUserCore" class="form-grid">
+				<label>
+					First name
+					<input name="firstName" value={data.user.first_name ?? ''} />
+				</label>
 
-			<label>
-				Last name
-				<input name="lastName" value={data.user.last_name ?? ''} />
-			</label>
+				<label>
+					Last name
+					<input name="lastName" value={data.user.last_name ?? ''} />
+				</label>
 
+				<label>
+					Username
+					<input name="username" value={data.user.name} required />
+				</label>
+
+				<label>
+					Email
+					<input name="email" type="email" value={data.user.email} required />
+				</label>
+
+				<label class="full-width">
+					Image URL
+					<input name="image" value={data.user.image ?? ''} />
+				</label>
+
+				<label class="full-width">
+					Biography
+					<textarea name="biography" rows="5">{data.user.biography ?? ''}</textarea>
+				</label>
+
+				<label class="full-width">
+					Interests
+					<input name="interests" value={data.user.interests ?? ''} />
+				</label>
+
+				<label>
+					Role
+					<select name="role" value={data.user.role}>
+						<option value="USER">USER</option>
+						<option value="MODERATOR">MODERATOR</option>
+						<option value="ADMIN">ADMIN</option>
+					</select>
+				</label>
+
+				<div class="timestamps">
+					<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
+					<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
+				</div>
+
+				<button type="submit" class="button confirm full-width">Save core details</button>
+			</form>
+		</section>
+
+		<form method="POST" action="?/deleteUser" onsubmit={confirmDelete}>
+			<button type="submit" class="button unsubscribe">Delete account</button>
+		</form>
+	{/if}
+
+	{#if data.role === 'MODERATOR'}
+		<section class="card">
+			<img src={data.user.image} alt={data.user.name} class="avatar" />
 			<label>
 				Username
-				<input name="username" value={data.user.name} required />
+				<input value={data.user.name} disabled />
 			</label>
-
 			<label>
-				Email
-				<input name="email" type="email" value={data.user.email} required />
-			</label>
-
-			<label class="full-width">
-				Image URL
-				<input name="image" value={data.user.image ?? ''} />
-			</label>
-
-			<label class="full-width">
 				Biography
-				<textarea name="biography" rows="5">{data.user.biography ?? ''}</textarea>
+				<textarea rows="5" disabled>{data.user.biography ?? ''}</textarea>
 			</label>
-
-			<label class="full-width">
+			<label>
 				Interests
-				<input name="interests" value={data.user.interests ?? ''} />
+				<input value={data.user.interests ?? ''} disabled />
 			</label>
-
 			<label>
 				Role
-				<select name="role" value={data.user.role}>
-					<option value="USER">USER</option>
-					<option value="MODERATOR">MODERATOR</option>
-					<option value="ADMIN">ADMIN</option>
-				</select>
+				<input value={data.user.role} disabled />
 			</label>
-
 			<div class="timestamps">
 				<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
 				<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
 			</div>
-			
-			<button type="submit" class="full-width">Save core details</button>
-
-		</form>
-	</section>
-
-	<form method="POST" action="?/deleteUser" onsubmit={confirmDelete}>
-		<button type="submit" class="full-width" style="background-color: red;">Delete account</button>
-	</form>
-	{/if}
-
-	{#if data.role === 'MODERATOR'}
-	<section class="card">
-		<img src={data.user.image} alt={data.user.name} class="avatar" />
-		<label>
-			Username
-			<input value={data.user.name} disabled />
-		</label>
-		<label>
-			Biography
-			<textarea rows="5" disabled>{data.user.biography ?? ''}</textarea>
-		</label>
-		<label>
-			Interests
-			<input value={data.user.interests ?? ''} disabled />
-		</label>
-		<label>
-			Role
-			<input value={data.user.role} disabled />
-		</label>
-		<div class="timestamps">
-			<div><strong>Joined:</strong> {formatDate(data.user.createdAt)}</div>
-			<div><strong>Last update:</strong> {formatDate(data.user.updatedAt)}</div>
-		</div>
-	</section>
+		</section>
 	{/if}
 </div>
 
@@ -178,11 +177,6 @@
 
 	.back-link {
 		font-size: 0.9rem;
-	}
-
-	h1,
-	h2 {
-		margin: 0;
 	}
 
 	.card {
@@ -233,23 +227,6 @@
 		align-content: end;
 	}
 
-	.posts-list {
-		margin: 0;
-		padding-left: 1rem;
-		display: grid;
-		gap: 0.35rem;
-	}
-
-	.posts-list li {
-		display: flex;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-
-	.posts-list small {
-		color: var(--color-text-secondary);
-	}
-
 	.success {
 		color: green;
 		margin: 0;
@@ -263,11 +240,6 @@
 	@media (max-width: 720px) {
 		.form-grid {
 			grid-template-columns: 1fr;
-		}
-
-		.posts-list li {
-			flex-direction: column;
-			gap: 0.2rem;
 		}
 	}
 
