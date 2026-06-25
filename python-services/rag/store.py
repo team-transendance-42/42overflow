@@ -72,7 +72,7 @@ def clear_collection(name: str = _DEFAULT_COLLECTION) -> int:
 
 def _chroma_error(operation: str, exc: Exception) -> RuntimeError:
     return RuntimeError(
-        f"Could not connect to ChromaDB during '{operation}' (url={CHROMA_URL}): {exc}"
+        f"ChromaDB error during '{operation}' (url={CHROMA_URL}): {exc}"
     )
 
 
@@ -117,51 +117,3 @@ def upsert(
         _invalidate_collection()
         raise _chroma_error("upsert", exc) from exc
 
-
-# NOT USED in production — only called from tests/flow_seed_embed_store.py.
-# NumpyIndex replaced both functions below for all query-time retrieval.
-# Kept commented so tests still document what ChromaDB used to provide.
-
-# def retrieve(ids: list[str], name: str = _DEFAULT_COLLECTION) -> dict:
-#     """Fetch documents, embeddings, and metadatas for the given IDs from ChromaDB."""
-#     try:
-#         col = _get_collection()
-#         return col.get(ids=ids, include=["embeddings", "documents", "metadatas"])
-#     except Exception as exc:
-#         _invalidate_collection()
-#         raise _chroma_error("retrieve", exc) from exc
-
-
-# NOT USED in production — replaced by NumpyIndex.search().
-# ChromaDB HNSW search cost: ~50-150ms network roundtrip per call.
-# NumpyIndex cosine similarity cost: ~0.05ms in-process matrix multiply.
-# Kept commented to document the ChromaDB-based approach for reference.
-
-# def query_dense(
-#     embedding:    list[float],
-#     n:            int = 20,
-#     topic_filter: str | None = None,
-#     name:         str = _DEFAULT_COLLECTION,
-# ) -> list[dict]:
-#     try:
-#         col   = _get_collection()
-#         where = {"topic": topic_filter} if topic_filter else None
-#         safe_n = min(n, col.count())
-#         if safe_n == 0:
-#             return []
-#         result = col.query(
-#             query_embeddings=[embedding],
-#             n_results=safe_n,
-#             where=where,
-#             include=["documents", "distances"],
-#         )
-#     except Exception as exc:
-#         _invalidate_collection()
-#         raise _chroma_error("query_dense", exc) from exc
-#     ids       = result["ids"][0]
-#     documents = result["documents"][0]
-#     distances = result["distances"][0]
-#     return [
-#         {"id": id_, "document": doc, "distance": dist}
-#         for id_, doc, dist in zip(ids, documents, distances)
-#     ]

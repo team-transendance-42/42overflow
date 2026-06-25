@@ -1,4 +1,3 @@
-import asyncio
 from collections import Counter
 import time
 
@@ -23,13 +22,17 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     augmented = [
         {
             **p,
-            "_id":   make_doc_id(p["question"]),
+            "_id":   make_doc_id(p["question"], p.get("answer", "")),
             "_hash": make_doc_hash(p["question"], p["answer"]),
             "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
         }
         for p in pairs
     ]
-    existing = get_existing_hashes([p["_id"] for p in augmented])
+    try:
+        existing = get_existing_hashes([p["_id"] for p in augmented])
+    except Exception as exc:
+        print(f"[chroma] WARNING: get_existing_hashes failed, re-embedding all {len(augmented)} docs: {exc}")
+        existing = {}
 
     to_update = [
         p for p in augmented
@@ -100,7 +103,7 @@ def _prepare_corpus(pairs: list[dict], label: str) -> dict:
 
     for p in pairs:
         text = format_doc(p["question"], p["answer"], p.get("tags", []))
-        doc_id = make_doc_id(p["question"])
+        doc_id = make_doc_id(p["question"], p.get("answer", ""))
         topic = p.get("topic", "unknown")
 
         all_texts.append(text)

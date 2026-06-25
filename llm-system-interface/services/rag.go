@@ -204,6 +204,19 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		return noContext()
 	}
 
+	// Tier 1 — identical/near-identical match: skip Ollama entirely.
+	// Return the stored answer verbatim; avoids all LLM non-determinism.
+	const directBypassSimilarity = 0.85
+	if retrieved.HasEmbeddings && retrieved.BestSimilarity >= directBypassSimilarity && len(retrieved.Contexts) > 0 {
+		answer := "From community: " + extractAnswer(retrieved.Contexts[0].Text)
+		log.Printf("[RAG] direct answer (similarity=%.4f) — skipping Ollama", retrieved.BestSimilarity)
+		ragCacheSet(question, answer)
+		ch := make(chan string, 1)
+		ch <- answer
+		close(ch)
+		return ch, nil
+	}
+
 	// Build answer-only context blocks.
 	// extractAnswer strips the "Q: ..." prefix (retrieval metadata, redundant here).
 	blocks := make([]string, len(retrieved.Contexts))
@@ -221,14 +234,19 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	prompt := buildRAGPrompt(ctxStr, question)
 	log.Printf("[RAG] prompt total_len=%d, sending to ollama model=%s", len(prompt), chatModelName())
 
-	body, err := json.Marshal(map[string]any{
+	ollamaReq := map[string]any{
 		"model":      chatModelName(),
 		"stream":     true,
 		"keep_alive": -1,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},
-	})
+	}
+	// Tier 2: similar but not exact — lower temperature for more deterministic output.
+	if retrieved.HasEmbeddings {
+		ollamaReq["options"] = map[string]any{"temperature": 0.3}
+	}
+	body, err := json.Marshal(ollamaReq)
 	if err != nil {
 		return nil, fmt.Errorf("marshal ollama request: %w", err)
 	}

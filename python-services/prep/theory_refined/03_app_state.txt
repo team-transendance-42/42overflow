@@ -27,8 +27,7 @@ app.state is a special object that FastAPI gives on the app instance for storing
   container starts  → app.state is empty
   lifespan startup  → load_and_index() fills it (indexes, centroids, qa_pairs, etc.)
   requests come in  → handlers read from it (never write)
-  container stops   → app.state.qa_pairs = []  (cleared in lifespan shutdown block)
-                      everything else is just garbage collected with the process
+  container stops   → everything is garbage collected with the process
 
   curl examples (all from inside the container or with exposed port):
 

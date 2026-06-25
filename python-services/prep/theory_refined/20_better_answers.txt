@@ -1,0 +1,8 @@
+Problem: Same question asked twice gives different answers (hallucination from Ollama's non-determinism).
+
+  Root cause:
+  - gemma3:4b at default temp 0.8 doesn't reliably follow "reproduce word for word"
+  - Bad truncated answer gets cached → same wrong answer returned again
+  - Slightly different question string → different cache key → fresh call → correct answer
+
+  Machine constraints : 15GB RAM, 3.9GB free — gemma3:12b is NOT feasible.

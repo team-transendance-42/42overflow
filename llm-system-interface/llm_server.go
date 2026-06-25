@@ -2,9 +2,6 @@ package main
 
 // go run llm_server.go
 //https://github.com/team-transendance-42/42overflow
-/* /api/ai-assist route accepts a POST req with JSON like {"prompt": "text"}, parses it, and return the prompt as the response. Under the hood, Go’s net/http decodes the JSON body into a struct.
- */
-//curl -X POST -H "Content-Type: application/json" -d '{"prompt":"hello world"}' http://localhost:8081/api/ai-assist
 import (
 	"llm-system-interface/handlers"
 	"llm-system-interface/middleware"
@@ -33,9 +30,9 @@ func main() {
 	router.Use(middleware.RateLimiter)
 
 	// url: what client calls
-	router.HandleFunc("/api/ai-assist", handlers.GenerateGeminiText).Methods("POST")
-	router.HandleFunc("/api/ollama", handlers.GenerateOllamaText).Methods("POST")
-	router.HandleFunc("/api/community", handlers.RagAskStreaming).Methods("POST")
+	router.HandleFunc("/ai-assist/gemini", handlers.GenerateGeminiText).Methods("POST")
+	router.HandleFunc("/ai-assist/ollama", handlers.GenerateOllamaText).Methods("POST")
+	router.HandleFunc("/ai-assist/community", handlers.RagAskStreaming).Methods("POST")
 
 	log.Println("Server running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", router))

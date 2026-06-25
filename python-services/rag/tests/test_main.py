@@ -172,7 +172,7 @@ def test_prepare_corpus_duplicate_intro_keeps_first():
         {"question": "Q2", "answer": "A2", "topic": "c", "tags": ["intro"]},
     ]
     corpus = _prepare_corpus(pairs, label="test")
-    assert corpus["topic_intro_ids"]["c"] == make_doc_id("Q1")
+    assert corpus["topic_intro_ids"]["c"] == make_doc_id("Q1", "A1")
 
 
 # ── _fetch_embeddings ─────────────────────────────────────────────────────────
