@@ -1,7 +1,6 @@
 <script lang="ts">
   import Input from '$lib/components/Input.svelte';
   import { authClient } from '$lib/auth-client';
-  import { goto } from '$app/navigation';
 
   let email = '';
   let password = '';
@@ -11,28 +10,32 @@
 
   async function handleSignup() {
     error = '';
-
-	if (!email.trim() || !password.trim() || !name.trim()) {
-    error = 'All fields are required';
-    return;
-  }
+	if (!email.trim() || !password.trim() || !name.trim()) 
+	{
+    	error = 'All fields are required';
+    	return;
+  	}
     loading = true;
-
+try {
     const { data, error: err } = await authClient.signUp.email({
       email,
       password,
       name,
     });
 
-    loading = false;
-
-    if (err) {
+ if (err) {
       error = err.message ?? 'Could not create account';
       return;
     }
-
-    window.location.href = '/profile';
+	window.location.href = '/profile';
+	} catch (err) {
+		error = 'An unexpected error occurred';
+	}
+	finally {
+    loading = false;
+	}
   }
+
 </script>
 
 <div class="sign-up-page">

@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, redirect , fail} from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 
@@ -76,6 +76,7 @@ export const actions = {
 
     if (!targetProfile) throw error(404, 'User not found');
 
+	try {
     const existing = await db.follow.findUnique({
       where: {
         followerId_followingId: {
@@ -102,6 +103,10 @@ export const actions = {
         }
       });
     }
+}	catch (err) {
+		console.error(err);
+		return fail(500, { error:'Failed to update follow status' });
+	}
 
     return { success: true };
   }
