@@ -72,26 +72,28 @@ func extractAnswer(text string) string {
 	return answer
 }
 
-// doJSONWithRetry is like doJSON but retries on network errors and transient
-// HTTP failures using withRetry.
-//
-// Why not reuse doJSON: http.Request.Body is an io.Reader — once read it is
-// exhausted and cannot be replayed. Each retry must construct a fresh request
-// with a new bytes.NewReader over the same marshalled bytes.
-//
-// Theory — why retries fix "connection refused" after python-rag restart:
-//
-//	Go's http.DefaultTransport keeps idle TCP connections in a pool.
-//	After python-rag restarts it gets a new Docker-internal IP. The pooled
-//	connection to the old IP gets a RST and fails immediately. withRetry
-//	catches the network error, waits 1s, and creates a new TCP connection.
-//	Docker's embedded DNS resolver returns the new container IP on the fresh
-//	DNS lookup, so the retry succeeds.
-//
-// Edge cases:
-//   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
-//     a clean error ("community posts not available"). User can retry manually.
-//   - ctx cancelled: withRetry propagates ctx.Done() immediately.
+/*
+	 doJSONWithRetry is like doJSON but retries on network errors and transient
+	 HTTP failures using withRetry.
+
+	 Why not reuse doJSON: http.Request.Body is an io.Reader — once read it is
+	 exhausted and cannot be replayed. Each retry must construct a fresh request
+	 with a new bytes.NewReader over the same marshalled bytes.
+
+	 Theory — why retries fix "connection refused" after python-rag restart:
+
+		Go's http.DefaultTransport keeps idle TCP connections in a pool.
+		After python-rag restarts it gets a new Docker-internal IP. The pooled
+		connection to the old IP gets a RST and fails immediately. withRetry
+		catches the network error, waits 1s, and creates a new TCP connection.
+		Docker's embedded DNS resolver returns the new container IP on the fresh
+		DNS lookup, so the retry succeeds.
+
+	 Edge cases:
+	   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
+	     a clean error ("community posts not available"). User can retry manually.
+	   - ctx cancelled: withRetry propagates ctx.Done() immediately.
+*/
 func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) error {
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -125,12 +127,14 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 	return nil
 }
 
-// buildRAGPrompt builds the grounded prompt sent to Ollama.
-// Strict rules prevent hallucination: the model must ONLY use the provided
-// context and must not fall back to its training knowledge or guess.
-//
-// Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
-// interpret "answer clearly" as "be concise" and return only the first sentence.
+/*
+buildRAGPrompt builds the grounded prompt sent to Ollama.
+Strict rules prevent hallucination: the model must ONLY use the provided
+context and must not fall back to its training knowledge or guess.
+
+Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
+interpret "answer clearly" as "be concise" and return only the first sentence.
+*/
 func buildRAGPrompt(ctxStr, question string) string {
 	return "42 school tutor. Use ONLY the context below — no training knowledge.\n" +
 		"- Context answers it: give a thorough, complete answer with all details.\n" +
@@ -303,7 +307,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		// Also skip "no info" responses so a /admin/sync-chroma that adds the
 		// relevant data is not blocked by a stale cache entry for up to 1h.
 		log.Printf("[RAG] ollama final answer len=%d: %q", sb.Len(), sb.String())
-		const noInfoMarker = "I don't have enough context to answer this"
+		const noInfoMarker = "I am here to help with 42 curriculum questions only"
 		if ctx.Err() == nil && !strings.Contains(sb.String(), noInfoMarker) {
 			ragCacheSet(question, sb.String())
 		}
