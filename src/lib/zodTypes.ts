@@ -28,6 +28,14 @@ export const PostSchema = z.object({
 
 export type PostInput = z.infer<typeof PostSchema>;
 
+export const CreatePostSchema = z.object({
+	title: z.string().min(1, { message: "Title is required." }).max(75, { message: "Title must be between 1 and 75 characters." }),
+    subjectId: IdSchema.shape.id,
+	content: z.string().min(1, { message: "Content is required." }).max(500, { message: "Content must be between 1 and 500 characters." }),
+});
+
+export type CreatePostInput = z.infer<typeof CreatePostSchema>;
+
 // Profile
 const NameSchema = z.object({
     name: z.string().min(1, { message: "Name is required." }).max(25, { message: "Name must be less than 25 characters." }),

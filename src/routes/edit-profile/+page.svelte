@@ -138,12 +138,17 @@
             } else {
                 alert('An error occurred while editing the profile. Please try again.');
             }
-        } catch (error) {
-            console.error('Error submitting form:', error);
-            alert('An unexpected error occurred. Please try again.');
-        } finally {
-            isSubmitting = false;
-        }
+        } catch (err) {
+			if (err instanceof z.ZodError) {
+				errors = z.flattenError(err).fieldErrors;
+				return;
+			}
+
+            alert('An error occurred while editing the profile. Please try again.');
+			console.error('Unexpected error submitting:', err);
+		} finally {
+			isSubmitting = false;
+		}
     }
 </script>
 
@@ -246,7 +251,6 @@
 	.profile-page { width: 100%; max-width: 490px; padding: 0; text-align: left; }
 	.name-row { display: flex; gap: 1rem; }
 	.name-row :global(.input-wrapper) { flex: 1; }
-	.error { color: red; font-size: 0.875rem; }
 	.success { color: green; font-size: 0.875rem; }
 
 	.upload-btn {

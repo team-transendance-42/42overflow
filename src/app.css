@@ -20,6 +20,11 @@
 	text-shadow: rgb(230, 230, 230) 0px 0px 2px;
 }
 
+.error {
+	color: red;
+	font-size: 0.875rem;
+}
+
 /* Header */
 .header.dropdown-container {
 	position: absolute;
