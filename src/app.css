@@ -492,6 +492,8 @@ textarea:focus {
 .input-group {
 	display: flex;
 	flex-direction: column;
+	width: 100%;
+	color: black;
 	gap: 0.4rem;
 	margin-bottom: .4rem;
 }

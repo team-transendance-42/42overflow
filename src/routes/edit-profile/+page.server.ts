@@ -1,71 +1,114 @@
+import { json, error } from '@sveltejs/kit';
 import { fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { uploadProductImage } from '$lib/fileUpload';
 import type { Actions, PageServerLoad } from './$types';
-import { error } from 'console';
+import { EditProfileSchema, type EditProfileInput } from '$lib/zodTypes';
+import { z } from 'zod';
 
-export const load: PageServerLoad = async ({ locals }) => 
+export const load: PageServerLoad = async ({ locals }) =>
 {
-  if (!locals.user) throw redirect(303, '/login');
+	if (!locals.user)
+		throw redirect(303, '/login');
 
-  return {
-    user: locals.user,
-  };
+	const user = await db.user.findFirst({
+		where: { id: locals.user.id },
+		select: {
+			id: true,
+			name: true,
+			first_name: true,
+			last_name: true,
+			email: true,
+			interests: true,
+			image: true
+		}
+	});
+
+	if (!user)
+		throw error(404, 'User not found');
+
+	return { user };
 };
 
 export const actions: Actions = {
-  update: async ({ request, locals }) => {
-    if (!locals.user) return fail(401, { error: 'Not logged in' });
+	update: async ({ request, locals }) => {
+		try {
+			if (!locals.user)
+				return fail(401, { error: 'Unauthorized' });
 
-    const data = await request.formData();
-    const avatarFile = data.get('avatarimage') as File;
-	const removeAvatar = data.get('removeAvatar') === 'true';
-    let imageUrl: string | null = null;
+			// Parse and validate form data
+			const formData = await request.formData();
+			const data = EditProfileSchema.parse({
+				id: formData.get('id') as string,
+				name: formData.get('name') as string,
+				first_name: formData.get('first_name') as string,
+				last_name: formData.get('last_name') as string,
+				email: formData.get('email') as string,
+				interests: formData.get('interests') as string,
+			});
 
-    if (avatarFile && avatarFile.size > 0) 
-	{
-	const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-	if (!allowedTypes.includes(avatarFile.type)) {
-    	throw error(400, 'Invalid image type');
-  	}
-      const uploadsDir = join('static', 'uploads');
-      mkdirSync(uploadsDir, { recursive: true });
-      const ext = avatarFile.type.split('/')[1];
-      const filename = `${locals.user.id}.${ext}`;
-      const buffer = Buffer.from(await avatarFile.arrayBuffer());
-      writeFileSync(join(uploadsDir, filename), buffer);
-      imageUrl = `/uploads/${filename}`;
-    }
+			// Check if edited profile belongs to the logged-in user
+			const loggedInUserId = locals.user.id;
+			const userId = data.id;
+			if (userId !== loggedInUserId)
+				return fail(403, { error: 'You can only edit your own profile' });
 
-	const interests = data.get('interests') as string;
-	const username = data.get('username') as string;
-	const firstname = data.get('firstname') as string;
-	const lastname = data.get('lastname') as string;
+			// Handle image upload
+			let imageUrl: string | undefined = undefined;
 
-	const updateData: {
-		interests?: string;
-		name?: string;
-		first_name?: string;
-		last_name?: string;
-		image?: string | null;
-	} = {};
+			const imageFile = formData.get('image') as File;
+			if (imageFile && imageFile.size > 0) {
+				const uploadResult = await uploadProductImage(imageFile);
+				if (!uploadResult.success) {
+					return fail(400, { error: uploadResult.error });
+				}
+				imageUrl = uploadResult.url;
+				console.log(`${new Date().toISOString()} - Image uploaded successfully: ${imageUrl}`);
+			}
 
-	if (interests) updateData.interests = interests;
-	if (username) updateData.name = username;
-	if (firstname) updateData.first_name = firstname;
-	if (lastname) updateData.last_name = lastname;
-	if (imageUrl) updateData.image = imageUrl;
-	else if (removeAvatar) updateData.image = null;
+			let profileData: EditProfileInput & { image?: string | null } = {
+				id: data.id,
+				name: data.name,
+				first_name: data.first_name,
+				last_name: data.last_name,
+				email: data.email,
+				interests: data.interests,
+			};
 
-	if (Object.keys(updateData).length > 0) {
-		await db.user.update({
-			where: { id: locals.user.id },
-			data: updateData
-		});
-	}
+			// Don't update image if no new image is provided (imageUrl is null)
+			if (imageUrl === undefined) {
+				if (formData.get('removeImage') === 'true') {
+					profileData.image = null;
+				}
+			} else {
+				// Update with new image URL
+				profileData.image = imageUrl;
+			}
 
-	return { success: true, imageUrl };
+			console.log('Profile data to update:', profileData);
+
+			const { id, ...toUpdateData } = profileData;
+
+			// Edit Profile
+			await db.user.update({
+				where: { id: locals.user.id },
+				data: toUpdateData
+			});
+
+			return { success: true };
+		} catch (error) {
+			console.error('Error editing profile:', error);
+			if (error instanceof z.ZodError) {
+				return json({
+					error: 'Invalid input data',
+					details: error.issues.map(e => ({
+						field: e.path.join('.'),
+						message: e.message
+					}))
+				}, { status: 400 });
+			}
+			return fail(500, { error: 'Internal Server Error' });
+		}
 	}
 };
 

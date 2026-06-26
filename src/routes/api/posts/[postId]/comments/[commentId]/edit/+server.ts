@@ -1,5 +1,5 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
-import { uploadProductImage } from '$lib/fileUpload.ts';
+import { uploadProductImage } from '$lib/fileUpload';
 import { CommentSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
 import { z } from 'zod';

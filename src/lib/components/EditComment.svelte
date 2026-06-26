@@ -77,6 +77,12 @@
         }
     }
 
+    function removeOldImage() {
+		previewUrl = '';
+		formData.image = undefined;
+		removeImage = true;
+	}
+
     // Handle form submission
     async function handleSubmit(event: Event) {
         if (isSubmitting) return; // Prevent multiple submissions
@@ -187,6 +193,11 @@
                     {/if}
                     {#if errors.image}
                         <p class="error">{errors.image[0]}</p>
+                    {/if}
+                    {#if previewUrl}
+                        <button type="button" class="button unsubscribe" onclick={removeOldImage}>
+                            <strong>Remove Image</strong>
+                        </button>
                     {/if}
                 </div>
 
