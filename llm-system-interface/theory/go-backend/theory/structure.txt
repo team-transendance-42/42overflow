@@ -18,7 +18,7 @@ import (
     "log"                 // log server status and errors
     "net/http"            // HTTP server and request handling
     "github.com/gorilla/mux" // advanced HTTP routing
-    "llm-system/handlers"     // request handler functions (e.g., GenerateText)
+    "llm-system/handlers"     // request handler functions (e.g., GenerateGeminiText)
     "llm-system/middleware"   // middleware (rate limiting, error recovery)
 )
 
@@ -29,7 +29,7 @@ func main() {
     r.Use(middleware.ErrorRecovery)
     r.Use(middleware.RateLimiter) //Checks request rate and may block requests if limits are exceeded.
 
-    r.HandleFunc("/generate", handlers.GenerateText).Methods("POST") //Registers the /generate route for POST requests, handled by GenerateText.
+    r.HandleFunc("/generate", handlers.GenerateGeminiText).Methods("POST") //Registers the /generate route for POST requests, handled by GenerateGeminiText.
     r.HandleFunc("/generate-image", handlers.GenerateImage).Methods("POST")
 
     log.Println("Server running on :8080") //Built-in log package. Logs a message to the console 
@@ -73,7 +73,7 @@ import (
     "llm-system/services"
 )
 
-func GenerateText(w http.ResponseWriter, r *http.Request) {
+func GenerateGeminiText(w http.ResponseWriter, r *http.Request) {
     var req models.TextRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         http.Error(w, "invalid request", http.StatusBadRequest)

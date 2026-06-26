@@ -22,7 +22,7 @@ go get google.golang.org/api/option
 Import the SDK in your Go code:
 Set up the client:
 Send a prompt to Gemini:
-resp, err := client.GenerateText(ctx, &genai.GenerateTextRequest{
+resp, err := client.GenerateGeminiText(ctx, &genai.GenerateGeminiTextRequest{
     Prompt: "Hello, Gemini!",
 })
 if err != nil {

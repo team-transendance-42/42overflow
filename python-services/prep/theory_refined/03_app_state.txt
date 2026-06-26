@@ -1,0 +1,63 @@
+app.state is a special object that FastAPI gives on the app instance for storing arbitrary data.
+  
+  app = FastAPI()
+  app.state.anything = "my data"   # FastAPI just lets to attach whatever
+
+  Where it lives: RAG container heap, same Python process as the request handlers. It's just an attribute on the app object — no magic, no
+  database, no serialization.
+
+  Why use it instead of module-level globals:
+  # module-level global — works but harder to test, harder to mock
+  _bm25 = None
+  
+  # app.state — cleaner: tied to the app lifetime, easy to replace in tests
+  app.state.bm25 = BM25Index()
+
+  How request handlers read it:
+  from fastapi import Request
+  
+  @router.post("/query")
+  async def query(request: Request, ...):
+      bm25 = request.app.state.bm25        # same object built at startup
+      numpy_idx = request.app.state.numpy_index
+
+  Every request handler gets request.app — which is the same app object — so !!app.state is effectively a shared memory space for the whole process.!!
+
+  Lifetime:
+  container starts  → app.state is empty
+  lifespan startup  → load_and_index() fills it (indexes, centroids, qa_pairs, etc.)
+  requests come in  → handlers read from it (never write)
+  container stops   → everything is garbage collected with the process
+
+  curl examples (all from inside the container or with exposed port):
+
+  # health check — returns qa_count, embeddings_ready, bm25_ready
+  curl http://localhost:8000/healthz
+
+  # trigger DB sync + index rebuild (requires admin token)
+  curl -X POST http://localhost:8000/admin/sync-chroma \
+       -H "X-Admin-Token: $ADMIN_TOKEN"
+
+  # seed fake data into Postgres
+  curl -X POST http://localhost:8000/admin/seed-postgres \
+       -H "X-Admin-Token: $ADMIN_TOKEN"
+
+  # seed and wipe existing data first
+  curl -X POST "http://localhost:8000/admin/seed-postgres?clean=true" \
+       -H "X-Admin-Token: $ADMIN_TOKEN"
+
+  # wipe Postgres + ChromaDB, rebuild from seed only
+  curl -X POST http://localhost:8000/admin/wipe \
+       -H "X-Admin-Token: $ADMIN_TOKEN"
+
+  # metrics
+  curl http://localhost:8000/admin/metrics \
+       -H "X-Admin-Token: $ADMIN_TOKEN"
+
+  # RAG retrieve (called by Go, but testable directly)
+  curl -X POST http://localhost:8000/rag/retrieve \
+       -H "Content-Type: application/json" \
+       -d '{"question": "how does malloc work?", "top_k": 5}'
+
+  It's not persistent, not shared across containers, not thread-safe for writes — but since it's written once at startup and only read after,
+  that's fine.

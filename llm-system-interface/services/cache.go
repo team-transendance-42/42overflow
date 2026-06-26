@@ -29,7 +29,7 @@ func ragCacheKey(question string) string {
 func ragCacheGet(question string) (string, bool) {
 	key := ragCacheKey(question)
 
-	ragCacheMu.RLock()
+	ragCacheMu.RLock() // allowed read only, no write
 	e, ok := ragCache[key]
 	ragCacheMu.RUnlock()
 

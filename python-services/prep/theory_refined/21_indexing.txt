@@ -1,0 +1,60 @@
+Indexing in RAG is the preprocessing step where your documents are converted into a searchable format before any queries happen.
+
+  What it does
+
+  1. Chunking — Split documents into smaller pieces (e.g. paragraphs, fixed-size windows). Large docs don't fit in context, and smaller chunks  retrieve more precisely.
+  2. Embedding — Each chunk is passed through an embedding model (e.g. nomic-embed-text) which converts text → a vector of floats (e.g. 768  numbers). Semantically similar text lands close together in vector space.
+  3. Storing — Vectors + original text are saved in a vector database (Chroma, pgvector, Qdrant, etc.).
+
+  At query time
+
+  The user's question is also embedded → we search for vectors closest to it (cosine similarity or dot product) → return the top-k chunks →  inject them into the LLM prompt.
+
+  Why indexing matters
+
+  - Done once, offline — querying is fast because we're just doing math on pre-computed vectors
+  - Chunk size is a tradeoff: too large = noisy context, too small = loses surrounding meaning
+  - Embedding model quality directly affects retrieval quality
+
+  in our rag:
+
+  the system searches pre-indexed Q&A pairs from the community, computes similarity scores, and uses a two-tier
+  threshold (≥0.85 = direct answer, 0.55–0.85 = LLM with temp 0.3, we chose this approach because gemma3:4b returns concise replies by default due to size and cuts relevant info: so, if similarity is very close: just give complete chunk). The "index" is whatever vector store we're querying against.
+=======================================
+                                                                                                                   
+A context window is the maximum amount of text an LLM can "see" at once — input + output combined, measured in tokens.
+like working memory
+
+  The model has no persistent memory between calls. Every request is stateless — we must fit everything relevant into the context window for that single call:
+  - System prompt
+  - Conversation history
+  - RAG chunks we retrieved
+  - The user's question
+  - The model's response
+
+  If it doesn't fit, it gets cut off or the request fails.
+
+  Tokens
+
+  ~1 token ≈ 0.75 words in English. "Hello world" = 2 tokens.
+
+  ┌───────────────────┬────────────────┐
+  │       Model       │ Context window │
+  ├───────────────────┼────────────────┤
+  │ Gemma 3 4B        │ 128k tokens    │
+  ├───────────────────┼────────────────┤
+  │ Claude Sonnet 4.6 │ 200k tokens    │
+  ├───────────────────┼────────────────┤
+  │ GPT-4o            │ 128k tokens    │
+  └───────────────────┴────────────────┘
+
+  Why it matters for RAG
+
+  RAG exists because of context window limits. we can't stuff an entire knowledge base into every prompt — so instead we:
+  1. Index everything upfront
+  2. Retrieve only the relevant chunks at query time
+  3. Inject just those chunks into the context window
+
+  This way a 10GB knowledge base can work with a 4k context window — we just fetch the 2-3 most relevant pieces per query.
+
+  our RAG retrieves community Q&A chunks and injects them into the Ollama prompt. The smaller and more precise those chunks are, the more room left for the model's actual answer.

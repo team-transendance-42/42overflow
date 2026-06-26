@@ -1,0 +1,21 @@
+The difference is the streaming protocol each API uses:
+--
+  Gemini → SSE (Server-Sent Events)
+  - !!Response body is a text stream, each line prefixed with data: !!
+  - Each data: line is a raw JSON string, not a Go struct
+  - You must manually strip "data: ", then parse the JSON blob — that's what extractTextFromJSON does
+  - The nested shape (candidates[0].content.parts[0].text) can't be decoded directly into a typed struct in one step
+---
+  Ollama → NDJSON (newline-delimited JSON)
+  - !!Response body is a stream of complete JSON objects, one per line !!
+  - Go's json.NewDecoder streams and decodes each object directly into the typed OllamaResponse struct
+  - r.Message.Content is just a struct field access — no manual parsing needed
+
+  Gemini:  data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}
+            ↑ raw SSE text line → extractTextFromJSON strips "data: " then json.Unmarshal
+
+  Ollama:  {"message":{"role":"assistant","content":"Hello"},"done":false}
+            ↑ already a complete JSON object → decoder.Decode(&r) directly
+
+  doGEMINIRequest vs doOllamaRequest: Gemini builds the request body in StreamGemini and passes raw []byte, while Ollama builds everything
+  inside doOllamaRequest using the typed OllamaRequest struct — cleaner because Ollama's simpler format maps 1:1 to a Go struct.

@@ -1,0 +1,1 @@
+Idempotent means: performing an operation multiple times produces the same result as doing it once.

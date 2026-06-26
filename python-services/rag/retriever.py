@@ -153,15 +153,17 @@ async def hybrid_search(
     dense_text: dict[str, str] = {hit["id"]: hit["document"] for hit in dense_hits}
     top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k]
 
-    results = [
-        {
+    results = []
+    for id_ in top_ids:
+        text = dense_text.get(id_) or id_to_text.get(id_, "")
+        if not text:
+            print(f"[retriever] WARNING: no text for {id_!r} — BM25-only hit missing from id_to_text")
+        results.append({
             "id":        id_,
-            "text":      dense_text.get(id_) or id_to_text.get(id_, ""),
+            "text":      text,
             "rrf_score": round(rrf_scores[id_], 6),
             "topic":     id_to_topic.get(id_, "unknown"),
-        }
-        for id_ in top_ids
-    ]
+        })
 
     # Pin intro doc: when a topic is detected and its intro doc is not already
     # in the top-k results, insert it at position 0.
