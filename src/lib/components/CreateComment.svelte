@@ -13,7 +13,7 @@
     let { postId, parentId }: Props = $props();
     let derivedPostId = $derived(postId);
     let derivedParentId = $derived(parentId ?? undefined);
-    let popover: HTMLDivElement;
+    let popover: HTMLDivElement | undefined = $state(undefined);
 
     type CommentFormInput = CommentInput & {
         image?: File;
