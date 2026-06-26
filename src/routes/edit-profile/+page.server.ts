@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { Actions, PageServerLoad } from './$types';
-import { error } from 'console';
+import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals }) => 
 {
@@ -59,13 +59,17 @@ export const actions: Actions = {
 	else if (removeAvatar) updateData.image = null;
 
 	if (Object.keys(updateData).length > 0) {
+	try {
 		await db.user.update({
 			where: { id: locals.user.id },
 			data: updateData
 		});
+	} catch (err) {
+		console.error(err);
+		return fail(500, { error: 'Failed to update profile' });
 	}
 
+}
 	return { success: true, imageUrl };
-	}
-};
-
+}
+  };
