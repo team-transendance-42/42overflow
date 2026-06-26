@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"llm-system-interface/models"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -134,11 +134,11 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 func buildRAGPrompt(ctxStr, question string) string {
 	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
 		"STRICT RULES — follow exactly:\n" +
-		"1. If the context directly covers the question: reproduce the COMPLETE answer from the context word for word. Do NOT summarize or shorten it.\n" +
-		"2. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
+		//"1. If the context directly covers the question: reproduce the COMPLETE answer from the context word for word. Do NOT summarize or shorten it.\n" + // didnt follow anyways: 4b limitation
+		"1. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
 		"   \"I don't have enough context to answer this.\"\n" +
-		"3. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
-		"4. If you are unsure whether the context covers it: apply rule 2.\n" +
+		"2. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
+		"3. If you are unsure whether the context covers it: apply rule 1.\n" +
 		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
 		"=== QUESTION ===\n" + question + "\n\n" +
 		"=== ANSWER ==="
