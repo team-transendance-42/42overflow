@@ -136,11 +136,8 @@ Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
 interpret "answer clearly" as "be concise" and return only the first sentence.
 */
 func buildRAGPrompt(ctxStr, question string) string {
-	return "You are a 42 school tutor. Your ONLY source of truth is the CONTEXT below.\n" +
-		"Rules:\n" +
-		"1. Answer ONLY using information explicitly stated in the CONTEXT.\n" +
-		"2. Do NOT infer, guess, or use any knowledge outside the CONTEXT.\n" +
-		"3. If the CONTEXT does not directly answer the QUESTION, reply EXACTLY: \"I am here to help with 42 curriculum questions only. How can I help you?\"\n" +
+	return "You are a 42 school tutor. Answer using ONLY the CONTEXT below. Reply thoroughly with all relevant info.\n" +
+		"If the answer is not in the CONTEXT, reply EXACTLY: \"I am here to help with 42 curriculum questions only. How can I help you?\"\n" +
 		"CONTEXT:\n" + ctxStr + "\n\n" +
 		"QUESTION:\n" + question + "\n\n" +
 		"ANSWER:"
