@@ -30,7 +30,7 @@ export type PostInput = z.infer<typeof PostSchema>;
 
 // Profile
 const NameSchema = z.object({
-    name: z.string().min(1, { message: "Name is required." }).max(25, { message: "Name must be less than 50 characters." }),
+    name: z.string().min(1, { message: "Name is required." }).max(25, { message: "Name must be less than 25 characters." }),
 });
 
 const optionalName = z.preprocess(
@@ -43,7 +43,6 @@ export const EditProfileSchema = z.object({
     name: optionalName,
     first_name: optionalName,
     last_name: optionalName,
-    email: z.string().optional(),
     interests: z.string().optional(),
 })
 

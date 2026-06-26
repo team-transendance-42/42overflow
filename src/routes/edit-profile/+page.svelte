@@ -7,6 +7,7 @@
 	interface Props {
 		data: {
 			user: EditProfileInput & {
+				email?: string;
 				image?: string;
 			};
 		};
@@ -34,7 +35,6 @@
 		name: '',
 		first_name: '',
 		last_name: '',
-		email: '',
 		interests: '',
 		image: undefined
 	});
@@ -46,7 +46,6 @@
         formData.name = derivedUsername;
 		formData.first_name = derivedFirstname;
 		formData.last_name = derivedLastname;
-		formData.email = derivedEmail;
 		formData.interests = derivedInterests;
 		previewUrl = (data.user.image ?? '');
     });
@@ -85,10 +84,14 @@
                 delete errors[key];
                 errors = { ...errors };
             }
-        } catch (error) {
-            if (error instanceof z.ZodError) {
-                z.treeifyError(error);
-            }
+        } catch (err) {
+            if (err instanceof z.ZodError) {
+				const fieldErrors = z.flattenError(err).fieldErrors;
+
+				errors = fieldErrors;
+				return;
+			}
+			console.error('Unexpected error:', err);
         }
     }
 
@@ -184,9 +187,6 @@
 				bind:value={formData.first_name}
                 oninput={(event) => handleInput('first_name', (event.target as HTMLTextAreaElement).value)}
 			/>
-			{#if errors.first_name}
-				<p class="error">{errors.first_name[0]}</p>
-			{/if}
 			<input
 				class="input-group"
 				placeholder="Last"
@@ -194,10 +194,13 @@
 				bind:value={formData.last_name}
                 oninput={(event) => handleInput('last_name', (event.target as HTMLTextAreaElement).value)}
 			/>
-			{#if errors.last_name}
-				<p class="error">{errors.last_name[0]}</p>
-			{/if}
 		</div>
+		{#if errors.first_name}
+			<p class="error">{errors.first_name[0]}</p>
+		{/if}
+		{#if errors.last_name}
+			<p class="error">{errors.last_name[0]}</p>
+		{/if}
 
 		<!-- User Name -->
 		<input
@@ -215,13 +218,9 @@
 			class="input-group"
 			placeholder="E-mail"
 			id="email"
-			bind:value={formData.email}
-            oninput={(event) => handleInput('email', (event.target as HTMLTextAreaElement).value)}
+			bind:value={derivedEmail}
 			disabled
 		/>
-		{#if errors.email}
-			<p class="error">{errors.email[0]}</p>
-		{/if}
 		<!-- Interests -->
 		<input
 			class="input-group"

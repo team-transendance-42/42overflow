@@ -43,7 +43,6 @@ export const actions: Actions = {
 				name: formData.get('name') as string,
 				first_name: formData.get('first_name') as string,
 				last_name: formData.get('last_name') as string,
-				email: formData.get('email') as string,
 				interests: formData.get('interests') as string,
 			});
 
@@ -71,7 +70,6 @@ export const actions: Actions = {
 				name: data.name,
 				first_name: data.first_name,
 				last_name: data.last_name,
-				email: data.email,
 				interests: data.interests,
 			};
 
