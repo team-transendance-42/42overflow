@@ -132,16 +132,12 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 // Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
 // interpret "answer clearly" as "be concise" and return only the first sentence.
 func buildRAGPrompt(ctxStr, question string) string {
-	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
-		"STRICT RULES — follow exactly:\n" +
-		//"1. If the context directly covers the question: reproduce the COMPLETE answer from the context word for word. Do NOT summarize or shorten it.\n" + // didnt follow anyways: 4b limitation
-		"1. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
-		"   \"I don't have enough context to answer this.\"\n" +
-		"2. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
-		"3. If you are unsure whether the context covers it: apply rule 1.\n" +
-		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
-		"=== QUESTION ===\n" + question + "\n\n" +
-		"=== ANSWER ==="
+	return "42 school tutor. Use ONLY the context below — no training knowledge.\n" +
+		"- Context answers it: give a thorough, complete answer with all details.\n" +
+		"- Context does not answer it: reply exactly \"I am here to help with 42 curriculum questions only. How can I help you?\"\n" +
+		"CONTEXT:\n" + ctxStr + "\n\n" +
+		"QUESTION:\n" + question + "\n\n" +
+		"ANSWER:"
 }
 
 // StreamRagAnswer retrieves community contexts from the Python RAG service,
