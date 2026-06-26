@@ -21,7 +21,6 @@
 	let derivedInterests = $derived(data.user?.interests ?? '');
 	let derivedUsername = $derived(data.user?.name ?? '');
 
-	let error = $state('');
 	let success = $state(false);
 	let removeImage = $state(false);
 
@@ -152,9 +151,6 @@
 	<div class="profile-page">
 		<h1><strong>PROFILE PAGE</strong></h1>
 
-		{#if error}
-			<p class="error">{error}</p>
-		{/if}
 		{#if success}
 			<p class="success">Profile updated!</p>
 		{/if}
