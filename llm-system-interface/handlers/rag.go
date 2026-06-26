@@ -14,7 +14,7 @@ import (
 // Kept separate from ollamaQueue so a slow RAG request does not block plain Ollama requests.
 var ragQueue = make(chan struct{}, 1)
 
-// RagAskStreaming handles POST /api/community.
+// RagAskStreaming handles POST /ai-assist/community.
 // Retrieves community contexts from the Python RAG service and streams
 // Gemma's answer constrained to those contexts.
 func RagAskStreaming(w http.ResponseWriter, r *http.Request) {

@@ -26,13 +26,12 @@ func decodeAndSanitize(w http.ResponseWriter, r *http.Request, req *models.TextR
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return false
 	}
-	req.Prompt = strings.TrimSpace(req.Prompt)
+	req.Prompt = strings.TrimSpace(req.Prompt) // only begin and end
 	return true
 }
 
 /*
-	a compatibility layer
-
+compitability layer:
 Frontend can send just { "prompt": "hello" } or full { "messages": [{...}] }.
 Both Gemini and Ollama expect req.Messages to be populated — never just a raw prompt.
 If messages is empty, wraps the prompt into a single user message so both models
@@ -78,7 +77,7 @@ In web servers, every incoming HTTP request has its own context.
 
 flusher is an object that implements the http.Flusher interface.
 w.(http.Flusher) is a type assertion: it checks if w (the http.ResponseWriter) also supports the Flush() method (needed for streaming).
-If ok is true, flusher is the same as w, but now you can call flusher.Flush() which
+If ok is true, flusher is the same as w, but now can call flusher.Flush() which
 forces Go’s HTTP server to immediately send any data written (with fmt.Fprintf, etc.) to the client, instead of waiting for the buffer to fill up.
 chunk is a string received from the channel (ch), which may contain multiple lines separated by \n.
 for _, line := range strings.Split(chunk, "\n") splits the chunk into individual lines, and each line is sent as a separate SSE message: fmt.Fprintf(w, "data: %s\n", line).
@@ -107,9 +106,9 @@ func GenerateGeminiText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ch, err := services.StreamLLM(r.Context(), req) // receiving from llm
+	ch, err := services.StreamGemini(r.Context(), req)
 	if err != nil {
-		log.Printf("GenerateGeminiText: StreamLLM error: %v", err)
+		log.Printf("GenerateGeminiText: StreamGemini error: %v", err)
 		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}

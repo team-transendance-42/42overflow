@@ -1,4 +1,3 @@
-// services/llm.go
 package services
 
 import (
@@ -14,16 +13,20 @@ import (
 	"strings"
 )
 
-/* safely pulls the text string out of a Gemini API streaming chunk
+/*
+	safely pulls the text string out of a Gemini API streaming chunk
+
 JSON can't be used directly in Go. needs a Go struct that mirrors the JSON shape so json.Unmarshal knows where to put each value.
 json looks like:
-  "candidates": [
-    {
-      "content": {
-        "parts": [
-          {
-            "text": "Hello, how can I help?"
-          }
+
+	"candidates": [
+	  {
+	    "content": {
+	      "parts": [
+	        {
+	          "text": "Hello, how can I help?"
+	        }
+
 chunk          → the whole parsed JSON object
 chunk.Candidates        → the "candidates" array
 chunk.Candidates[0]     → first candidate
@@ -98,7 +101,7 @@ func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiK
 			return nil, fmt.Errorf("build Gemini request: %w", err)
 		}
 		httpReq.Header.Set("Content-Type", "application/json") // Tells Gemini "the body I'm sending is JSON format"
-		httpReq.Header.Set("x-goog-api-key", apiKey) // Authentication — proves you have permission to use the API, without it: 403
+		httpReq.Header.Set("x-goog-api-key", apiKey)           // Authentication — proves we have permission to use the API, without it: 403
 		return client.Do(httpReq)
 	})
 }
@@ -158,7 +161,7 @@ Returns the HTTP response or an error
 !!NB!!
 After readGeminiSSEToChannel finishes and closes the channel, the caller can still receive all values sent before closing, but cannot send to the channel. The sending side (inside the goroutine) is done and closed; the receiving side (the caller) can keep reading until the channel is empty and closed.
 */
-func StreamLLM(ctx context.Context, req models.TextRequest) (<-chan string, error) {
+func StreamGemini(ctx context.Context, req models.TextRequest) (<-chan string, error) {
 	const geminiSystemPrompt = "reply with less words, dont repeat info"
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {

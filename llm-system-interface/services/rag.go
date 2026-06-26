@@ -204,19 +204,19 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		return noContext()
 	}
 
-	// DISABLED — Tier 1: identical/near-identical match, skip Ollama entirely.
-	// When similarity >= 0.85: return stored answer verbatim as "From community: <answer>", cache it.
-	// Eliminates LLM non-determinism for exact repeated questions. See doc-dev-rag.md.
-	// const directBypassSimilarity = 0.85
-	// if retrieved.HasEmbeddings && retrieved.BestSimilarity >= directBypassSimilarity && len(retrieved.Contexts) > 0 {
-	// 	answer := "From community: " + extractAnswer(retrieved.Contexts[0].Text)
-	// 	log.Printf("[RAG] direct answer (similarity=%.4f) — skipping Ollama", retrieved.BestSimilarity)
-	// 	ragCacheSet(question, answer)
-	// 	ch := make(chan string, 1)
-	// 	ch <- answer
-	// 	close(ch)
-	// 	return ch, nil
-	// }
+	// Tier 1: high-similarity match — skip Ollama, return stored answer verbatim.
+	// Gemma3:4b truncates long answers even at temp 0.3; bypassing the LLM for
+	// near-identical questions guarantees the full seed answer is returned.
+	const directBypassSimilarity = 0.85
+	if retrieved.HasEmbeddings && retrieved.BestSimilarity >= directBypassSimilarity && len(retrieved.Contexts) > 0 {
+		answer := "From community: " + extractAnswer(retrieved.Contexts[0].Text)
+		log.Printf("[RAG] direct answer (similarity=%.4f) — skipping Ollama", retrieved.BestSimilarity)
+		ragCacheSet(question, answer)
+		ch := make(chan string, 1)
+		ch <- answer
+		close(ch)
+		return ch, nil
+	}
 
 	// Build answer-only context blocks.
 	// extractAnswer strips the "Q: ..." prefix (retrieval metadata, redundant here).

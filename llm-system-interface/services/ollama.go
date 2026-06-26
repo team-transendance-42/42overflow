@@ -9,9 +9,9 @@ import (
 	"llm-system-interface/models"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 )
+
 /*
 Ollama
 ======================================
@@ -40,31 +40,33 @@ type OllamaResponse struct {
 }
 
 func truncate(s string, n int) string {
-	if (len(s) > n) {
+	if len(s) > n {
 		return s[:n]
 	}
 	return s
 }
 
-/**
+/*
+*
 In Go, the maximum length of a string you can send through a channel (like ch <- r.Message.Content) is limited by available memory, not by the channel itself. The channel transmits the string as a value, and Go strings can be up to 2GB (on 32-bit systems) or much larger (on 64-bit systems), but in practice, you are limited by system memory and performance.
 */
 func buildOllamaMessages(req models.TextRequest) []models.Message {
-    const systemPrompt = "reply with less words, dont repeat info"
-    const maxHistory = 10
+	const systemPrompt = "reply with less words, don't repeat yourself"
+	const maxHistory = 10
 	const maxContentLen = 2000 // chars per msg
 
-    msgs := make([]models.Message, 0, len(req.Messages)+1)
-    for _, m := range req.Messages {
-        msgs = append(msgs, models.Message{Role: m.Role, Content: truncate(m.Content, maxContentLen)})
-    }
-    if strings.TrimSpace(req.Prompt) != "" {
-        msgs = append(msgs, models.Message{Role: "user", Content: truncate(req.Prompt, maxContentLen)})
-    }
-    if len(msgs) > maxHistory {
-        msgs = msgs[len(msgs)-maxHistory:]
-    }
-    return append([]models.Message{{Role: "system", Content: systemPrompt}}, msgs...)
+	//create a slice(dynamic arr) with len 0, capacity(len(req.M)+1 on the heap)
+	msgs := make([]models.Message, 0, len(req.Messages)+1)
+	for _, m := range req.Messages {
+		msgs = append(msgs, models.Message{Role: m.Role, Content: truncate(m.Content, maxContentLen)})
+	}
+	if strings.TrimSpace(req.Prompt) != "" {
+		msgs = append(msgs, models.Message{Role: "user", Content: truncate(req.Prompt, maxContentLen)})
+	}
+	if len(msgs) > maxHistory {
+		msgs = msgs[len(msgs)-maxHistory:]
+	}
+	return append([]models.Message{{Role: "system", Content: systemPrompt}}, msgs...)
 }
 
 /*
@@ -115,13 +117,7 @@ func readOllamaToChannel(ctx context.Context, resp *http.Response, ch chan strin
 }
 
 func StreamOllama(ctx context.Context, req models.TextRequest) (<-chan string, error) {
-	model := os.Getenv("OLLAMA_MODEL")
-	ollamaURL := os.Getenv("OLLAMA_URL")
-	if model == "" || ollamaURL == "" {
-		return nil, fmt.Errorf("OLLAMA_URL and OLLAMA_MODEL must be set")
-	}
-
-	resp, err := doOllamaRequest(ctx, ollamaURL, model, req)
+	resp, err := doOllamaRequest(ctx, ollamaURL(), chatModelName(), req)
 	if err != nil {
 		return nil, err
 	}
