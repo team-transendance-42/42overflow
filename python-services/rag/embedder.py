@@ -1,9 +1,9 @@
 """
 Text embedding using fastembed (model controlled by EMBED_MODEL env var).
 
-LRU cache on single-text embedding:
+LRU(least recently used) cache on single-text embedding:
   At query time, embed_texts is called with one question. The same questions
-  repeat across users (42 students ask similar things). An LRU cache avoids
+  repeat across users (students ask similar things). An LRU cache avoids
   re-running the CPU-bound fastembed model for repeated questions.
 
 Theory — lru_cache:
@@ -75,9 +75,14 @@ def format_doc(question: str, answer: str, tags: list[str] | None = None) -> str
     return base
 
 
-def make_doc_id(question: str) -> str:
-    """Stable unique ID for a document, derived from the question text."""
-    return hashlib.sha256(question.encode()).hexdigest()
+def make_doc_id(question: str, answer: str = "") -> str:
+    """Stable unique ID for a document, derived from question + answer.
+
+    Answer is included so that multiple comments on the same post (same question,
+    different answers) each get a distinct ID — hashing question alone caused
+    duplicate IDs when the DB query returns one row per comment.
+    """
+    return hashlib.sha256((question + answer).encode()).hexdigest()
 
 
 def make_doc_hash(question: str, answer: str) -> str:
@@ -136,7 +141,8 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         key = texts[0].lower().strip()
         # asyncio.to_thread handles both cache miss (CPU-bound embed)
         # and cache hit (O(1) lookup — thread overhead ~0.01ms, acceptable).
-        result_tuple = await asyncio.to_thread(_embed_one_cached, key)
+        result_tuple = await asyncio.to_thread(_embed_one_cached, key) #  Without asyncio.to_thread, FastEmbed would freeze the event loop for 100–300ms — no other request could be answered during that time. With it, the loop stays free while the CPU crunches numbers on a separate thread.
+
         return [list(result_tuple)]
 
     # Batch path: startup embeds all docs at once — bypass cache.

@@ -33,27 +33,6 @@ def test_seed():
     print(f"  topic distribution: {dict(sorted(dist.items()))}")
 
 
-def test_merge():
-    from main import _merge
-
-    seed = [
-        {"question": "What is X?", "answer": "seed answer", "topic": "c",
-         "difficulty": "beginner", "tags": ["x"]},
-    ]
-    db = [
-        {"question": "What is X?", "answer": "db answer", "topic": "c",
-         "difficulty": "beginner", "tags": ["x"]},          # same question → DB wins
-        {"question": "What is Y?", "answer": "db only", "topic": "python",
-         "difficulty": "intermediate", "tags": ["y"]},      # new from DB
-    ]
-    result = _merge(seed, db)
-
-    assert len(result) == 2, f"Expected 2, got {len(result)}"
-    by_q = {r["question"]: r for r in result}
-    assert by_q["What is X?"]["answer"] == "db answer", "DB should overwrite seed"
-    assert "What is Y?" in by_q, "DB-only pair should be included"
-    print("✓ merge: DB overwrites seed on duplicate question, additives included")
-
 
 def test_load_seed_missing_dir():
     with patch("seed._SEED_DIR") as mock_dir:
@@ -76,5 +55,4 @@ def test_load_seed_bad_json(tmp_path):
 
 if __name__ == "__main__":
     test_seed()
-    test_merge()
     print("\nAll tests passed.")

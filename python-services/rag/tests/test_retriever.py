@@ -29,7 +29,7 @@ def _build_test_fixtures(with_centroids: bool = False):
     """
     pairs = load_seed()
     all_texts = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
-    all_ids = [make_doc_id(p["question"]) for p in pairs]
+    all_ids = [make_doc_id(p["question"], p.get("answer", "")) for p in pairs]
     all_topics = [p.get("topic", "unknown") for p in pairs]
 
     id_to_text = dict(zip(all_ids, all_texts))
@@ -162,7 +162,7 @@ def _build_topic_intro_ids() -> dict[str, str]:
     """Build {topic: intro_doc_id} from seed — mirrors what main.py will do."""
     pairs = load_seed()
     return {
-        p["topic"]: make_doc_id(p["question"])
+        p["topic"]: make_doc_id(p["question"], p.get("answer", ""))
         for p in pairs
         if "intro" in p.get("tags", [])
     }

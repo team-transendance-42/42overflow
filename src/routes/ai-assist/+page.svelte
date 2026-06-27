@@ -715,7 +715,7 @@ async function sendToWhisper(blob: Blob) {
             class="form-input"
             type="text"
             bind:value={question}
-            placeholder="Ask a question..."
+            placeholder={llmMode === 'community' ? 'Ask one question...' : 'Ask a question...'}
         />
         <span aria-live="polite" aria-atomic="true" class="sr-only">{sttStatus}</span>
         <button
@@ -734,6 +734,9 @@ async function sendToWhisper(blob: Blob) {
             Stop
         </button>
     </form>
+    {#if llmMode === 'community'}
+        <p style="font-size:0.82rem;text-align:center;opacity:0.6;margin:4px 0 0;">For best results, ask one question at a time</p>
+    {/if}
     {#if error}
         <div style="color:tomato;text-align:center;">{error}</div>
     {/if}

@@ -46,6 +46,6 @@ bash reload_rag.sh
 
 ## Notes
 
-- `reload_rag.sh` is at the project root and calls `POST /admin/reload-from-db` inside the container.
+- `reload_rag.sh` is at the project root and calls `POST /admin/sync-chroma` inside the container.
 - The reload rebuilds BM25, NumpyIndex, and ChromaDB without restarting the container.
 - Future improvement: automate the reload on a schedule (e.g. twice a day).

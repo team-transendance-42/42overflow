@@ -2,7 +2,7 @@
 2. models/           — add UserID, SessionID to structs  
 3. Auth middleware   — JWT login/register endpoints
 4. History service   — GetRecent + Save + sliding window prune
-5. Handler changes   — wire history into GenerateText
+5. Handler changes   — wire history into GenerateGeminiText
 6. Frontend          — send JWT token + collect session_id
 ============================================
 
@@ -27,7 +27,7 @@ Step 3 — Issue your own JWT from that user_id
 Step 4 — Auth middleware (verify JWT, put user_id in context)
 Step 5 — Upgrade rate limiter (user_id key instead of IP)
 Step 6 — History service + sliding window
-Step 7 — Wire into GenerateText handler
+Step 7 — Wire into GenerateGeminiText handler
 Step 8 — Frontend sends Bearer token
 ==========================================
 

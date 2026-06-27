@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"llm-system-interface/models"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -71,26 +72,28 @@ func extractAnswer(text string) string {
 	return answer
 }
 
-// doJSONWithRetry is like doJSON but retries on network errors and transient
-// HTTP failures using withRetry.
-//
-// Why not reuse doJSON: http.Request.Body is an io.Reader — once read it is
-// exhausted and cannot be replayed. Each retry must construct a fresh request
-// with a new bytes.NewReader over the same marshalled bytes.
-//
-// Theory — why retries fix "connection refused" after python-rag restart:
-//
-//	Go's http.DefaultTransport keeps idle TCP connections in a pool.
-//	After python-rag restarts it gets a new Docker-internal IP. The pooled
-//	connection to the old IP gets a RST and fails immediately. withRetry
-//	catches the network error, waits 1s, and creates a new TCP connection.
-//	Docker's embedded DNS resolver returns the new container IP on the fresh
-//	DNS lookup, so the retry succeeds.
-//
-// Edge cases:
-//   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
-//     a clean error ("community posts not available"). User can retry manually.
-//   - ctx cancelled: withRetry propagates ctx.Done() immediately.
+/*
+	 doJSONWithRetry is like doJSON but retries on network errors and transient
+	 HTTP failures using withRetry.
+
+	 Why not reuse doJSON: http.Request.Body is an io.Reader — once read it is
+	 exhausted and cannot be replayed. Each retry must construct a fresh request
+	 with a new bytes.NewReader over the same marshalled bytes.
+
+	 Theory — why retries fix "connection refused" after python-rag restart:
+
+		Go's http.DefaultTransport keeps idle TCP connections in a pool.
+		After python-rag restarts it gets a new Docker-internal IP. The pooled
+		connection to the old IP gets a RST and fails immediately. withRetry
+		catches the network error, waits 1s, and creates a new TCP connection.
+		Docker's embedded DNS resolver returns the new container IP on the fresh
+		DNS lookup, so the retry succeeds.
+
+	 Edge cases:
+	   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
+	     a clean error ("community posts not available"). User can retry manually.
+	   - ctx cancelled: withRetry propagates ctx.Done() immediately.
+*/
 func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) error {
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -124,24 +127,26 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 	return nil
 }
 
-// buildRAGPrompt builds the grounded prompt sent to Ollama.
-// Strict rules prevent hallucination: the model must ONLY use the provided
-// context and must not fall back to its training knowledge or guess.
+/*
+buildRAGPrompt builds the grounded prompt sent to Ollama.
+Strict rules prevent hallucination: the model must ONLY use the provided
+context and must not fall back to its training knowledge or guess.
+
+Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
+interpret "answer clearly" as "be concise" and return only the first sentence.
+*/
 func buildRAGPrompt(ctxStr, question string) string {
-	return "You are a 42 school tutor. You ONLY answer using the context below.\n" +
-		"STRICT RULES — follow exactly:\n" +
-		"1. If the context directly covers the question: answer clearly using ONLY what is written there.\n" +
-		"2. If the context does NOT contain the answer: reply with this exact sentence and nothing else:\n" +
-		"   \"I don't have enough context to answer this.\"\n" +
-		"3. DO NOT use your training knowledge. DO NOT guess. DO NOT answer from memory.\n" +
-		"4. If you are unsure whether the context covers it: apply rule 2.\n" +
-		"=== CONTEXT ===\n" + ctxStr + "\n\n" +
-		"=== QUESTION ===\n" + question + "\n\n" +
-		"=== ANSWER ==="
+	return "You are a 42 school tutor. Answer using ONLY the CONTEXT below. Reply thoroughly with all relevant info.\n" +
+		"If the answer is not in the CONTEXT, reply EXACTLY: \"I am here to help with 42 curriculum questions only. How can I help you?\"\n" +
+		"CONTEXT:\n" + ctxStr + "\n\n" +
+		"QUESTION:\n" + question + "\n\n" +
+		"ANSWER:"
 }
 
-// StreamRagAnswer retrieves community contexts from the Python RAG service,
-// builds a grounded prompt, and streams Gemma's answer token by token.
+/*
+StreamRagAnswer retrieves community contexts from the Python RAG service,
+builds a grounded prompt, and streams Gemma's answer token by token.
+*/
 func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error) {
 	question = strings.TrimSpace(question)
 	if question == "" {
@@ -149,17 +154,21 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	}
 
 	if cached, ok := ragCacheGet(question); ok {
+		log.Printf("[RAG] cache HIT for %q — len=%d", question, len(cached))
 		ch := make(chan string, 1)
 		ch <- cached
 		close(ch)
 		return ch, nil
 	}
+	log.Printf("[RAG] cache MISS for %q — calling python-rag", question)
 
 	var retrieved models.RagRetrieveResponse
 	if err := doJSONWithRetry(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
 		map[string]any{"question": question}, &retrieved); err != nil {
 		return nil, fmt.Errorf("retrieve contexts: %w", err)
 	}
+	log.Printf("[RAG] retrieved %d contexts, confidence=%.4f, best_similarity=%.4f, has_embeddings=%v",
+		len(retrieved.Contexts), retrieved.Confidence, retrieved.BestSimilarity, retrieved.HasEmbeddings)
 
 	// Two-layer relevance gate — both must pass before Ollama is called.
 	//
@@ -196,11 +205,27 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		return noContext()
 	}
 
+	// Tier 1: high-similarity match — skip Ollama, return stored answer verbatim.
+	// Gemma3:4b truncates long answers even at temp 0.3; bypassing the LLM for
+	// near-identical questions guarantees the full seed answer is returned.
+	const directBypassSimilarity = 0.85
+	if retrieved.HasEmbeddings && retrieved.BestSimilarity >= directBypassSimilarity && len(retrieved.Contexts) > 0 {
+		answer := "From community: " + extractAnswer(retrieved.Contexts[0].Text)
+		log.Printf("[RAG] direct answer (similarity=%.4f) — skipping Ollama", retrieved.BestSimilarity)
+		ragCacheSet(question, answer)
+		ch := make(chan string, 1)
+		ch <- answer
+		close(ch)
+		return ch, nil
+	}
+
 	// Build answer-only context blocks.
 	// extractAnswer strips the "Q: ..." prefix (retrieval metadata, redundant here).
 	blocks := make([]string, len(retrieved.Contexts))
 	for i, c := range retrieved.Contexts {
-		blocks[i] = fmt.Sprintf("[%d] %s", i+1, extractAnswer(c.Text))
+		extracted := extractAnswer(c.Text)
+		log.Printf("[RAG] context[%d] raw_len=%d extracted_len=%d", i+1, len(c.Text), len(extracted))
+		blocks[i] = fmt.Sprintf("[%d] %s", i+1, extracted)
 	}
 
 	ctxStr := "(no context retrieved)"
@@ -209,11 +234,38 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	}
 
 	prompt := buildRAGPrompt(ctxStr, question)
+	log.Printf("[RAG] prompt total_len=%d, sending to ollama model=%s", len(prompt), chatModelName())
 
+	// DISABLED — Tier 2 (conditional): lower temperature only for similar matches. See doc-dev-rag.md.
+	// ollamaReq := map[string]any{
+	// 	"model":      chatModelName(),
+	// 	"stream":     true,
+	// 	"keep_alive": -1,
+	// 	"messages": []map[string]string{
+	// 		{"role": "user", "content": prompt},
+	// 	},
+	// }
+	// if retrieved.HasEmbeddings {
+	// 	ollamaReq["options"] = map[string]any{"temperature": 0.3}
+	// }
+	// body, err := json.Marshal(ollamaReq)
+
+	// DISABLED — original: default Ollama temperature (0.8), higher randomness.
+	// body, err := json.Marshal(map[string]any{
+	// 	"model":      chatModelName(),
+	// 	"stream":     true,
+	// 	"keep_alive": -1,
+	// 	"messages": []map[string]string{
+	// 		{"role": "user", "content": prompt},
+	// 	},
+	// })
+
+	// temperature 0.3 for all calls — more deterministic, reduces inconsistent answers.
 	body, err := json.Marshal(map[string]any{
 		"model":      chatModelName(),
 		"stream":     true,
 		"keep_alive": -1,
+		"options":    map[string]any{"temperature": 0.3},
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},
@@ -253,7 +305,11 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		// Only cache when the stream completed naturally. If ctx was cancelled
 		// (client disconnected), rawCh closes early with a partial answer —
 		// caching it would serve a truncated response to the next N users for 1h.
-		if ctx.Err() == nil {
+		// Also skip "no info" responses so a /admin/sync-chroma that adds the
+		// relevant data is not blocked by a stale cache entry for up to 1h.
+		log.Printf("[RAG] ollama final answer len=%d: %q", sb.Len(), sb.String())
+		const noInfoMarker = "I am here to help with 42 curriculum questions only"
+		if ctx.Err() == nil && !strings.Contains(sb.String(), noInfoMarker) {
 			ragCacheSet(question, sb.String())
 		}
 	}()

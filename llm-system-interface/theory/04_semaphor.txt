@@ -1,0 +1,77 @@
+---
+  Ollama runs locally on my laptop's CPU. If 10 users ask questions at the same time, all 10 would hammer the CPU simultaneously — the server could
+  crash or freeze. You need a bouncer at the door: only 1 user inside at a time.
+
+  ---
+  The Queue (Semaphore)
+
+  var ollamaQueue = make(chan struct{}, 1)
+
+  This is a buffered channel with capacity 1. Think of it as a room with 1 seat.
+
+  - struct{}{} = an empty token. It has no data, it just exists. It means "someone is in the room."
+  - Capacity 1 = only 1 token fits. The room holds 1 person.
+
+  ┌──────────────┬───────────────────────┬──────────────────┐
+  │    State     │ What's in the channel │  What it means   │
+  ├──────────────┼───────────────────────┼──────────────────┤
+  │ Empty []     │ nobody                │ Room is free     │
+  ├──────────────┼───────────────────────┼──────────────────┤
+  │ Full [token] │ 1 token               │ Room is occupied │
+  └──────────────┴───────────────────────┴──────────────────┘
+
+  ---
+  The select — The Bouncer
+
+  select {
+  case ollamaQueue <- struct{}{}:     // TRY to put a token in (enter the room)
+  case <-r.Context().Done():          // User cancelled their request
+      return
+  case <-time.After(30 * time.Second): // Waited 30s, still no room
+      http.Error(w, "Ollama is busy...", 503)
+      return
+  }
+
+  select tries all cases at the same time and runs whichever one is ready first.
+
+  Case 1: ollamaQueue <- struct{}{} — tries to put a token into the channel.
+  - If the channel is empty (room is free): succeeds immediately. You're in!
+  - If the channel is full (room is occupied): this case blocks — it waits.
+
+  Case 2: r.Context().Done() — the user closed their browser tab or cancelled.
+  - If the request is cancelled: fires immediately. We stop waiting and return. No point holding the queue.
+
+  Case 3: time.After(30s) — a timer that fires after 30 seconds.
+  - If nobody leaves the room after 30 seconds: give up, send a 503 error.
+
+  Without select, you'd write just ollamaQueue <- struct{}{} — but that blocks forever if the room is full, ignoring cancellations.
+
+  ---
+  The defer — Leaving the Room
+
+  defer func() {
+      <-ollamaQueue
+      log.Println("Ollama slot released for next student.")
+  }()
+
+  defer runs when the function returns — no matter how (success, error, panic).
+
+  <-ollamaQueue takes the token back out of the channel. Room is now empty again. The next waiting user's select case 1 can now succeed.
+
+  ---
+  Full Flow, Step by Step
+
+  User A arrives → select → room empty → puts token in → enters
+  User B arrives → select → room full → waits...
+                                           User A finishes → defer removes token
+                                           User B's select fires → puts token in → enters
+  User C arrives → select → room full → waits 30s → gets 503 if still full
+
+  ---
+  Why Not Just a Mutex?
+
+  A mutex would also work, but a channel lets you add the timeout and cancellation cases cleanly inside select. That's the Go idiom.
+
+  ---
+  One sentence summary: ollamaQueue is a 1-slot room; select is the bouncer who either lets you in, sends you away if you cancel, or turns you
+  away after 30 seconds; defer makes sure you always leave the room when done.

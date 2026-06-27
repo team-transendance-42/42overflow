@@ -21,8 +21,8 @@ Network travel is negligible.
  Gemma3:4b on CPU generates roughly 3-7 tokens/second. A 100-token answer takes 15-30 seconds. With GPU it would be 30-100 tokens/second, meaning
   1-3 seconds. You're on CPU, so you wait.
 
-  The network between Go and Python adds maybe 300ms total to the 25s — you'd never notice it.
+  The network between Go and Python adds maybe 300ms total to the 25s(not noticable)
   =======================
-  current flow: Browser → [Go: rate limiter → queue → cache check → RAG retrieve → relevance gates → Ollama stream → cache write → SSE] → Browser
+  current flow: Browser → [Go: rate limiter → queue → cache check → RAG retrieve → relevance gates → Ollama stream → cache write → SSE → Browser]
   =======================
 
