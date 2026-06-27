@@ -20,8 +20,6 @@
         content: '',
     });
 
-    let previewUrl = $state<string>('');
-
     $effect(() => {
         formData.postId = derivedPostId;
         formData.title = post.title;
@@ -60,7 +58,7 @@
             // Validate form data
             const { ...postData } = formData;
             PostSchema.parse(postData);
-			
+
 			const formDataToSend = new FormData();
             Object.entries(postData).forEach(([key, value]) => {
                 if (value !== undefined && value !== null) {
@@ -75,18 +73,22 @@
 
             if (response.ok) {
                 showPopover = false;
-                previewUrl = '';
                 // Refresh page to show updated post
                 location.reload();
             } else {
                 alert('An error occurred while editing the post. Please try again.');
             }
-        } catch (error) {
-            console.error('Error submitting form:', error);
-            alert('An unexpected error occurred. Please try again.');
-        } finally {
-            isSubmitting = false;
-        }
+        } catch (err) {
+			if (err instanceof z.ZodError) {
+				errors = z.flattenError(err).fieldErrors;
+				return;
+			}
+
+			alert('An error occurred while editing the post. Please try again.');
+			console.error('Unexpected error submitting:', err);
+		} finally {
+			isSubmitting = false;
+		}
     }
 
     function handleDocumentClick(event: PointerEvent) {
@@ -130,10 +132,10 @@
                         oninput={(event) => handleInput('title', (event.target as HTMLTextAreaElement).value)}
                         required
                     ></textarea>
-                    {#if errors.title}
-                        <p class="error">{errors.title[0]}</p>
-                    {/if}
                 </div>
+                {#if errors.title}
+                    <p class="error">{errors.title[0]}</p>
+                {/if}
 
                 <!-- Content -->
                 <div class="textarea-group">
@@ -144,10 +146,10 @@
                         oninput={(event) => handleInput('content', (event.target as HTMLTextAreaElement).value)}
                         required
                     ></textarea>
-                    {#if errors.content}
-                        <p class="error">{errors.content[0]}</p>
-                    {/if}
                 </div>
+                {#if errors.content}
+                    <p class="error">{errors.content[0]}</p>
+                {/if}
 
                 <button
 					class="button secondary"

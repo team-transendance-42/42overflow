@@ -31,23 +31,24 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 			throw error(403, 'You can only edit your own posts');
 		}
 
+		// Parse and validate form data
 		const formData = await request.formData();
-
-		// Extract form fields and convert types
-		const postData = {
-			postId: postId,
+		const postData = PostSchema.parse({
+			postId: parseInt(formData.get('postId') as string),
 			title: formData.get('title') as string,
 			content: formData.get('content') as string,
-		}
+		});
 
-		const data = PostSchema.parse(postData);
+		if (postData.postId !== postId) {
+			throw error(400, 'Post ID mismatch');
+		}
 
 		// Edit post
 		const editedPost = await db.post.update({
 			where: { id: postId },
 			data: {
-				title: data.title,
-				content: data.content,
+				title: postData.title,
+				content: postData.content,
 				isEdited: true
 			}
 		});
