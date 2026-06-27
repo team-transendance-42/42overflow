@@ -1,41 +1,18 @@
 """
 Text embedding using fastembed (model controlled by EMBED_MODEL env var).
+fastembed.TextEmbedding converts any text chunk into a fixed-size float vector:
+  1. Tokenizes the text
+  2. Runs it through a transformer (ONNX under the hood)
+  3. Mean-pools the token embeddings → one fixed-size vector
+  4. Optionally L2-normalizes it
 
-LRU(least recently used) cache on single-text embedding:
-  At query time, embed_texts is called with one question. The same questions
-  repeat across users (students ask similar things). An LRU cache avoids
-  re-running the CPU-bound fastembed model for repeated questions.
+Output dimension depends on the model (nomic-ai/nomic-embed-text-v1.5 → 768 floats).
+Chunk size does not change the dimension — a 10-word chunk and a 500-word chunk
+both produce the same 768 floats. Very long chunks are truncated at the model's
+token limit (~512 tokens), so extremely large chunks lose their tail content.
 
-Theory — lru_cache:
-  functools.lru_cache wraps a function with an O(1) dict + doubly-linked list.
-  On hit: one dict lookup, return cached value — no model call.
-  On miss: call the function, store result, evict LRU entry if at maxsize.
-  Thread-safe: protected by the GIL and an internal lock.
-  Cache key: the function argument(s) — must be hashable (str is hashable).
-
-Cache key normalisation:
-  text.lower().strip() before lookup — "What is malloc?" and "what is malloc?"
-  share one slot. The normalised text is what gets embedded (consistent).
-
-Why single-text only, not batch:
-  Startup embeds 200 unique docs in one batch call — all would miss the cache,
-  adding N lookup overhead for zero benefit. The batch path bypasses the cache
-  and calls _embed_sync directly (one model call for all N texts).
-
-Pros:
-  - Repeated questions: ~0ms (cache hit) vs ~100-300ms (CPU embed)
-  - No new dependency — functools is stdlib
-  - 512 slots x 768 floats x 4 bytes ≈ 1.5MB RAM (negligible)
-
-Cons:
-  - Cache is process-local; cleared on restart, not shared between workers
-  - Novel (first-time) questions still pay full embed cost
-  - Multi-text batch calls bypass the cache entirely
-
-Edge cases:
-  - asyncio.to_thread overhead on cache hit: ~0.01ms (acceptable)
-  - cache_clear() must be called in tests to prevent cross-test contamination
-  - NaN/inf in model output: not filtered here — callers handle it (detector.py)
+The dot product / cosine similarity happens at search time inside pgvector,
+not inside fastembed — fastembed only produces the vectors.
 """
 
 import asyncio
@@ -49,17 +26,13 @@ from config import EMBED_MODEL
 # Loaded once at module import — stays in RAM, reused on every request.
 # fastembed downloads the model to ~/.cache/fastembed/ on first use;
 # the Dockerfile pre-downloads it at build time so container startup is instant.
-# Model is controlled by EMBED_MODEL env var (see config.py):
-#   BAAI/bge-small-en-v1.5        — 384-dim, ~100 MB RAM (default, memory-constrained)
-#   nomic-ai/nomic-embed-text-v1.5 — 768-dim, ~2 GB RAM  (school computers)
 try:
     _model: TextEmbedding | None = TextEmbedding(EMBED_MODEL)
 except Exception as _load_exc:
     print(f"[embedder] FATAL: failed to load embedding model '{EMBED_MODEL}': {_load_exc}")
     _model = None
 
-# LRU cache size: 512 slots x dim x 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
-# 512 is generous for a 42-school context — covers the most common questions.
+# LRU cache size: 512 slots x dim x 4 bytes ≈ 1.5 MB (nomic/768-dim).
 _CACHE_SIZE = 512
 
 
@@ -104,11 +77,20 @@ def _embed_one_cached(text: str) -> tuple[float, ...]:
     """
     Embed a single normalised text with LRU caching.
 
+    LRU (Least Recently Used) is a fixed-size dict + doubly-linked list.
+    Holds up to _CACHE_SIZE entries. When full, the entry unused longest
+    is evicted — like 512 parking spots where the longest-idle car gets
+    towed when a new one arrives.
+
+    Storage: lives in the RAM of this Python process on the server.
+    Not shared with pgvector, Redis, or any other worker process.
+    Cleared on container restart — first call after restart pays full cost.
+
     Returns tuple (not list) because lru_cache requires a hashable return
-    value to be storable — callers convert back to list[float].
+    value — callers convert back to list[float].
 
     Cache key = the 'text' argument, which callers must normalise
-    (lower + strip) before calling this function.
+    (lower + strip) so "What is malloc?" and "what is malloc?" share one slot.
 
     On cache miss: calls _embed_sync([text]) — CPU-bound, takes 100-300ms.
     On cache hit: returns the stored tuple — O(1), ~0ms.

@@ -37,62 +37,28 @@ func chatModelName() string {
 	return v
 }
 
-// extractAnswer pulls the "A: ..." portion from "Q: ...\nA: ..." formatted text.
-//
-// Theory: docs are formatted by Python's embedder.format_doc() as
-//
-//	"Q: {question}\nA: {answer}"  or  "Q: ...\nA: ...\ntags: ..."
-//
-// The Q: line helped retrieve the doc but is redundant in the prompt — dropping
-// it saves ~40-60% of context tokens, directly speeding up per-token generation.
-//
-// Falls back to full text if the separator is missing (malformed/legacy docs).
-// Strips the "\ntags: ..." suffix which was added for embedding quality only.
-//
-// Edge cases:
-//   - No "\nA: " → return full text (safe fallback, no crash)
-//   - Empty answer after split → return full text
-//   - Tags suffix → stripped before return
+/*
+we get text: 'Q:..\nA:..'; we want to save tokens, so take only A:
+*/
 func extractAnswer(text string) string {
-	const sep = "\nA: "
-	idx := strings.Index(text, sep)
-	if idx == -1 {
+	_, answer, found := strings.Cut(text, "\nA: ")
+	if !found {
 		return text // unknown format — safe fallback
 	}
-	answer := text[idx+len(sep):]
-
-	// Strip tags suffix added for embedding signal, not for LLM consumption.
-	if tagIdx := strings.Index(answer, "\ntags: "); tagIdx != -1 {
-		answer = answer[:tagIdx]
+	// tags suffix ais used for embedding signal, not for LLM consumption.
+	if before, _, ok := strings.Cut(answer, "\ntags: "); ok {
+		answer = before
 	}
 	answer = strings.TrimSpace(answer)
 	if answer == "" {
-		return text // empty answer → fallback to full text
+		return text
 	}
 	return answer
 }
 
 /*
-	 doJSONWithRetry is like doJSON but retries on network errors and transient
-	 HTTP failures using withRetry.
-
-	 Why not reuse doJSON: http.Request.Body is an io.Reader — once read it is
-	 exhausted and cannot be replayed. Each retry must construct a fresh request
-	 with a new bytes.NewReader over the same marshalled bytes.
-
-	 Theory — why retries fix "connection refused" after python-rag restart:
-
-		Go's http.DefaultTransport keeps idle TCP connections in a pool.
-		After python-rag restarts it gets a new Docker-internal IP. The pooled
-		connection to the old IP gets a RST and fails immediately. withRetry
-		catches the network error, waits 1s, and creates a new TCP connection.
-		Docker's embedded DNS resolver returns the new container IP on the fresh
-		DNS lookup, so the retry succeeds.
-
-	 Edge cases:
-	   - python-rag mid-startup (~2min): retries 1-3 will all fail; caller gets
-	     a clean error ("community posts not available"). User can retry manually.
-	   - ctx cancelled: withRetry propagates ctx.Done() immediately.
+sends a JSON HTTP request with automatic retry logic
+out must be a pointer (e.g. &myStruct) — json.Decode silently does nothing if it isn't
 */
 func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) error {
 	b, err := json.Marshal(in)
@@ -128,16 +94,14 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 }
 
 /*
-buildRAGPrompt builds the grounded prompt sent to Ollama.
 Strict rules prevent hallucination: the model must ONLY use the provided
 context and must not fall back to its training knowledge or guess.
-
 Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
 interpret "answer clearly" as "be concise" and return only the first sentence.
 */
 func buildRAGPrompt(ctxStr, question string) string {
 	return "You are a 42 school tutor. Answer using ONLY the CONTEXT below. Reply thoroughly with all relevant info.\n" +
-		"If the answer is not in the CONTEXT, reply EXACTLY: \"I am here to help with 42 curriculum questions only. How can I help you?\"\n" +
+		"If the answer is not in the CONTEXT, reply EXACTLY: \"I am here to help with 42 curriculum questions only. Shoot :)\"\n" +
 		"CONTEXT:\n" + ctxStr + "\n\n" +
 		"QUESTION:\n" + question + "\n\n" +
 		"ANSWER:"
@@ -190,7 +154,7 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 	)
 	noContext := func() (<-chan string, error) {
 		ch := make(chan string, 1)
-		ch <- "Hi! I can only help with 42 School project questions — ask me about your projects and I'll look through what other students have shared."
+		ch <- "Hi! I can only help with 42 curriculum projects. Shoot :)"
 		close(ch)
 		return ch, nil
 	}

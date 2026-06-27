@@ -290,15 +290,26 @@ async def ensure_subjects(conn) -> dict[str, int]:
 
 async def clean_posts(conn) -> None:
     ids = [u["id"] for u in USERS]
-    comment_count = await conn.fetchval(
-        'SELECT COUNT(*) FROM "Comment" WHERE "userId" = ANY($1::text[])', ids
+    comment_ids = await conn.fetch(
+        'SELECT id FROM "Comment" WHERE "userId" = ANY($1::text[])', ids
     )
-    post_count = await conn.fetchval(
-        'SELECT COUNT(*) FROM "Post" WHERE "userId" = ANY($1::text[])', ids
+    post_ids = await conn.fetch(
+        'SELECT id FROM "Post" WHERE "userId" = ANY($1::text[])', ids
+    )
+    comment_id_list = [r["id"] for r in comment_ids]
+    post_id_list    = [r["id"] for r in post_ids]
+
+    like_count = await conn.fetchval(
+        'SELECT COUNT(*) FROM "Like" WHERE "commentId" = ANY($1::int[]) OR "postId" = ANY($2::int[])',
+        comment_id_list, post_id_list,
+    )
+    await conn.execute(
+        'DELETE FROM "Like" WHERE "commentId" = ANY($1::int[]) OR "postId" = ANY($2::int[])',
+        comment_id_list, post_id_list,
     )
     await conn.execute('DELETE FROM "Comment" WHERE "userId" = ANY($1::text[])', ids)
     await conn.execute('DELETE FROM "Post" WHERE "userId" = ANY($1::text[])', ids)
-    print(f"[clean] deleted {post_count} posts and {comment_count} comments")
+    print(f"[clean] deleted {len(post_id_list)} posts, {len(comment_id_list)} comments, {like_count} likes")
 
 
 async def insert_posts(conn, subject_map: dict[str, int]) -> tuple[int, int]:

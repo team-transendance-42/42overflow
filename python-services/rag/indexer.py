@@ -15,7 +15,6 @@ from store import get_embeddings, get_existing_hashes, upsert
 
 async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     """Sync question-answer pairs to ChromaDB — only embeds new or changed docs.
-
     Returns {doc_id: embedding} for every doc that was freshly embedded this
     call. Empty dict when nothing changed or embedding failed. The caller uses
     this to avoid a redundant GET for docs whose vectors are already in memory."""

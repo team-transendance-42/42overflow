@@ -108,7 +108,7 @@ _QUERY = """
         r.comment_content                   AS answer,
         r.comment_id
     FROM "Post" p
-    JOIN "Subject" s ON s.id = p."subjectId"
+    JOIN "Subject" s ON s.id = p."subjectId" AND s.deleted_at IS NULL
     JOIN ranked r    ON r."postId" = p.id
     WHERE p.deleted_at IS NULL
       AND p.content    IS NOT NULL

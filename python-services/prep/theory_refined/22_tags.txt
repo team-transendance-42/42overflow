@@ -1,0 +1,21 @@
+ Tags are NOT exactly the subject — they are keywords appended to the embedded text to boost BM25 matching
+
+ From seed JSONs — manually curated, multi-keyword:
+  "tags": ["intro", "overview", "agentic-framework", "MBPP", "thought-code-observation"]
+  Each QA pair has its own specific tags written by hand. They can be anything relevant to the content.
+
+  From DB (db.py)— auto-generated, always just one tag:
+  "tags": [topic]   # e.g. ["push_swap"], ["minishell"], ["agent-smith"]
+  DB pairs get exactly one tag: the normalized subject slug (s.slug from the Subject table, lowercased + hyphenated). No manual curation — it's
+  derived automatically from the post's subject.
+---
+  How tags are used:
+
+  1. Appended to the embedded text (format_doc in embedder.py):
+  Q: What is X?
+  A: X is Y.
+  tags: intro overview mytopic
+  1. Both the embedding model and BM25 see the tag words, so queries mentioning e.g. "push_swap" score higher against docs tagged with it.
+  2. "intro" tag is special (indexer.py):
+  if "intro" in p.get("tags", []):
+  2. Used to identify the introductory/overview doc for a topic — stored separately as topic_intros. Only seed JSONs use this; DB pairs never gets it.

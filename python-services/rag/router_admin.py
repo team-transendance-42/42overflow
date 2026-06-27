@@ -76,10 +76,14 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
         raise HTTPException(status_code=503, detail=f"Cannot connect to Postgres: {exc}")
 
     try:
-        comment_count = await conn.fetchval('SELECT COUNT(*) FROM "Comment"')
-        post_count    = await conn.fetchval('SELECT COUNT(*) FROM "Post"')
-        subject_count = await conn.fetchval('SELECT COUNT(*) FROM "Subject"')
+        comment_count       = await conn.fetchval('SELECT COUNT(*) FROM "Comment"')
+        post_count          = await conn.fetchval('SELECT COUNT(*) FROM "Post"')
+        subject_count       = await conn.fetchval('SELECT COUNT(*) FROM "Subject"')
+        like_count          = await conn.fetchval('SELECT COUNT(*) FROM "Like"')
+        membership_count    = await conn.fetchval('SELECT COUNT(*) FROM "SubjectMember"')
 
+        await conn.execute('DELETE FROM "Like"')
+        await conn.execute('DELETE FROM "SubjectMember"')
         await conn.execute('DELETE FROM "Comment"')
         await conn.execute('DELETE FROM "Post"')
         await conn.execute('DELETE FROM "Subject"')
@@ -93,12 +97,14 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"ChromaDB wipe failed: {exc}")
 
-    print(f"[wipe] deleted {post_count} posts, {comment_count} comments, {subject_count} subjects, {chroma_count} chroma docs")
+    print(f"[wipe] deleted {post_count} posts, {comment_count} comments, {subject_count} subjects, {like_count} likes, {membership_count} memberships, {chroma_count} chroma docs")
 
     summary = await load_and_index(request.app, label="wipe", include_db=False)
     return {
         "status": "ok",
         "deleted": {
+            "postgres_likes": like_count,
+            "postgres_memberships": membership_count,
             "postgres_comments": comment_count,
             "postgres_posts": post_count,
             "postgres_subjects": subject_count,
