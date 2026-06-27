@@ -2,19 +2,19 @@ import * as z from "zod";
 
 // id validation
 export const IdSchema = z.object({
-    id: z.number('id Has to be a number').int('id Has to be an integer').positive('id Has to be a positive number')
+    id: z.number({ message: "ID has to be a number" }).int({ message: "ID has to be an integer" }).positive({ message: "ID has to be a positive number" })
 });
 
 // id string validation (e.g OdPthUHbePkNPADAyQGDe1Ez1db6ziPj)
 export const idStringSchema = z.object({
-    id: z.string().min(1, 'id Has to be a non-empty string')
+    id: z.string().min(1, { message: "ID is required." })
 });
 
 // Comment
 export const CommentSchema = z.object({
     postId: IdSchema.shape.id,
     parentId: IdSchema.shape.id.nullable().optional(),
-	content: z.string().min(1).max(500),
+	content: z.string().min(1, { message: "Content is required." }).max(500, { message: "Content must be between 1 and 500 characters." }),
 });
 
 export type CommentInput = z.infer<typeof CommentSchema>;
@@ -22,8 +22,8 @@ export type CommentInput = z.infer<typeof CommentSchema>;
 // Post
 export const PostSchema = z.object({
 	postId: IdSchema.shape.id,
-	title: z.string().min(1).max(100, { message: "Title must be between 1 and 100 characters." }),
-	content: z.string().min(1).max(500, { message: "Content must be between 1 and 500 characters." }),
+	title: z.string().min(1, { message: "Title is required." }).max(100, { message: "Title must be between 1 and 100 characters." }),
+	content: z.string().min(1, { message: "Content is required." }).max(500, { message: "Content must be between 1 and 500 characters." }),
 });
 
 export type PostInput = z.infer<typeof PostSchema>;
