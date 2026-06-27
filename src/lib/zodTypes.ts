@@ -37,12 +37,18 @@ export const CreatePostSchema = z.object({
 export type CreatePostInput = z.infer<typeof CreatePostSchema>;
 
 // Subject
-export const CreateSubjectSchema = z.object({
-    name: z.string().min(1, { message: "Name is required." }).max(50, { message: "Name must be between 1 and 50 characters." }),
+export const SubjectDescriptionSchema = z.object({
     description: z.string().max(500, { message: "Description must be less than 500 characters." }).optional(),
 });
 
+export const CreateSubjectSchema = z.object({
+    name: z.string().min(1, { message: "Name is required." }).max(50, { message: "Name must be between 1 and 50 characters." }),
+    description: SubjectDescriptionSchema.shape.description,
+});
+
+export type SubjectDescriptionInput = z.infer<typeof SubjectDescriptionSchema>;
 export type CreateSubjectInput = z.infer<typeof CreateSubjectSchema>;
+
 
 // Profile
 const NameSchema = z.object({
