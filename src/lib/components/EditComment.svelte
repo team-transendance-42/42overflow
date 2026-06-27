@@ -206,7 +206,7 @@
                 </button>
 
                 {#if isSubmitting}
-                    <button type="button" class="button secondary" disabled>
+                    <button type="button" class="button primary" disabled>
                         Submitting...
                     </button>
                 {:else}

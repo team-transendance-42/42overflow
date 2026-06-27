@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-// id validation
+// id validation (e.g. 1, 2, 3)
 export const IdSchema = z.object({
     id: z.number({ message: "ID has to be a number" }).int({ message: "ID has to be an integer" }).positive({ message: "ID has to be a positive number" })
 });
@@ -35,6 +35,14 @@ export const CreatePostSchema = z.object({
 });
 
 export type CreatePostInput = z.infer<typeof CreatePostSchema>;
+
+// Subject
+export const CreateSubjectSchema = z.object({
+    name: z.string().min(1, { message: "Name is required." }).max(50, { message: "Name must be between 1 and 50 characters." }),
+    description: z.string().max(500, { message: "Description must be less than 500 characters." }).optional(),
+});
+
+export type CreateSubjectInput = z.infer<typeof CreateSubjectSchema>;
 
 // Profile
 const NameSchema = z.object({

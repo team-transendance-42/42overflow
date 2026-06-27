@@ -1,77 +1,122 @@
 <script lang="ts">
-	let name = '';
-	let description = '';
-	let message = '';
-	let error = '';
+	import { goto } from '$app/navigation';
+	import { type CreateSubjectInput, CreateSubjectSchema } from '$lib/zodTypes';
+	import { z } from 'zod';
 
-	async function handleSubmit(e: SubmitEvent) {
-		e.preventDefault();
-		message = '';
-		error = '';
+    let errors = $state({} as Record<string, string[]>);
+	let isSubmitting = $state(false);
 
-		const res = await fetch('/api/subjects/create', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ name, description })
-		});
+	let formData = $state<CreateSubjectInput>({
+		name: '',
+		description: ''
+	});
 
-		if (!res.ok) {
-			const text = await res.text();
-			error = text || 'Failed to create subject';
-			return;
+	// Real-time validation on single input field
+    function handleInput<K extends keyof CreateSubjectInput>(field: K, value: CreateSubjectInput[K]) {
+        // update the reactive $state object in-place instead of replacing it
+        (formData as any)[field] = value;
+        try {
+            CreateSubjectSchema.pick({ [field]: true } as any).parse({ [field]: value } as any);
+            const key = field as string;
+            if (errors[key]) {
+                delete errors[key];
+                errors = { ...errors };
+            }
+        } catch (err) {
+            if (err instanceof z.ZodError) {
+				const fieldErrors = z.flattenError(err).fieldErrors;
+
+				errors = fieldErrors;
+				return;
+			}
+			console.error('Unexpected error:', err);
+        }
+    }
+
+	// Handle form submission
+    async function handleSubmit(event: Event) {
+        if (isSubmitting) return; // Prevent multiple submissions
+        event.preventDefault();
+        isSubmitting = true;
+        errors = {};
+
+        try {
+            // Validate form data (excluding image)
+            const { ...postData } = formData;
+            CreateSubjectSchema.parse(postData);
+
+            // Create FormData for file upload
+            const formDataToSend = new FormData();
+            Object.entries(postData).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    formDataToSend.append(key, value.toString());
+                }
+            });
+
+            const response = await fetch(`/api/subjects/create`, {
+                method: 'POST',
+                body: formDataToSend
+            });
+
+            if (response.ok) {
+                // Redirect to subjects page after successful creation
+                goto('/subjects');
+            } else {
+                alert('An error occurred while creating the subject. Please try again.');
+            }
+        } catch (err) {
+			if (err instanceof z.ZodError) {
+				errors = z.flattenError(err).fieldErrors;
+				return;
+			}
+
+			alert('An error occurred while creating the subject. Please try again.');
+			console.error('Unexpected error submitting:', err);
+		} finally {
+			isSubmitting = false;
 		}
-
-		const subject = await res.json();
-		message = `Created subject: ${subject.name}`;
-		name = '';
-		description = '';
-	}
+    }
 </script>
 
-<div>
-	<h1>Create a subject</h1>
 
-	<form on:submit={handleSubmit}>
-		<label>
-			Name
-			<input bind:value={name} required />
-		</label>
+<form onsubmit={handleSubmit}>
+	<div>
+		<h1>Create a subject</h1>
 
-		<label>
-			Description
-			<textarea bind:value={description} rows="3"></textarea>
-		</label>
+		<label for="name">Name</label>
+		<input
+			class="input-group"
+			placeholder="Name"
+			id="name"
+			bind:value={formData.name}
+			oninput={(event) => handleInput('name', (event.target as HTMLTextAreaElement).value)}
+			required
+		/>
+		{#if errors.name}
+			<p class="error">{errors.name[0]}</p>
+		{/if}
 
-		<button type="submit">Create</button>
-	</form>
-</div>
+		<label for="description">Description</label>
+		<textarea
+			class="input-group"
+			placeholder="Description"
+			id="description"
+			bind:value={formData.description}
+			oninput={(event) => handleInput('description', (event.target as HTMLTextAreaElement).value)}
+			rows="3"
+		></textarea>
+		{#if errors.description}
+			<p class="error">{errors.description[0]}</p>
+		{/if}
 
-{#if message}<p class="success">{message}</p>{/if}
-{#if error}<p class="error">{error}</p>{/if}
-
-<style>
-	form {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		max-width: 400px;
-	}
-
-	input, textarea {
-		color: black;
-	}
-
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.success {
-		color: green;
-	}
-
-	.error {
-		color: red;
-	}
-</style>
+		{#if isSubmitting}
+			<button type="button" class="button primary" disabled>
+				Submitting...
+			</button>
+		{:else}
+			<button type="submit" class="button confirm">
+				Confirm
+			</button>
+		{/if}
+	</div>
+</form>
