@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Avatar from '$lib/components/Avatar.svelte';
 
 	type UserRole = 'USER' | 'MODERATOR' | 'ADMIN';
 
@@ -95,7 +96,7 @@
 
 				<label class="full-width">
 					Image URL
-					<input name="image" value={data.user.image ?? ''} />
+					<Avatar src={data.user.image ?? ''}/>
 				</label>
 
 				<label class="full-width">
@@ -133,7 +134,7 @@
 
 	{#if data.role === 'MODERATOR'}
 		<section class="card">
-			<img src={data.user.image} alt={data.user.name} class="avatar" />
+			<Avatar src={data.user.image ?? ''}/>
 			<label>
 				Username
 				<input value={data.user.name} disabled />
