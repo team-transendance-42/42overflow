@@ -74,6 +74,9 @@
 	{#if data.role === 'ADMIN'}
 		<section class="card">
 			<form method="POST" action="?/updateUserCore" class="form-grid">
+				<label class="full-width">
+					<Avatar src={data.user.image ?? ''}/>
+				</label>
 				<label>
 					First name
 					<input name="firstName" value={data.user.first_name ?? ''} />
@@ -94,10 +97,6 @@
 					<input name="email" type="email" value={data.user.email} required />
 				</label>
 
-				<label class="full-width">
-					Image URL
-					<Avatar src={data.user.image ?? ''}/>
-				</label>
 
 				<label class="full-width">
 					Biography
