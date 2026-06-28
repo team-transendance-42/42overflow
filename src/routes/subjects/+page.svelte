@@ -15,7 +15,7 @@
 <div class="subjects-container">
 	<div class="subjects-header">
 		<h1>Subjects</h1>
-		<a class="create-subject-link" href="/subjects/create">Create your own subject</a>
+		<a class="button primary" href="/subjects/create">Create your own subject</a>
 	</div>
 
 	{#if data.subjects.length > 0}
@@ -67,8 +67,11 @@
 		align-items: center;
 		padding: 0.25rem 0.5rem;
 		text-decoration: none;
-		color: #000000;
+		color: #ffffff;
 		font-weight: 600;
+		background-color: black;
+		border: 5px solid black;
+		border-radius: 20px;
 	}
 
 	.create-subject-link:hover {
