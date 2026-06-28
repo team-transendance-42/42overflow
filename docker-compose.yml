@@ -53,6 +53,7 @@ services:
     command: >
       sh -c "echo 'WARNING: prisma db push --accept-data-loss is set — any columns/tables missing from schema will be DROPPED without prompt' &&
       npx prisma db push --accept-data-loss &&
+      npx tsx prisma/seed.ts &&
       npm run dev -- --host"
     networks:
       - app-net
