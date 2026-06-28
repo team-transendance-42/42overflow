@@ -29,7 +29,7 @@
 	}
 
 	let { data } = $props() as any as { data: PageData };
-	let post = data.post;
+	let post = $derived(data.post);
 	let comments = $state<Comment[]>([]);
 
 	onMount(() => {

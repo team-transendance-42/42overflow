@@ -10,7 +10,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		where: {
 			slug,
 		},
-		include: {
+		select: {
+			id: true,
+			name: true,
+			slug: true,
+			description: true,
 			memberships: true,
 		},
 	});
@@ -30,31 +34,4 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	return {
 		subject,
 	};
-};
-
-export const actions: Actions = {
-	default: async ({ request, params, fetch }) => {
-		const { slug } = params;
-		const data = await request.formData();
-		const description = data.get('description');
-
-		if (typeof description !== 'string') {
-			return fail(400, { description, error: 'Description must be a string' });
-		}
-
-		const response = await fetch(`/api/subjects/${slug}/edit`, {
-			method: 'PATCH',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ description }),
-		});
-
-		if (!response.ok) {
-			const errorData = await response.json();
-			return fail(response.status, { description, error: errorData.message });
-		}
-
-		// throw redirect(303, `/s/${slug}`);
-	},
 };

@@ -126,13 +126,6 @@
 </script>
 
 <section class="manage-page">
-	<!-- <header class="manage-header">
-		<p class="eyebrow">Owner controls</p>
-		<h1>Manage {data.subject.name}</h1>
-		<p class="subhead">Promote members to curator or demote curators back to member.</p>
-		<p class="meta">Owners in this subject: {ownerCount}</p>
-	</header> -->
-
 	{#if message}
 		<p class="message success">{message}</p>
 	{/if}
@@ -155,7 +148,7 @@
 		<a href="/s/{data.subject.slug}/edit">Edit description</a>
 	</div>
 	<div>
-		<button on:click={archiveSubject} disabled={isArchiving}>
+		<button onclick={archiveSubject} disabled={isArchiving}>
 			{isArchiving ? 'Archiving…' : 'Archive subject'}
 		</button>
 	</div>
@@ -166,30 +159,6 @@
 		max-width: 860px;
 		margin: 0 auto;
 		padding: 1.5rem 1rem 2rem;
-	}
-
-	.manage-header h1 {
-		margin: 0;
-		font-size: 1.7rem;
-	}
-
-	.eyebrow {
-		margin: 0 0 0.2rem;
-		text-transform: uppercase;
-		font-size: 0.75rem;
-		letter-spacing: 0.08em;
-		color: var(--color-neutral-500);
-	}
-
-	.subhead {
-		margin: 0.5rem 0 0;
-		color: var(--color-neutral-500);
-	}
-
-	.meta {
-		margin-top: 0.65rem;
-		font-size: 0.88rem;
-		color: var(--color-neutral-500);
 	}
 
 	.member-list {

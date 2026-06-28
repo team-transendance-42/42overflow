@@ -13,7 +13,7 @@
     let { postId, parentId }: Props = $props();
     let derivedPostId = $derived(postId);
     let derivedParentId = $derived(parentId ?? undefined);
-    let popover: HTMLDivElement;
+    let popover: HTMLDivElement | undefined = $state(undefined);
 
     type CommentFormInput = CommentInput & {
         image?: File;
@@ -204,7 +204,7 @@
                 </button>
 
                 {#if isSubmitting}
-                    <button type="button" class="button secondary" disabled>
+                    <button type="button" class="button primary" disabled>
                         Submitting...
                     </button>
                 {:else}

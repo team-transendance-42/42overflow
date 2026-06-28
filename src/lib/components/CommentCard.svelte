@@ -14,8 +14,8 @@
 	let { comment, depth = 0, hasPermission }: Props = $props();
 
 	// Derive postId and parentId for creating replies to this comment
-	const postId = comment.postId;
-	const parentId = comment.id;
+	const postId = $derived(comment.postId);
+	const parentId = $derived(comment.id);
 	let isOwn = $derived.by(() => page.data.user?.id === comment.userId);
 
 	async function deleteComment() {

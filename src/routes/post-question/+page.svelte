@@ -1,117 +1,155 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import Input from '$lib/components/Input.svelte';
-	import Textarea from '$lib/components/Textarea.svelte';
+	import { type CreatePostInput, CreatePostSchema } from '$lib/zodTypes';
+	import { z } from 'zod';
 
-	let { data } = $props() as any as { data: { subjectList: { id: number; name: string }[] } };
-	let subjectList = data.subjectList;
-
-	let projectname = "";
-	let body = "";
-	let error = $state(''); // For reactive error messages
-	let submitting = false;
-
-	let subject = page.url.searchParams.get('subject') || "";
-
-	async function submitQuestion() 
-	{
-		if (!projectname.trim() || !subject.trim() || !body.trim()) {
-			if (!projectname.trim()) {
-				error = "Project name is required.";
-			} else if (!subject.trim()) {
-				error = "Subject is required.";
-			} else {
-				error = "Question body is required.";
-			}
-			return;
-		}
-
-		error = "";
-		submitting = true;
-
-		let subjectId = subjectList.find(s => s.name === subject)?.id;
-		if (!subjectId) {
-			error = "Selected subject is invalid.";
-			submitting = false;
-			return;
-		}
-
-		try {
-			const res = await fetch('/api/posts/create', 
-			{
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify
-				({projectname, subjectId, body})
-			});
-
-			if (res.ok) {
-				goto('/posts');
-			} else if (res.status === 401) {
-				error = "You must be logged in to post a question.";
-			} else {
-				const data = await res.json();
-				error = data?.message || "An error occurred while submitting your question.";
-			}
-		} finally {
-			submitting = false;
-		}
+	interface Props {
+		data: {
+			subjectList: {
+				id: number;
+				name: string;
+			}[];
+		};
 	}
+
+	let { data }: Props = $props();
+	let subjectList = $derived(data.subjectList ?? []);
+
+    let errors = $state({} as Record<string, string[]>);
+	let isSubmitting = $state(false);
+
+	let formData = $state<CreatePostInput>({
+		title: '',
+		subjectId: 0,
+		content: ''
+	});
+
+	$effect(() => {
+		formData.subjectId = subjectList.find(s => s.name === (page.url.searchParams.get('subject') || ''))?.id ?? 0;
+	});
+
+	// Real-time validation on single input field
+    function handleInput<K extends keyof CreatePostInput>(field: K, value: CreatePostInput[K]) {
+        // update the reactive $state object in-place instead of replacing it
+        (formData as any)[field] = value;
+        try {
+            CreatePostSchema.pick({ [field]: true } as any).parse({ [field]: value } as any);
+            const key = field as string;
+            if (errors[key]) {
+                delete errors[key];
+                errors = { ...errors };
+            }
+        } catch (err) {
+            if (err instanceof z.ZodError) {
+				const fieldErrors = z.flattenError(err).fieldErrors;
+
+				errors = fieldErrors;
+				return;
+			}
+			console.error('Unexpected error:', err);
+        }
+    }
+
+	// Handle form submission
+    async function handleSubmit(event: Event) {
+        if (isSubmitting) return; // Prevent multiple submissions
+        event.preventDefault();
+        isSubmitting = true;
+        errors = {};
+
+        try {
+            // Validate form data (excluding image)
+            const { ...postData } = formData;
+            CreatePostSchema.parse(postData);
+
+            // Create FormData for file upload
+            const formDataToSend = new FormData();
+            Object.entries(postData).forEach(([key, value]) => {
+                if (value !== undefined && value !== null) {
+                    formDataToSend.append(key, value.toString());
+                }
+            });
+
+            const response = await fetch(`/api/posts/create`, {
+                method: 'POST',
+                body: formDataToSend
+            });
+
+            if (response.ok) {
+                // Redirect to posts page after successful creation
+                goto('/posts');
+            } else {
+                alert('An error occurred while creating the post. Please try again.');
+            }
+        } catch (err) {
+			if (err instanceof z.ZodError) {
+				errors = z.flattenError(err).fieldErrors;
+				return;
+			}
+
+			alert('An error occurred while creating the post. Please try again.');
+			console.error('Unexpected error submitting:', err);
+		} finally {
+			isSubmitting = false;
+		}
+    }
 </script>
 
-<div class="post-question">
-	<h1>ASK A QUESTION</h1>
+<form onsubmit={handleSubmit}>
+	<div>
+		<h1>ASK A QUESTION</h1>
 
-	{#if error}
-		<p class="error">{error}</p>
-	{/if}
+		<label for="title">Title</label>
+		<input
+			class="input-group"
+			placeholder="Title"
+			id="title"
+			bind:value={formData.title}
+			oninput={(event) => handleInput('title', (event.target as HTMLTextAreaElement).value)}
+		/>
+		{#if errors.title}
+			<p class="error">{errors.title[0]}</p>
+		{/if}
 
-	<Input
-		label="Project Name"
-		name="projectname"
-		placeholder="Enter project name"
-		bind:value={projectname}
-	/>
+		<div class="dropdown-group">
+			<label for="subject-selector">Subject</label>
+			<select
+				class="black-text"
+				bind:value={formData.subjectId}
+			>
+				<option value={0} disabled>Select a subject</option>
 
-	<div class="dropdown-group">
-		<label for="subject-selector">Subject</label>
-		<select
-			class="black-text"
-			name="subject"
-			bind:value={subject}
-		>
-			<option value="" disabled>Select a subject</option>
-			{#each subjectList as subjectOption}
-				<option value={subjectOption.name}>{subjectOption.name}</option>
-			{/each}
-		</select>
+				{#each subjectList as subjectOption}
+					<option value={subjectOption.id}>
+						{subjectOption.name}
+					</option>
+				{/each}
+			</select>
+		</div>
+
+		<label for="content">Content</label>
+		<textarea
+			class="input-group"
+			name="content"
+			id="content"
+			placeholder="Write your question in detail here..."
+			bind:value={formData.content}
+			oninput={(event) => handleInput('content', (event.target as HTMLTextAreaElement).value)}
+			rows={5}
+		></textarea>
+		{#if errors.content}
+			<p class="error">{errors.content[0]}</p>
+		{/if}
+
+		{#if isSubmitting}
+			<button type="button" class="button primary" disabled>
+				Submitting...
+			</button>
+		{:else}
+			<button type="submit" class="button confirm">
+				Confirm
+			</button>
+		{/if}
 	</div>
-
-	<Textarea
-		label="Question"
-		name="body paragraph"
-		placeholder="Write your question in detail here..."
-		bind:value={body}
-		rows={5}
-	/>
-
-	<button class="button primary" type="button" onclick={submitQuestion}>
-		{submitting ? 'Submitting...' : 'Submit'}
-	</button>
-
-</div>
-
-<style>
-  .post-question {
-    width: 100%;
-    max-width: 700px;
-    padding: 0rem;
-    text-align: left;
-  }
-  .error {
-    color: var(--color-error-250);
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
-  }
-</style>
+</form>
