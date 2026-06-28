@@ -119,5 +119,23 @@
       "loops",
       "YAML"
     ]
+  },
+  {
+    "question": "What is async programming and why is it used for servers?",
+    "answer": "Async programming is a model where a single thread handles many concurrent operations by switching between them whenever one is waiting for I/O. Instead of blocking (sitting idle waiting for a network read or database response with the CPU doing nothing), an async function yields control using `await`, letting the event loop run another task. In Python, `async def` functions are coroutines — they can be suspended and resumed. When one client's coroutine awaits a network read, the event loop immediately picks up another client's coroutine that has data ready. For TAP: each connected player gets a coroutine that reads commands and writes responses. With 50 simultaneous players, a threaded server would create 50 OS threads (heavy memory, OS scheduling overhead). An asyncio server uses one thread — the event loop efficiently multiplexes all 50 connections, switching between them at every await point. Async is the right choice when the bottleneck is I/O (waiting for clients), not CPU computation. For CPU-heavy work (image processing, ML inference), threads or processes are better.",
+    "topic": "tap",
+    "tags": ["concept", "async", "asyncio", "concurrency", "event-loop", "fundamentals"]
+  },
+  {
+    "question": "What is an event loop in asyncio and how does it schedule coroutines?",
+    "answer": "The event loop is the core of asyncio — a scheduler that manages all pending coroutines and I/O events in a single thread. It maintains a queue of ready-to-run coroutines and a set of coroutines waiting on I/O. Each iteration of the loop: (1) Run all currently ready coroutines until each hits an await. (2) Check which I/O events completed (using OS-level select/epoll). (3) Move coroutines waiting on completed I/O back to the ready queue. (4) Repeat. The key property: only one coroutine runs at a time — there is no true parallelism within asyncio (unlike threads). This eliminates most race conditions on shared memory: two coroutines cannot simultaneously modify the same dict or list, because the event loop only runs one coroutine at a time. The only race conditions that can occur in asyncio are between coroutines at `await` points — where one coroutine checks a condition, yields, and another coroutine modifies the state before the first resumes. TAP's TAKE race condition is exactly this pattern.",
+    "topic": "tap",
+    "tags": ["concept", "event-loop", "asyncio", "scheduler", "coroutine", "fundamentals"]
+  },
+  {
+    "question": "What is a coroutine and how does it differ from a thread?",
+    "answer": "A coroutine is a function that can be paused and resumed at explicit suspension points (await expressions). Threads are preemptively scheduled — the OS can interrupt a thread at any instruction and switch to another. Coroutines are cooperatively scheduled — a coroutine runs until it explicitly yields with await, and only then can the event loop switch to another. This difference has major consequences: threads require mutexes for every shared variable access (the OS can switch at any moment); coroutines only need synchronization around await points (shared state is safe between awaits). In TAP, all player state (room membership, inventory) is shared Python dicts — no mutexes needed because only one coroutine runs at a time. However, any operation that spans an await point is not atomic: the TAP TAKE command must pop an item from room.items without any intervening await, otherwise another player's coroutine could take the same item between the check and the pop. Coroutines are much lighter than threads: millions of coroutines can exist in a Python process, while thousands of threads would exhaust memory.",
+    "topic": "tap",
+    "tags": ["concept", "coroutine", "async-await", "cooperative-scheduling", "vs-threads", "fundamentals"]
   }
 ]

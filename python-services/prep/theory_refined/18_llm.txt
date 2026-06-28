@@ -1,0 +1,188 @@
+Key LLM concepts (quick map)
+
+  Tokens & context window
+  - Everything the model sees (our prompt + its reply so far) must fit in the context window — e.g. 8192 tokens for gemma3:4b
+  - Longer prompt = less room for the reply
+
+  Sampling strategies (all interact with temperature):
+  ┌─────────────────┬──────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │    Strategy     │                                             What it does                                             │
+  ├─────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ temperature     │ Controls randomness of the distribution                                                              │
+  ├─────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ top_k           │ Only consider the K highest-probability tokens at each step (e.g. top_k=40 ignores the other 31,960) │
+  ├─────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ top_p (nucleus) │ Only consider tokens whose cumulative probability reaches P (e.g. top_p=0.9 cuts the long tail)      │
+  ├─────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ repeat_penalty  │ Penalizes tokens the model already used — reduces loops                                              │
+  └─────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  These stack. Ollama default: top_k=40, top_p=0.9, temperature=0.8.
+System prompt vs user prompt
+  - system: instructions/persona set before the conversation (what was built with buildRAGPrompt)
+  - user: the human turn
+  - Ollama's /api/chat endpoint supports both via the messages array with role: "system" or role: "user"
+
+  RAG (Retrieval-Augmented Generation) — what was built:
+  user question
+       ↓
+  search KB (BM25 + dense) → relevant docs
+       ↓
+  stuff docs into prompt as "context"
+       ↓
+  LLM generates answer grounded in that context
+  The LLM never "knows" our data — it's shown it fresh each time. That's why the retrieval quality matters so much.
+
+  Hallucination — the model generates plausible-sounding but wrong tokens. Happens because the model always produces something; it has no "I don't
+  know" reflex unless explicitly trained for it. At temperature > 0, it can drift from the provided context toward its training priors.
+
+============================================
+Ollama's default temperature is 0.8 for all models unless the request or Modelfile overrides it. That's fairly high — 0.8 means the model
+  samples creatively rather than picking the most probable token. For a task that's supposed to be "copy this text verbatim," it's working against
+us.
+
+  temperature: 0 forces greedy decoding (always picks the highest-probability token), which is what we want for a "reproduce exactly"
+  instruction.
+==================
+An LLM doesn't "think" and then write. It works one token at a time:
+
+  "On Linux, printf" → predicts next token → "%p" → predicts next → ...
+
+  A token ≈ a word piece. "uintptr_t" might be 3 tokens: "uint", "ptr", "_t".
+
+  At each step the model produces a score (called a logit) for every token in its vocabulary (~32,000 tokens for most models). Higher score = more
+  likely next token.
+
+  ---
+  What temperature does
+
+  Before sampling, logits go through softmax to become probabilities:
+
+  raw logits:  [8.2,  5.1,  4.9,  0.3, ...]   ← unnormalized scores
+  after softmax: [0.73, 0.09, 0.08, 0.001, ...] ← probabilities, sum to 1
+
+  Temperature divides the logits BEFORE softmax:
+
+  logits / temperature → softmax → probabilities
+
+  Temperature = 1.0 (neutral, no change):
+  logits: [8.2, 5.1, 4.9]
+  probs:  [0.73, 0.09, 0.08]  ← top token wins clearly
+
+  Temperature = 0.8 (Ollama default — slightly sharpened):
+  logits / 0.8: [10.25, 6.375, 6.125]
+  probs:        [0.89,  0.04,  0.03]   ← top token wins more, but #2 still has chance
+
+  Temperature = 0.1 (very low — almost deterministic):
+  logits / 0.1: [82, 51, 49]
+  probs:        [≈1.0, ≈0.0, ≈0.0]   ← always picks the top token
+
+  Temperature = 2.0 (high — chaotic):
+  logits / 2.0: [4.1, 2.55, 2.45]
+  probs:        [0.47, 0.23, 0.21]   ← #3 and #4 get real chances → random output
+
+  Temperature = 0 is the limit: always greedy, always the single highest-probability token. Fully deterministic — same input → same output every
+  time.
+
+  ---
+  Why 0.8 hurt our case
+
+  our prompt said "reproduce the context word for word." With temperature 0.8:
+  - Most of the time the model picks the right token
+  - Occasionally it picks token #2 or #3 instead
+  - Over a 200-token answer, small deviations compound → different sentences get emphasized, some get dropped
+
+  With temperature 0 it would at least be consistent — always the same (possibly still incomplete) answer.
+
+  ---
+  A logit in an LLM is the raw, unnormalized score a model assigns to each token in its vocabulary before converting to a probability.
+
+  The flow:
+
+  Input tokens → transformer layers → logit vector (vocab_size floats)
+                                            ↓
+                                       softmax()
+                                            ↓
+                                     probability distribution
+                                            ↓
+                                      sample next token
+
+  Example: For a vocabulary of 50,000 tokens, the model outputs 50,000 logit values. Higher logit = model thinks that token is more likely next.
+
+  Why "logit"? It's short for "log-odds." Softmax converts logits to probabilities:
+
+  P(token_i) = exp(logit_i) / sum(exp(all logits))
+
+  Where logits matter in practice:
+
+  - Temperature — divides logits before softmax: logit / temperature. Lower temp → sharper distribution (more deterministic). Higher temp →
+  flatter (more random).
+  - Top-k / top-p sampling — filters which logits are eligible before sampling.
+  - Log probabilities (logprobs) — what APIs return when we ask for token probabilities; these are log(softmax(logits)).
+  - Training loss — cross-entropy loss is computed directly from logits.
+
+  In short: logits are the model's "raw opinion" on every possible next token, before normalization into probabilities.
+  =====================
+  We have two conflicting goals:
+
+  ┌────────────────────────────┬──────────────────────────────────────────┐
+  │            Goal            │                  Wants                   │
+  ├────────────────────────────┼──────────────────────────────────────────┤
+  │ No hallucination           │ temp 0 — copy only what's in context     │
+  ├────────────────────────────┼──────────────────────────────────────────┤
+  │ Adapt to question phrasing │ temp > 0 — synthesize, reorder, rephrase │
+  └────────────────────────────┴──────────────────────────────────────────┘
+
+  At temp 0 with our strict prompt ("reproduce word for word OR say no context"), the model will:
+  - Questions that match context exactly → reproduce correctly ✓
+  - Questions phrased differently from the stored Q → might reproduce the wrong sentence first, or treat it as "no context" and refuse ✗
+
+  At temp 0.8:
+  - Flexible, adapts phrasing → better UX ✓
+  - Non-deterministic, can hallucinate → our current bug ✗
+  ===========================
+
+  he reason we're getting hallucination isn't really temperature — it's that we're asking a 4B parameter model to do two hard things at once:
+  judge relevance AND reproduce faithfully. It fails at both inconsistently.
+
+  The cleaner architecture:
+
+  high similarity (> 0.85)  → return extractAnswer(context[0]) directly, skip LLM
+                                deterministic, zero hallucination, instant
+
+  low similarity (0.55–0.85) → send to LLM with temp 0.3–0.5
+                                let it synthesize/adapt across contexts
+                                some creativity is actually useful here
+
+  below threshold            → "I don't have enough context"
+
+  This separates the two jobs. Temperature becomes meaningful only in the middle tier where synthesis is actually needed
+  ===================
+
+campus machine:
+  ┌───────────┬──────────────────────────────────┬─────────────────────────────────┐
+  │ Component │               Spec               │             Verdict             │
+  ├───────────┼──────────────────────────────────┼─────────────────────────────────┤
+  │ RAM       │ 15GB total, 3.9GB available      │ critical bottleneck             │
+  ├───────────┼──────────────────────────────────┼─────────────────────────────────┤
+  │ CPU       │ i5-7500, 4 cores, 3.4GHz         │ slow for LLM inference          │
+  ├───────────┼──────────────────────────────────┼─────────────────────────────────┤
+  │ GPU       │ AMD RX 470/480/570/580 (no CUDA) │ Ollama can't use it effectively │
+  ├───────────┼──────────────────────────────────┼─────────────────────────────────┤
+  │ Swap      │ 2.2GB free                       │ will be hit hard                │
+  └───────────┴──────────────────────────────────┴─────────────────────────────────┘
+
+  What gemma3:12b needs
+
+  Ollama downloads Q4 quantized models by default:
+
+  ┌─────────────────────┬─────────────────┬───────────────────────┐
+  │        Model        │ RAM needed (Q4) │  Your available RAM   │
+  ├─────────────────────┼─────────────────┼───────────────────────┤
+  │ gemma3:4b (current) │ ~3.5GB          │ 3.9GB ← already tight │
+  ├─────────────────────┼─────────────────┼───────────────────────┤
+  │ gemma3:12b          │ ~8.5GB          │ 3.9GB ← impossible    │
+  ├─────────────────────┼─────────────────┼───────────────────────┤
+  │ gemma3:27b          │ ~18GB           │ impossible            │
+===============================
+

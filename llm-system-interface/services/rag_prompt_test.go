@@ -8,21 +8,28 @@ import (
 func TestBuildRAGPromptContainsOnlyConstraint(t *testing.T) {
 	prompt := buildRAGPrompt("some context", "what is malloc?")
 	if !strings.Contains(prompt, "ONLY") {
-		t.Error("prompt must instruct model to answer ONLY from posts")
+		t.Error("prompt must instruct model to answer ONLY from context")
 	}
 }
 
-func TestBuildRAGPromptContainsDoNotInclude(t *testing.T) {
+func TestBuildRAGPromptContainsDoNotGuess(t *testing.T) {
 	prompt := buildRAGPrompt("some context", "what is malloc?")
-	if !strings.Contains(prompt, "do NOT include that sentence") {
-		t.Error("prompt must explicitly prohibit the fallback phrase when an answer exists")
+	if !strings.Contains(prompt, "DO NOT guess") {
+		t.Error("prompt must explicitly prohibit guessing")
+	}
+}
+
+func TestBuildRAGPromptContainsDoNotUseTrainingKnowledge(t *testing.T) {
+	prompt := buildRAGPrompt("some context", "what is malloc?")
+	if !strings.Contains(prompt, "DO NOT use your training knowledge") {
+		t.Error("prompt must prohibit use of training knowledge")
 	}
 }
 
 func TestBuildRAGPromptContainsFallbackPhrase(t *testing.T) {
 	prompt := buildRAGPrompt("some context", "what is malloc?")
-	if !strings.Contains(prompt, "The community hasn't covered this yet") {
-		t.Error("prompt must include the fallback phrase for the model to use")
+	if !strings.Contains(prompt, "I don't have enough context to answer this.") {
+		t.Error("prompt must include the exact fallback phrase the model should use")
 	}
 }
 

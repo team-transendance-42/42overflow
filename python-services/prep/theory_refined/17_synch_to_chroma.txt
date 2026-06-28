@@ -1,0 +1,21 @@
+bug: sync_to_chroma calls get_existing_hashes as an optimization: only re-embed docs whose content changed. If that call throws (duplicate IDs in
+  ChromaDB's internal storage), the current code lets the exception bubble up to _fetch_embeddings, which catches it and returns [], {} — silently
+  replacing the good NumpyIndex with an empty one. One ChromaDB hiccup permanently kills semantic search until restart.
+
+
+  Pros:
+  - Sync is self-healing: ChromaDB data corruption no longer kills NumpyIndex
+  - Re-upserting all docs may fix the duplicate state in ChromaDB
+
+  Cons:
+  - On hash-check failure, re-embeds all N docs instead of just the changed ones (expensive at large scale; at 138 docs it's ~1s)
+
+  Edge cases:
+  - ChromaDB is fully down (not just corrupt): get_existing_hashes fails → we fall through to upsert → upsert also fails → _sync_to_chroma returns
+  {} → _fetch_embeddings falls back to the stored embeddings path via get_embeddings → that also fails → returns [], {}. Behavior is unchanged
+  from today in full-outage scenario.
+  - Duplicate IDs persist after the fix: upsert with unique IDs should overwrite/consolidate them in ChromaDB, but not guaranteed for all ChromaDB
+  versions. The immediate wipe I mentioned is still the cleanest resolution for existing corruption.
+
+  Also fixing _chroma_error: it labels all ChromaDB errors as "Could not connect" — a duplicate-ID error is not a connection error, which made
+  this bug hard to find.

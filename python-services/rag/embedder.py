@@ -1,9 +1,9 @@
 """
 Text embedding using fastembed (model controlled by EMBED_MODEL env var).
 
-LRU cache on single-text embedding:
+LRU(least recently used) cache on single-text embedding:
   At query time, embed_texts is called with one question. The same questions
-  repeat across users (42 students ask similar things). An LRU cache avoids
+  repeat across users (students ask similar things). An LRU cache avoids
   re-running the CPU-bound fastembed model for repeated questions.
 
 Theory — lru_cache:
@@ -25,7 +25,7 @@ Why single-text only, not batch:
 Pros:
   - Repeated questions: ~0ms (cache hit) vs ~100-300ms (CPU embed)
   - No new dependency — functools is stdlib
-  - 512 slots × 768 floats × 4 bytes ≈ 1.5MB RAM (negligible)
+  - 512 slots x 768 floats x 4 bytes ≈ 1.5MB RAM (negligible)
 
 Cons:
   - Cache is process-local; cleared on restart, not shared between workers
@@ -52,9 +52,13 @@ from config import EMBED_MODEL
 # Model is controlled by EMBED_MODEL env var (see config.py):
 #   BAAI/bge-small-en-v1.5        — 384-dim, ~100 MB RAM (default, memory-constrained)
 #   nomic-ai/nomic-embed-text-v1.5 — 768-dim, ~2 GB RAM  (school computers)
-_model = TextEmbedding(EMBED_MODEL)
+try:
+    _model: TextEmbedding | None = TextEmbedding(EMBED_MODEL)
+except Exception as _load_exc:
+    print(f"[embedder] FATAL: failed to load embedding model '{EMBED_MODEL}': {_load_exc}")
+    _model = None
 
-# LRU cache size: 512 slots × dim × 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
+# LRU cache size: 512 slots x dim x 4 bytes ≈ 0.75 MB (BAAI/384-dim) or 1.5 MB (nomic/768-dim).
 # 512 is generous for a 42-school context — covers the most common questions.
 _CACHE_SIZE = 512
 
@@ -71,9 +75,14 @@ def format_doc(question: str, answer: str, tags: list[str] | None = None) -> str
     return base
 
 
-def make_doc_id(question: str) -> str:
-    """Stable unique ID for a document, derived from the question text."""
-    return hashlib.sha256(question.encode()).hexdigest()
+def make_doc_id(question: str, answer: str = "") -> str:
+    """Stable unique ID for a document, derived from question + answer.
+
+    Answer is included so that multiple comments on the same post (same question,
+    different answers) each get a distinct ID — hashing question alone caused
+    duplicate IDs when the DB query returns one row per comment.
+    """
+    return hashlib.sha256((question + answer).encode()).hexdigest()
 
 
 def make_doc_hash(question: str, answer: str) -> str:
@@ -82,7 +91,12 @@ def make_doc_hash(question: str, answer: str) -> str:
 
 def _embed_sync(texts: list[str]) -> list[list[float]]:
     """Synchronous batch embed. CPU-bound — must run in a thread pool."""
-    return [vec.tolist() for vec in _model.embed(texts)]
+    if _model is None:
+        raise RuntimeError(f"Embedding model '{EMBED_MODEL}' failed to load at startup")
+    try:
+        return [vec.tolist() for vec in _model.embed(texts)]
+    except Exception as exc:
+        raise RuntimeError(f"Embedding failed for {len(texts)} text(s): {exc}") from exc
 
 
 @lru_cache(maxsize=_CACHE_SIZE)
@@ -127,7 +141,8 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         key = texts[0].lower().strip()
         # asyncio.to_thread handles both cache miss (CPU-bound embed)
         # and cache hit (O(1) lookup — thread overhead ~0.01ms, acceptable).
-        result_tuple = await asyncio.to_thread(_embed_one_cached, key)
+        result_tuple = await asyncio.to_thread(_embed_one_cached, key) #  Without asyncio.to_thread, FastEmbed would freeze the event loop for 100–300ms — no other request could be answered during that time. With it, the loop stays free while the CPU crunches numbers on a separate thread.
+
         return [list(result_tuple)]
 
     # Batch path: startup embeds all docs at once — bypass cache.

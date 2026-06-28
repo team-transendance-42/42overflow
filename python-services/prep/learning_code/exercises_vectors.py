@@ -9,9 +9,6 @@ import math
 # HELPERS
 #=============================================================================
 
-def magnitude(v: list[float]) -> float:
-    return math.sqrt(sum(x**2 for x in v))
-
 """
 zip(a, b)
 Pairs elements from a and b together into tuples:
@@ -34,10 +31,25 @@ Alternative (with NumPy for large arrays):
 import numpy as np
 np.dot(a, b)
 """
+"""
+Cosine similarity  measures: the angle between two vectors, not their distance.
+  Result is always between -1 and 1:
+  - 1.0 → identical direction (same meaning)
+  - 0.0 → perpendicular (unrelated)
+  - -1.0 → opposite direction (opposite meaning)
+
+"""
+def magnitude(v: list[float]) -> float:
+    return math.sqrt(sum(x**2 for x in v))
+
 def dot_product(a: list[float], b: list[float]) -> float:
     return sum(ai * bi for ai, bi in zip(a, b))
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
+    """
+    cosine of any angle is always between -1 and 1
+	cos(θ) = A·B / (|A| x |B|)
+    """
     mag_a, mag_b = magnitude(a), magnitude(b)
     if mag_a == 0 or mag_b == 0:
         return 0.0
@@ -48,7 +60,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 # EXERCISE 1 — Compute magnitude by hand
 # =============================================================================
 # The magnitude of a vector is its "length" in space.
-# Formula: sqrt( x1² + x2² + x3² + ... )
+# Formula: sqrt( x1² + x2² + x3² + ... ) pythagorian: x and y etc are sides fo 3angle and hypoth is the magnitude(our vector)
 #
 # Example: magnitude([3, 4]) = sqrt(9 + 16) = sqrt(25) = 5
 #
@@ -62,10 +74,10 @@ def exercise_1():
     v4 = [2.0, 3.0, 6.0]     # expected: 7.0
 
     # YOUR CODE — replace None with your calculation
-    mag_v1 = None
-    mag_v2 = None
-    mag_v3 = None
-    mag_v4 = None
+    mag_v1 = magnitude(v1) # 3x3 + 4x4 = 9 + 16 = sqrt25 = 5
+    mag_v2 = magnitude(v2) # 1 + 0 = 1 = sqrt1 = 1
+    mag_v3 = magnitude(v3)
+    mag_v4 = magnitude(v4) # 4+9+36=49= sqrt49=7
 
     # check
     assert round(mag_v1, 4) == 5.0,             f"v1 wrong: got {mag_v1}"
@@ -84,7 +96,7 @@ def exercise_1():
 # Example: [1,2,3] · [4,5,6] = (1×4) + (2×5) + (3×6) = 4+10+18 = 32
 
 def exercise_2():
-    a = [1.0, 2.0, 3.0]
+    a = [1.0, 2.0, 3.0]     # 4 + 10 + 18 = 32
     b = [4.0, 5.0, 6.0]     # expected: 32.0
 
     c = [1.0, 0.0]
@@ -94,9 +106,9 @@ def exercise_2():
     f = [3.0, 3.0]           # expected: 18.0 (same vector)
 
     # YOUR CODE — replace None
-    dp_ab = None
-    dp_cd = None
-    dp_ef = None
+    dp_ab = dot_product(a, b) # sum(ai * bi for ai, bi in zip(a, b))
+    dp_cd = dot_product(c, d)
+    dp_ef = dot_product(e, f)
 
     assert dp_ab == 32.0,  f"ab wrong: got {dp_ab}"
     assert dp_cd == 0.0,   f"cd wrong: got {dp_cd}"
@@ -108,13 +120,19 @@ def exercise_2():
 # EXERCISE 3 — Cosine similarity formula
 # =============================================================================
 # cosine(A, B) = (A · B) / (|A| × |B|)
+#  - θ = 0° → same direction → cos = 1.0 (identical sentences)
+#  - θ = 90° → perpendicular → cos = 0.0 (completely unrelated)
+#  - θ = 180° → opposite direction → cos = -1.0 (opposite meaning)
+#   / hypothenose(len of vector) a * hypothenose b
 #
 # Using dot_product() and magnitude() from the helpers above is fine here.
 # Write the formula yourself — do NOT call cosine_similarity().
 
 def my_cosine(a: list[float], b: list[float]) -> float:
-    # YOUR CODE — replace this line
-    return None
+    # YOUR CODE
+    ma: float = magnitude(a);
+    mb: float = magnitude(b);
+    return dot_product(a, b) / (ma * mb)
 
 
 def exercise_3():
@@ -148,9 +166,9 @@ def exercise_4():
     v3 = [0.3,  0.4 ]    # v1 × 0.1
 
     # YOUR CODE — compute the three pairwise cosine similarities
-    sim_12 = None   # between v1 and v2
-    sim_13 = None   # between v1 and v3
-    sim_23 = None   # between v2 and v3
+    sim_12 = my_cosine(v1,v2)   # between v1 and v2
+    sim_13 = my_cosine(v1,v3)   # between v1 and v3
+    sim_23 = my_cosine(v2, v3)  # between v2 and v3
 
     assert round(sim_12, 4) == 1.0, f"v1 vs v2: expected 1.0, got {sim_12}"
     assert round(sim_13, 4) == 1.0, f"v1 vs v3: expected 1.0, got {sim_13}"
@@ -181,8 +199,25 @@ def exercise_5() -> int:
     # YOUR CODE
     # Hint: for each vector, compute the AVERAGE cosine similarity to all others.
     # The one with the lowest average is the odd one out.
-    odd_index = None
-
+    min_avg = float('inf')
+    odd_index = -1
+    #for i, v in enumerate(vectors):
+    #    total = 0.0
+    #    for j in range(len(vectors)):
+    #        if j != i:
+    #            total += my_cosine(v, vectors[j])
+    #    avg = total / (len(vectors) - 1)
+    #    if (avg < min_avg):
+    #        min_avg = avg
+    #        odd_index = i
+	# optimized:
+    for i, v in enumerate(vectors):
+        avg = sum(my_cosine(v, vectors[j]) for j in range(len(vectors)) if j != i) / (len(vectors) - 1)
+        if avg < min_avg:
+            min_avg = avg
+            odd_index = i
+	
+                
     assert odd_index == 3, f"wrong: got {odd_index}, expected 3"
     print("EXERCISE 5 passed ✓")
     return odd_index
@@ -191,7 +226,7 @@ def exercise_5() -> int:
 # =============================================================================
 # EXERCISE 6 — Normalise a vector (make it unit length)
 # =============================================================================
-# A "unit vector" has magnitude = 1.0.
+# A "unit vector" has magnitude(len) = 1.0.
 # You create one by dividing each component by the vector's magnitude.
 #
 # Formula: normalise(v) = v / |v|   (component-wise)
@@ -200,6 +235,42 @@ def exercise_5() -> int:
 #   After normalisation, dot_product(a, b) == cosine_similarity(a, b)
 #   Production vector DBs pre-normalise everything so they only need
 #   a dot product (faster) instead of full cosine.
+#   v = arrow of any length
+#   v̂ = same direction, but length = 1
+#Normal cosine formula is:
+
+#cos(a,b)=
+#∣a∣∣b∣
+#a⋅b
+#	​
+#Meaning:
+#dot product (a · b)
+#divided by lengths of both vectors
+#So we must compute:
+#dot product
+#length of a
+#length of b
+#divisions
+#That is slower.
+#3. Trick used in real systems
+#Before storing vectors, we do:
+#make every vector length = 1
+#This is called normalization
+#So:
+#|a| = 1
+#|b| = 1
+#4. What happens then
+#Put into formula:
+#cos(a,b)=
+#1⋅1
+#a⋅b
+#	​
+#So it becomes:
+#cos(a,b)=a⋅b
+#After normalization:
+#dot product already tells you cosine similarity
+#dot product = similarity score
+#no extra math needed
 
 def normalise(v: list[float]) -> list[float]:
     # YOUR CODE — return a new list with each component divided by magnitude(v)
@@ -434,11 +505,11 @@ def run_all():
     exercise_3()
     exercise_4()
     exercise_5()
-    exercise_6()
-    exercise_7()
-    exercise_8()
-    exercise_9()
-    exercise_10()
+    #exercise_6()
+    #exercise_7()
+    #exercise_8()
+    #exercise_9()
+    #exercise_10()
     print("\nAll exercises done.")
 
 if __name__ == "__main__":

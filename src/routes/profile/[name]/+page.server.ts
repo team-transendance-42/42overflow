@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, redirect , fail} from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 
@@ -36,6 +36,15 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     ? new Date().getTime() - new Date(profile.last_seen).getTime() < 5 * 60 * 1000
     : false;
 
+  const posts = await db.post.findMany({
+	where: { userId: profile.id, deleted_at: null },
+	orderBy: { created_at: 'desc' },
+	include: {
+		subject: true,
+		_count: { select: { likes: true, comments: true } }
+	}
+});
+
   return {
     profile,
     user: {
@@ -46,6 +55,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     followerCount,
     followingCount,
     isOnline,
+	posts,
     isOwnProfile: myProfile?.id === profile.id,
   };
 };
@@ -66,6 +76,7 @@ export const actions = {
 
     if (!targetProfile) throw error(404, 'User not found');
 
+	try {
     const existing = await db.follow.findUnique({
       where: {
         followerId_followingId: {
@@ -92,6 +103,10 @@ export const actions = {
         }
       });
     }
+}	catch (err) {
+		console.error(err);
+		return fail(500, { error:'Failed to update follow status' });
+	}
 
     return { success: true };
   }

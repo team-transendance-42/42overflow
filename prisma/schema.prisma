@@ -14,6 +14,12 @@ enum Role {
   ADMIN
 }
 
+enum SubjectRole {
+  MEMBER
+  CURATOR
+  OWNER
+}
+
 // ─── better-auth required tables ─────────────────────────────────────────────
 
 model User {
@@ -37,10 +43,11 @@ model User {
   updatedAt    DateTime  @updatedAt
   role         Role      @default(USER)
 
-  followers Follow[]  @relation("Follower")
-  following Follow[]  @relation("Following")
-  posts     Post[]
-  comments  Comment[]
+  followers   Follow[]  @relation("Follower")
+  following   Follow[]  @relation("Following")
+  memberships SubjectMember[]
+  posts       Post[]
+  comments    Comment[]
 
   sessions Session[]
   accounts Account[]
@@ -106,15 +113,18 @@ model Post {
   content String
   image   String?
 
-  userId String
+  userId    String
+  subjectId Int
+  isEdited  Boolean @default(false)
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
   deleted_at DateTime?
 
   likes    Like[]
-  user     User      @relation(fields: [userId], references: [id])
-  comments Comment[]
+  user      User      @relation(fields: [userId], references: [id])
+  subject   Subject   @relation(fields: [subjectId], references: [id])
+  comments  Comment[]
 }
 
 model Like {
@@ -138,6 +148,7 @@ model Comment {
   parentId Int?
   postId   Int
   userId   String
+  isEdited  Boolean @default(false)
 
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now()) @updatedAt
@@ -148,4 +159,45 @@ model Comment {
   likes    Like[]
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   children Comment[] @relation("CommentThread")
+}
+
+model Subject {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  memberships SubjectMember[]
+  posts       Post[]
+}
+
+model SubjectMember {
+  id        Int         @id @default(autoincrement())
+  userId    String
+  subjectId Int
+  role      SubjectRole @default(MEMBER)
+  joined_at DateTime    @default(now())
+
+  user      User    @relation(fields: [userId], references: [id])
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId])
+}
+
+// ─── RAG knowledge base ───────────────────────────────────────────────────────
+
+// source is not consumed by the RAG pipeline today — it is stored for future
+// admin tooling (e.g. "show all QA pairs added by users vs imported from seed").
+model QAPair {
+  id        Int      @id @default(autoincrement())
+  question  String   @unique
+  answer    String
+  topic     String
+  tags      String[]
+  source    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

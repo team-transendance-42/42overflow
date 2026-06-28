@@ -29,7 +29,7 @@ def _build_test_fixtures(with_centroids: bool = False):
     """
     pairs = load_seed()
     all_texts = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
-    all_ids = [make_doc_id(p["question"]) for p in pairs]
+    all_ids = [make_doc_id(p["question"], p.get("answer", "")) for p in pairs]
     all_topics = [p.get("topic", "unknown") for p in pairs]
 
     id_to_text = dict(zip(all_ids, all_texts))
@@ -55,10 +55,10 @@ def _build_test_fixtures(with_centroids: bool = False):
 
 
 def test_result_shape():
-    """hybrid_search returns a list of dicts with the expected keys."""
+    """hybrid_search returns (results, best_similarity, has_embeddings) with correct keys."""
     bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures()
 
-    results = asyncio.run(hybrid_search(
+    results, best_similarity, has_embeddings = asyncio.run(hybrid_search(
         "what is a segfault", bm25, numpy_idx, id_to_text, id_to_topic, centroids, top_k=3
     ))
 
@@ -74,14 +74,19 @@ def test_result_shape():
         assert r["text"].startswith("Q:"), f"text should start with 'Q:': {r['text'][:40]}"
         assert r["rrf_score"] > 0, f"rrf_score must be positive: {r['rrf_score']}"
 
-    print(f"✓ result shape: {len(results)} results, all keys present")
+    assert isinstance(best_similarity, float), f"best_similarity must be float, got {type(best_similarity)}"
+    assert 0.0 <= best_similarity <= 1.0, f"best_similarity out of range: {best_similarity}"
+    assert isinstance(has_embeddings, bool), f"has_embeddings must be bool, got {type(has_embeddings)}"
+    assert has_embeddings is True, "has_embeddings must be True when NumpyIndex is built"
+
+    print(f"✓ result shape: {len(results)} results, best_similarity={best_similarity:.4f}, has_embeddings={has_embeddings}")
 
 
 def test_results_sorted_by_rrf_score():
     """Results must be sorted by descending rrf_score."""
     bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures()
 
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "memory allocation deadlock", bm25, numpy_idx, id_to_text, id_to_topic, centroids, top_k=5
     ))
     scores = [r["rrf_score"] for r in results]
@@ -95,7 +100,7 @@ def test_relevant_doc_in_top_results():
     """A specific keyword query should surface a relevant doc in top-3."""
     bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures()
 
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "EDF scheduling deadline coder dongle",
         bm25, numpy_idx, id_to_text, id_to_topic, centroids, top_k=3,
     ))
@@ -111,7 +116,7 @@ def test_dense_only_fallback():
     _, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures()
 
     empty_bm25 = BM25Index()
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "what is malloc", empty_bm25, numpy_idx, id_to_text, id_to_topic, centroids, top_k=3
     ))
 
@@ -124,7 +129,7 @@ def test_topic_aware_retrieval_codexion():
     """A codexion-specific query should return mostly codexion docs with centroids."""
     bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures(with_centroids=True)
 
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "EDF deadline scheduling dongle coder burnout pthread",
         bm25, numpy_idx, id_to_text, id_to_topic, centroids,
         top_k=5,
@@ -143,7 +148,7 @@ def test_fallback_when_no_topic_detected():
     """A generic query should return results without locking to one topic."""
     bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures(with_centroids=True)
 
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "error handling graceful exit",
         bm25, numpy_idx, id_to_text, id_to_topic, centroids,
         top_k=5,
@@ -157,7 +162,7 @@ def _build_topic_intro_ids() -> dict[str, str]:
     """Build {topic: intro_doc_id} from seed — mirrors what main.py will do."""
     pairs = load_seed()
     return {
-        p["topic"]: make_doc_id(p["question"])
+        p["topic"]: make_doc_id(p["question"], p.get("answer", ""))
         for p in pairs
         if "intro" in p.get("tags", [])
     }
@@ -171,7 +176,7 @@ def test_intro_pinned_when_not_in_top_results():
     topic_intro_ids = _build_topic_intro_ids()
 
     # Highly specific query unlikely to retrieve the codexion intro overview doc.
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "EDF deadline heap extract min priority recompile dongle coder burnout",
         bm25, numpy_idx, id_to_text, id_to_topic, centroids,
         topic_intro_ids=topic_intro_ids,
@@ -193,7 +198,7 @@ def test_intro_not_duplicated_when_already_retrieved():
     )
     topic_intro_ids = _build_topic_intro_ids()
 
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "what is codexion dining philosophers overview intro",
         bm25, numpy_idx, id_to_text, id_to_topic, centroids,
         topic_intro_ids=topic_intro_ids,
@@ -212,7 +217,7 @@ def test_no_pinning_when_no_topic_detected():
     bm25, numpy_idx, id_to_text, id_to_topic, _ = _build_test_fixtures(with_centroids=False)
     topic_intro_ids = _build_topic_intro_ids()
 
-    results = asyncio.run(hybrid_search(
+    results, _, _ = asyncio.run(hybrid_search(
         "EDF deadline heap extract min",
         bm25, numpy_idx, id_to_text, id_to_topic,
         {},  # empty centroids → no topic detection → no pinning
@@ -222,6 +227,29 @@ def test_no_pinning_when_no_topic_detected():
 
     assert len(results) > 0, "should still return results when pinning is skipped"
     print(f"✓ no-topic fallback: {len(results)} results, no crash")
+
+
+def test_gate_signals_on_technical_query():
+    """A tech question returns high best_similarity; greeting returns low."""
+    bm25, numpy_idx, id_to_text, id_to_topic, centroids = _build_test_fixtures()
+
+    _, tech_sim, tech_emb = asyncio.run(hybrid_search(
+        "what is a segmentation fault in C", bm25, numpy_idx, id_to_text, id_to_topic, centroids
+    ))
+    _, greet_sim, greet_emb = asyncio.run(hybrid_search(
+        "hi", bm25, numpy_idx, id_to_text, id_to_topic, centroids
+    ))
+
+    assert tech_emb is True, "has_embeddings must be True when NumpyIndex is built"
+    assert greet_emb is True, "has_embeddings must be True when NumpyIndex is built"
+    assert tech_sim > greet_sim, (
+        f"tech query should score higher than greeting: "
+        f"tech={tech_sim:.4f} greet={greet_sim:.4f}"
+    )
+    assert greet_sim < 0.55, (
+        f"greeting should score below the 0.55 gate threshold: got {greet_sim:.4f}"
+    )
+    print(f"✓ gate signals: tech={tech_sim:.4f} greet={greet_sim:.4f}")
 
 
 if __name__ == "__main__":
@@ -234,4 +262,5 @@ if __name__ == "__main__":
     test_intro_pinned_when_not_in_top_results()
     test_intro_not_duplicated_when_already_retrieved()
     test_no_pinning_when_no_topic_detected()
+    test_gate_signals_on_technical_query()
     print("\nAll retriever tests passed.")

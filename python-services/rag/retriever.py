@@ -45,7 +45,7 @@ async def hybrid_search(
     centroids:       dict[str, list[float]],
     top_k:           int = 5,
     topic_intro_ids: dict[str, str] | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], float, bool]:
     """
     Retrieve top-k docs using topic-aware hybrid search.
 
@@ -64,32 +64,77 @@ async def hybrid_search(
                          (no pinning) for backwards compatibility.
 
     Returns:
-        [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
-        sorted by descending rrf_score (best match first).
+        (results, best_similarity, has_embeddings) where:
+        - results: [{"id": ..., "text": ..., "rrf_score": ..., "topic": ...}]
+          sorted by descending rrf_score (best match first).
+        - best_similarity: cosine similarity of the single best-matching doc
+          across the full corpus (unfiltered). Used by the Go service as a
+          semantic gate — questions with best_similarity < threshold are
+          off-topic and Ollama is not called.
+        - has_embeddings: True when NumpyIndex is built and best_similarity is
+          meaningful. False when NumpyIndex is empty (embedding failed at
+          startup) — Go skips the semantic gate and relies on RRF confidence alone.
     """
     # 1. Embed question — needed for both dense retrieval and centroid detection.
     #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
-    question_embedding = (await embed_texts([question]))[0]
+    #    On failure: log and fall back to BM25-only (has_embeddings=False).
+    question_embedding: list[float] | None = None
+    try:
+        question_embedding = (await embed_texts([question]))[0]
+    except Exception as exc:
+        print(f"[retriever] WARNING: embedding failed — falling back to BM25-only: {exc}")
 
-    # 2. Detect topic from embedding vs centroids (no-op if centroids={}).
-    #    numpy matrix multiply — ~0.01ms for any reasonable number of topics.
-    detected_topic, _ = detect_topic(question_embedding, centroids)
+    # 1b. Gate signal: best cosine against the FULL corpus (no topic filter).
+    #     Only meaningful when embeddings are available.
+    full_hits: list[dict] = []
+    has_embeddings = False
+    best_similarity = 0.0
+    if question_embedding is not None:
+        try:
+            full_hits = numpy_index.search(question_embedding, n=20)
+            has_embeddings = len(full_hits) > 0
+            best_similarity = round(1.0 - full_hits[0]["distance"], 4) if has_embeddings else 0.0
+        except Exception as exc:
+            print(f"[retriever] WARNING: dense search failed — using BM25 only: {exc}")
+
+    # 2. Detect topic from embedding vs centroids (no-op if centroids={} or no embedding).
+    detected_topic = None
+    if question_embedding is not None:
+        try:
+            detected_topic, _ = detect_topic(question_embedding, centroids)
+        except Exception as exc:
+            print(f"[retriever] WARNING: topic detection failed: {exc}")
     use_filter = detected_topic is not None
 
     # 3a. Filtered retrieval when topic is confidently detected.
-    if use_filter:
-        dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
-        sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
+    if use_filter and question_embedding is not None:
+        try:
+            dense_hits = numpy_index.search(question_embedding, n=20, topic_filter=detected_topic)
+        except Exception as exc:
+            print(f"[retriever] WARNING: filtered dense search failed: {exc}")
+            dense_hits = full_hits
+        try:
+            sparse_hits = bm25_index.search(question, n=20, topic_filter=detected_topic)
+        except Exception as exc:
+            print(f"[retriever] WARNING: filtered BM25 search failed: {exc}")
+            sparse_hits = []
 
-        # 3b. Fallback: too few filtered results → search full corpus instead.
-        #     Prevents over-filtering when a topic has few docs.
+        # 3b. Fallback: too few filtered results → reuse the full-corpus hits.
         if len(dense_hits) + len(sparse_hits) < _MIN_FILTERED:
-            dense_hits = numpy_index.search(question_embedding, n=20)
-            sparse_hits = bm25_index.search(question, n=20)
+            dense_hits = full_hits
+            try:
+                sparse_hits = bm25_index.search(question, n=20)
+            except Exception as exc:
+                print(f"[retriever] WARNING: BM25 fallback search failed: {exc}")
+                sparse_hits = []
     else:
-        # 4. Full corpus (no confident topic detected or centroids disabled).
-        dense_hits = numpy_index.search(question_embedding, n=20)
-        sparse_hits = bm25_index.search(question, n=20)
+        # 4. Full corpus (no confident topic detected, centroids disabled, or no embedding).
+        dense_hits = full_hits
+        try:
+            sparse_hits = bm25_index.search(question, n=20)
+        except Exception as exc:
+            print(f"[retriever] WARNING: BM25 search failed: {exc}")
+            sparse_hits = []
 
     # 5. RRF merge: score each doc by rank position in each list.
     #    Formula: score += 1 / (rank + k)   where k=60 is the RRF constant.
@@ -108,29 +153,35 @@ async def hybrid_search(
     dense_text: dict[str, str] = {hit["id"]: hit["document"] for hit in dense_hits}
     top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k]
 
-    results = [
-        {
+    results = []
+    for id_ in top_ids:
+        text = dense_text.get(id_) or id_to_text.get(id_, "")
+        if not text:
+            print(f"[retriever] WARNING: no text for {id_!r} — BM25-only hit missing from id_to_text")
+        results.append({
             "id":        id_,
-            "text":      dense_text.get(id_) or id_to_text.get(id_, ""),
+            "text":      text,
             "rrf_score": round(rrf_scores[id_], 6),
             "topic":     id_to_topic.get(id_, "unknown"),
-        }
-        for id_ in top_ids
-    ]
+        })
 
     # Pin intro doc: when a topic is detected and its intro doc is not already
-    # in the top-k results, insert it at position 0 and drop the last entry.
+    # in the top-k results, insert it at position 0.
     # Ensures vague queries always start with "what is X" context before detail entries.
+    # At capacity (len == top_k): drop the last entry to keep the count stable.
+    # Under capacity (len < top_k):  just prepend — spare slots exist, keep all docs.
     if detected_topic and topic_intro_ids:
         intro_id = topic_intro_ids.get(detected_topic)
         result_ids = {r["id"] for r in results}
         if intro_id and intro_id not in result_ids:
             intro_text = dense_text.get(intro_id) or id_to_text.get(intro_id, "")
-            results = [{
+            intro_doc = {
                 "id":        intro_id,
                 "text":      intro_text,
                 "rrf_score": 0.0,
                 "topic":     detected_topic,
-            }] + results[:-1]
+            }
+            tail = results[:-1] if len(results) >= top_k else results
+            results = [intro_doc] + tail
 
-    return results
+    return results, best_similarity, has_embeddings

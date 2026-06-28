@@ -8,13 +8,14 @@
 	interface Props {
 		comment: any;
 		depth?: number;
+		hasPermission?: boolean;
 	}
 
-	let { comment, depth = 0 }: Props = $props();
+	let { comment, depth = 0, hasPermission }: Props = $props();
 
 	// Derive postId and parentId for creating replies to this comment
-	const postId = comment.postId;
-	const parentId = comment.id;
+	const postId = $derived(comment.postId);
+	const parentId = $derived(comment.id);
 	let isOwn = $derived.by(() => page.data.user?.id === comment.userId);
 
 	async function deleteComment() {
@@ -59,78 +60,80 @@
     }
 </script>
 
-<div style="margin-left: {depth * 20}px;">
-	<div class="postbox clickable relative">
-		<!-- Comment Content -->
-		<div class="break-all">{comment.content}</div>
+<div class="commentbox clickable relative" style="margin-left: {depth * 30}px; width: calc(100% - {depth * 30}px);">
+	{#if comment.isEdited}
+		<div class="break-all line-clamp-1"><em>[Edited]</em></div>
+	{/if}
 
-		<!-- Comment Image (Optional) -->
-		{#if comment.image}
-			<img
-                src={comment.image || `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`}
-                onerror={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`; }}
-				alt="Comment attachment"
-                class="card-img"
-            />
+	<!-- Comment Content -->
+	<div class="break-all">{comment.content}</div>
+
+	<!-- Comment Image (Optional) -->
+	{#if comment.image}
+		<img
+			src={comment.image || `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`}
+			onerror={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/300x300/white/black.webp?text=404+Not+Found`; }}
+			alt="Comment attachment"
+			class="card-img"
+		/>
+	{/if}
+
+	<!-- Buttons -->
+	<div class="comment-actions">
+		<!-- View Profile Button -->
+		{#if comment.deleted_at == null}
+			<button
+				class="button postcard clickable"
+				onclick={openProfile}
+				aria-label="View {comment.user.name}'s profile'"
+			>
+				<p class="author">
+					Author: <em>{comment.user.name}</em>
+				</p>
+			</button>
+		{:else}
+			<div class="button postcard">
+				<p class="author">
+					<em>[anonymous]</em>
+				</p>
+			</div>
 		{/if}
 
-		<!-- Buttons -->
-		<div class="comment-actions">
-			<!-- View Profile Button -->
-			{#if comment.deleted_at == null}
-				<button
-					class="button postcard clickable"
-					onclick={openProfile}
-					aria-label="View {comment.user.name}'s profile'"
-				>
-					<p class="author">
-						Author: <em>{comment.user.name}</em>
-					</p>
-				</button>
-			{:else}
-				<div class="button postcard">
-					<p class="author">
-						<em>[anonymous]</em>
-					</p>
-				</div>
-			{/if}
+		<!-- Reply to Comment -->
+		{#if comment.deleted_at == null}
+			<CreateComment {postId} {parentId} />
+		{/if}
 
-			<!-- Reply to Comment -->
-			{#if comment.deleted_at == null}
-				<CreateComment {postId} {parentId} />
-			{/if}
+		<!-- Edit Comment -->
+		{#if isOwn && comment.deleted_at == null}
+			<EditComment {postId} {comment} />
+		{/if}
 
-			<!-- Edit Comment -->
-			{#if isOwn && comment.deleted_at == null}
-				<EditComment {postId} {comment} />
-			{/if}
-
-			<!-- Delete Comment -->
-			{#if isOwn && comment.deleted_at == null}
-				<button
-					class="button postcard delete clickable"
-					onclick={deleteComment}
-					aria-label="Delete comment"
-				>
-					Delete
-				</button>
-			{/if}
-
-			<!-- Like Button -->
+		<!-- Delete Comment -->
+		{#if (isOwn || hasPermission) && comment.deleted_at == null}
 			<button
-				class="button postcard like clickable"
-				onclick={likeComment}
-				aria-label="Like comment"
+				class="button postcard delete clickable"
+				onclick={deleteComment}
+				aria-label="Delete comment"
 			>
-				{(comment.userLiked ? '♥ ' : '♡ ') + (comment.likeCount ?? 0)}
+				Delete
 			</button>
-		</div>
-	</div>
+		{/if}
 
-	<!-- Render nested children/replies -->
-	{#if comment.children && comment.children.length > 0}
-		{#each comment.children as child}
-			<CommentCard comment={child} depth={depth + 1} />
-		{/each}
-	{/if}
+		<!-- Like Button -->
+		<button
+			class="button postcard like clickable"
+			onclick={likeComment}
+			aria-label="Like comment"
+		>
+			{(comment.userLiked ? '♥ ' : '♡ ') + (comment.likeCount ?? 0)}
+		</button>
+	</div>
 </div>
+
+<!-- Render nested children/replies -->
+{#if comment.children && comment.children.length > 0}
+	{#each comment.children as child}
+		<CommentCard comment={child} depth={depth + 1} />
+	{/each}
+{/if}

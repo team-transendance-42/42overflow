@@ -1,4 +1,4 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -11,35 +11,16 @@ export const GET: RequestHandler = async ({ url }) => {
 	  skip: (page - 1) * limit,
 	  take: limit,
 	  orderBy: { created_at: 'desc' },
-	  where: { deleted_at: null },
+	  where: { deleted_at: null,
+			subject: { deleted_at: null }
+	   },
 	  include: {
-		user: { select: { name: true } }
+		user: { select: { name: true, id: true } },
+		subject: { select: { slug: true } }
 	  }
 	}),
 	db.post.count({ where: { deleted_at: null } })
   ]);
 
   return json({ data: posts, total });
-};
-
-export const POST: RequestHandler = async ({ request, locals }) => {
-  if (!locals.user) throw error(401, 'Unauthorized');
-
-  const myProfile = await db.user.findUnique({
-	where: { id: locals.user.id }
-  });
-
-  if (!myProfile) throw error(400, 'Profile not found');
-
-const { projectname, body } = await request.json();
-
-const post = await db.post.create({
-  data: {
-	title: projectname,
-	content: body,
-	userId: myProfile.id
-  }
-});
-
-  return json(post, { status: 201 });
 };

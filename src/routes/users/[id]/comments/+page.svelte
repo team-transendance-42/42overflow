@@ -58,9 +58,9 @@
 					<div class="post-actions">
 						<form method="POST" action="?/deleteComment" onsubmit={confirmDelete}>
 							<input type="hidden" name="commentId" value={comment.id} />
-							<button type="submit" style="background-color: red;">Delete comment</button>
+							<button type="submit" class="button unsubscribe">Delete comment</button>
 						</form>
-						<a href={`/posts/${comment.postId}`} style="color: blue;">View post</a>
+						<a href={`/posts/${comment.postId}`} class="button primary">View post</a>
 					</div>
 				</section>
 			{/each}

@@ -1,0 +1,166 @@
+seed.json  +  Postgres (optional, skipped at startup)
+                           ↓
+                _load_pairs()                                         [indexer.py]
+                   load_seed() → reads rag/seed/*.json files from container filesystem (disk)
+                   load_db_pairs() → skipped (include_db=False at startup)
+                   validates: every pair must have "question" + "answer"
+                           ↓
+                pairs = list[dict]
+                ┌─ lives in: RAG container heap (Python process RAM) ─────────────────┐
+                │  ~200 raw dicts, each: {question, answer, tags, topic, source}       │
+                │  lost on container restart — reloaded from disk on next startup      │
+                └────────────────────────────────────────────────────────────────────-─┘
+                           ↓
+                app.state.qa_pairs = pairs
+                ┌─ lives in: RAG container heap (app.state attribute) ────────────────┐
+                │  same list as pairs, stored on the FastAPI app object               │
+                │  read by /health (qa_count) and /admin routes only                  │
+                │  never touched by /community (RAG) route — uses indexes instead     │
+                │  not shared with Go service, not shared with ChromaDB container     │
+                │  cleared to [] on container shutdown                                 │
+                │  guard: getattr(request.app.state, "qa_pairs", []) in /healthz      │
+                │         in case health check fires before startup completes          │
+                └──────────────────────────────────────────────────────────────────────┘
+                           ↓
+                _prepare_corpus()                                     [indexer.py]
+                   single loop over all pairs:
+                     format_doc(q, a, tags)   → "Q: ...\nA: ...\ntags: ..."
+                     make_doc_id(question)    → sha256(question) hex string
+                     make_doc_hash(q+a)       → sha256(question+answer)
+                   ┌─ lives in: RAG container heap (local variables in _prepare_corpus) ─┐
+                   │  all_texts:        list[str]          — formatted doc strings        │
+                   │  all_ids:          list[str]          — sha256 hex IDs               │
+                   │  all_topics:       list[str]          — topic label per doc           │
+                   │  id_to_text:       dict[str, str]     — id → formatted text          │
+                   │  id_to_topic:      dict[str, str]     — id → topic label             │
+                   │  topic_intro_ids:  dict[str, str]     — topic → intro doc id         │
+                   │  freed after load_and_index() returns (only app.state refs survive)  │
+                   └──────────────────────────────────────────────────────────────────────┘
+                           ↓
+                _sync_to_chroma()                                     [indexer.py]
+                   get_existing_hashes(all_ids)
+                   ┌─ reads from: ChromaDB container (HTTP, persistent volume on disk) ──┐
+                   │  ChromaDB stores: id → doc_hash in metadata                         │
+                   │  survives RAG container restarts (separate container, disk-backed)   │
+                   └──────────────────────────────────────────────────────────────────────┘
+                   compares: skip docs where stored_hash == current_hash
+                   embeds ONLY new/changed docs:
+                     embed_texts([texts...])   ← batch path, bypasses LRU cache
+                       └─ asyncio.to_thread(_embed_sync)
+                             └─ fastembed model.embed(texts)
+                                ┌─ model lives in: RAG container heap (loaded once at import) ─┐
+                                │  BAAI/bge-small-en-v1.5:        ~100 MB RAM, 384-dim         │
+                                │  nomic-ai/nomic-embed-text-v1.5: ~2 GB RAM,  768-dim         │
+                                │  downloaded to container filesystem at Docker build time       │
+                                └────────────────────────────────────────────────────────────────┘
+                                → list of float arrays (768 floats per doc)
+                                ┌─ lives in: RAG container heap (local variable, temporary) ────┐
+                                │  discarded after upsert, not stored long-term in Python        │
+                                └────────────────────────────────────────────────────────────────┘
+                   upsert to ChromaDB: ids, documents, embeddings, metadata{topic, doc_hash}
+                   ┌─ written to: ChromaDB container (HTTP → persistent volume on disk) ──┐
+                   │  ChromaDB stores: id, raw text, 768-float vector, metadata            │
+                   │  persists across both RAG and ChromaDB container restarts             │
+                   └──────────────────────────────────────────────────────────────────────┘
+                   returns {doc_id: embedding} — freshly embedded docs only, still in heap
+                           ↓
+                get_embeddings(stale_ids)
+                   ┌─ reads from: ChromaDB container (HTTP, disk) ──────────────────────-┐
+                   │  fetches 768-float vectors for unchanged docs                         │
+                   │  reason: we didn't re-embed them above, need their vectors for below  │
+                   └──────────────────────────────────────────────────────────────────────┘
+                merges: {stored} ∪ {fresh}
+                   ┌─ lives in: RAG container heap (local variable) ────────────────────-─┐
+                   │  all_embeddings: list[list[float]] — one 768-float vector per doc     │
+                   │  full set, every doc now has a vector                                  │
+                   └──────────────────────────────────────────────────────────────────────┘
+                           ↓
+                build_topic_centroids()                               [detector.py]
+                   for each topic:
+                     np.stack(vecs)           → (n_docs_in_topic, 768) numpy matrix
+                     np.mean(matrix, axis=0)  → one 768-dim centroid vector
+                   ┌─ lives in: RAG container heap → moved to app.state.centroids ────────┐
+                   │  dict[str, list[float]] — one vector per topic                        │
+                   │  e.g. {"git": [0.12, -0.03, ...], "malloc": [...]}                   │
+                   └──────────────────────────────────────────────────────────────────────┘
+                           ↓
+                NumpyIndex.build()                                    [numpy_index.py]
+                   np.array(all_embeddings)   → (N_docs, 768) float32 numpy matrix
+                   L2-normalises every row    → unit vectors
+                   ┌─ lives in: RAG container heap → moved to app.state.numpy_index ──────┐
+                   │  _matrix:    numpy ndarray (N, 768) float32 — the search matrix       │
+                   │  _ids:       list[str]    — doc IDs in same row order as matrix       │
+                   │  _topics:    list[str]    — topic per row                             │
+                   │  _documents: list[str]    — formatted text per row                    │
+                   │  ~200 docs × 768 floats × 4 bytes ≈ 600 KB                           │
+                   │  immutable after build — safe for concurrent reads                    │
+                   └──────────────────────────────────────────────────────────────────────┘
+                           ↓
+                BM25Index.build()                                     [bm25_index.py]
+                   tokenizes all_texts
+                   builds term-frequency + IDF tables (BM25+ variant)
+                   ┌─ lives in: RAG container heap → moved to app.state.bm25 ─────────────┐
+                   │  inverted index: {token: {doc_id: tf_score}}                          │
+                   │  per-topic doc lists for filtered search                              │
+                   │  vocab size logged at startup (e.g. "1432 unique tokens")             │
+                   └──────────────────────────────────────────────────────────────────────┘
+
+  app.state — FastAPI object, RAG container heap, shared across ALL request handlers in this process:
+    app.state.qa_pairs        → list[dict] raw pairs — read by /health and /admin only
+    app.state.bm25            → BM25Index (inverted index)
+    app.state.numpy_index     → NumpyIndex (_matrix + metadata lists)
+    app.state.centroids       → {topic: centroid_vector}
+    app.state.id_to_text      → {doc_id: formatted_text}
+    app.state.id_to_topic     → {doc_id: topic}
+    app.state.topic_intro_ids → {topic: intro_doc_id}
+    app.state.metrics         → Metrics object (counters)
+    NOT visible to Go service. NOT shared with ChromaDB container.
+    Lost on RAG container restart — rebuilt from seed JSON + ChromaDB in ~5s.
+
+  ─────────────────────────────────────────────────────────────────────
+  Per-Request (every user question)
+
+  user question (string) — arrives from Go service over HTTP
+          ↓
+  embed_texts([question])                                            [embedder.py:114]
+     key = question.lower().strip()
+     asyncio.to_thread(_embed_one_cached, key)
+     ┌─ _embed_one_cached: lru_cache (functools) ────────────────────────────────────┐
+     │  lives in: RAG container heap (Python dict + doubly-linked list)              │
+     │  max 512 slots × 768 floats × 4 bytes ≈ 1.5 MB                               │
+     │  hit  → returns stored tuple from heap, ~0ms, no model call                   │
+     │  miss → calls fastembed model (also in heap), 100–300ms CPU, stores result    │
+     │  cleared on RAG container restart                                              │
+     │  NOT shared between requests (GIL-protected) — safe, no race condition        │
+     └───────────────────────────────────────────────────────────────────────────────┘
+     returns [768-float vector] — local variable in request handler, heap
+          ↓
+  NumpyIndex.search(q_vec, n=20)         ← reads app.state.numpy_index._matrix (heap)
+     q_hat = q / ||q||
+     scores = _matrix @ q_hat            → (N,) float array, temporary heap variable
+     best_similarity = 1 - scores[0]     ← scalar, passed to Go in response JSON
+          ↓
+  detect_topic(q_vec, centroids)         ← reads app.state.centroids (heap)
+     C = stack(all_centroid_vectors)     → (T, 768) matrix, temporary heap variable
+     scores = C_unit @ q_unit            → (T,) float array, temporary
+     best topic wins IF score >= 0.70 AND margin vs second >= 0.08
+     → detected_topic: str | None        — local variable
+          ↓ (if topic detected)
+  NumpyIndex.search(q_vec, n=20, topic_filter=detected_topic)   ← heap read only
+  BM25Index.search(question, n=20, topic_filter=detected_topic) ← heap read only
+          ↓ (fallback if < 3 combined hits)
+  full corpus search (no filter)         ← same heap reads
+          ↓
+  RRF merge
+     rrf_scores: dict[str, float]        → temporary heap variable per request
+     score += 1/(rank + 60) per hit in dense and sparse lists
+          ↓
+  sort → top_k results
+  intro doc pinning (if applicable)      ← reads app.state.topic_intro_ids (heap)
+          ↓
+  return: [{id, text, rrf_score, topic}], best_similarity, has_embeddings
+  ┌─ lives in: RAG container heap until serialised to JSON response ──────────────┐
+  │  serialised → HTTP response → Go service heap (separate process/container)    │
+  │  Go reads text fields, builds Ollama prompt string → Go heap                  │
+  │  Go uses best_similarity to skip Ollama if question is off-topic              │
+  └───────────────────────────────────────────────────────────────────────────────┘

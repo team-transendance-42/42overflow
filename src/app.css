@@ -20,12 +20,273 @@
 	text-shadow: rgb(230, 230, 230) 0px 0px 2px;
 }
 
-/* Posts */
-.postbox {
+.error {
+	color: red;
+	font-size: 0.875rem;
+}
+
+/* Header */
+.header.dropdown-container {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	background: var(--color-primary-400);
+	border: 1px solid #ccc;
+	border-radius: var(--radius-md);
+	min-width: 150px;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+}
+
+header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	background-color: var(--color-primary-400);
+	color: var(--color-neutral-900);
+	font-size: var(--font-size-medium);
+	font-weight: bold;
+	padding: var(--space-sm) var(--space-lg);
+	border-bottom: 2px solid var(--color-neutral-100);
+}
+
+header .right {
+	color: rgb(0, 0, 0, 0.5);
+	display: block;
+}
+
+header .right a {
+	text-decoration: none;
+	color: inherit;
+	margin-right: var(--space-sm);
+}
+
+header .right a.active {
+	text-decoration: none;
+	color: black;
+	margin-right: var(--space-sm);
+}
+
+.profile-row {
+	display: flex;
+	align-items: center;
+	position: relative;
+}
+
+.header-avatar {
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	margin-left: var(--space-sm);
+	margin-right: var(--space-sm);
+}
+
+/* Sidebar */
+.sidebar {
+	background-color: var(--color-neutral-200);
+	color: rgb(0, 0, 0, 0.5);
+	width: 140px;
+	padding: 1.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	font-weight: bold;
+	font-size: 0.8rem;
+	border-right: 2px solid var(--color-neutral-100);
+}
+
+.subjects-row {
+    display: flex;
+    align-items: center;
+}
+
+.subjects-row .sidebar-link {
+    flex: 1;
+}
+
+.dropdown-btn {
+    width: auto;
+    padding: 0 0.5rem;
+}
+
+.sidebar a, .dropdown-btn {
+	color: #818181;
+	display: block;
+	border: none;
+	width:100%;
+	text-align: left;
+	cursor: pointer;
+	outline: none;
+}
+
+.dropdown-container {
+	padding-left: 8px;
+}
+
+.sidebar-link.active {
+	color: black;
+}
+
+.dropdown-btn.active {
+	color: black;
+}
+
+.top-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Profile Page */
+.profile-page {
+	width: 100%;
+	max-width: 490px;
+	padding: 0;
+	text-align:
+	left;
+}
+
+.avatar-section {
+	margin: 1rem 0;
+}
+
+.interests {
+	margin: 0.75rem 0;
+}
+
+.label {
+	font-size: 0.75rem;
+	color: var(--color-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.following-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.4rem 0;
+}
+
+.following-link:hover {
+	text-decoration: underline;
+}
+
+.following-link {
+	color: var(--color-primary-dark-400);
+}
+
+.following-avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	margin-right: var(--space-sm);
+}
+
+/* Profile/[Name] */
+.avatar-row {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	margin: 1rem 0;
+}
+
+.avatar-wrap {
+	position: relative;
+	display: inline-block;
+}
+
+.status-dot {
+	position: absolute;
+	bottom: 4px;
+	right: 4px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	border: 2px solid white;
+}
+
+.status-dot.online {
+	background: #22c55e;
+}
+
+.status-dot.offline {
+	background: #888;
+}
+
+.info {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.online-text {
+	font-size: 0.8rem;
+	color: var(--color-text-secondary);
+	margin: 0;
+}
+
+.counts {
+	display: flex;
+	gap: 1rem;
+	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+}
+
+.profile-postbox {
+	display: block;
+	text-decoration: none;
+	color: white;
+	background-color: var(--color-neutral-300);
+	border: 1px solid var(--color-neutral-500);
+	border-radius: var(--radius-md);
+	padding: 0.75rem;
+	margin-bottom: 0.5rem;
+	max-width: 420px;
+}
+
+.profile-postbox:hover {
+	z-index: 10;
+
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+	border-color: #60a5fa;
+}
+
+.profile-postbox p {
+	font-size: 0.875rem;
+}
+
+
+/* Subject Header */
+.subject-header {
+	color: black;
+	background-color: var(--color-neutral-200);
+	min-width: 300px;
+	width: 50%;
+	padding: 1rem;
+	border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+/* Posts Page */
+.posts-page {
+	width: 70vw;
+	position: relative;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+/* Posts & Comments */
+.postbox, .commentbox {
 	position: relative;
 
 	box-sizing: border-box;
 	width: 100%;
+	min-width: 400px;
 	min-height: 150px;
 	background-color: var(--color-neutral-100);
 	border: 1px solid var(--color-neutral-500);
@@ -38,6 +299,10 @@
 	font-family: var(--font-family-base);
 }
 
+.commentbox {
+	background-color: var(--color-neutral-300);
+}
+
 .postbox.clickable:hover {
 	z-index: 10;
 
@@ -48,7 +313,7 @@
 .questions-page {
 	width: 100%;
 	max-width: 3400px;
-	margin: 100 auto;
+	margin: 100px auto;
 }
 
 .questions-page h1 {
@@ -67,7 +332,7 @@
 /* Comment Actions */
 .comment-actions {
 	position: absolute;
-	bottom: 0px;
+	bottom: 0.5rem;
 	left: 0.5rem;
 	display: flex;
 	align-items: center;
@@ -124,26 +389,49 @@
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-	margin-bottom: 1rem;
+}
+
+.button.small {
+	font-size: var(--font-size-small);
+	padding: 0.25rem 0.5rem;
+	border-radius: var(--radius-sm);
 }
 
 .button:hover {
 	opacity: 0.85;
 }
 
-.button.primary {
+.button.primary, .button.small.primary {
     background-color: var(--color-neutral-900);
 	color: black;
 }
 
-.button.secondary {
+.button.secondary, .button.small.secondary {
 	background-color: var(--color-neutral-500);
 	color: white;
 }
 
-.button.confirm {
+.button.confirm, .button.small.confirm {
 	background-color: var(--color-success-150);
 	color: white;
+}
+
+.button.subscribe {
+	z-index: 3;
+	background-color: var(--color-success-150);
+	color: white;
+}
+
+.button.unsubscribe {
+	z-index: 3;
+	background-color: var(--color-error-250);
+	color: white;
+}
+
+.button.manage {
+	z-index: 3;
+	background-color: white;
+	color: black;
 }
 
 .button.postcard {
@@ -209,6 +497,8 @@ textarea:focus {
 .input-group {
 	display: flex;
 	flex-direction: column;
+	width: 100%;
+	color: black;
 	gap: 0.4rem;
 	margin-bottom: .4rem;
 }
@@ -241,4 +531,12 @@ input:focus {
 input:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
+}
+
+/* Dropdown */
+.dropdown-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-bottom: .4rem;
 }

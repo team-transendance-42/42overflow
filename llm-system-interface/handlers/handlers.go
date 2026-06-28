@@ -26,11 +26,12 @@ func decodeAndSanitize(w http.ResponseWriter, r *http.Request, req *models.TextR
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return false
 	}
-	req.Prompt = strings.TrimSpace(req.Prompt)
+	req.Prompt = strings.TrimSpace(req.Prompt) // only begin and end
 	return true
 }
 
-/* a compatibility layer
+/*
+compitability layer:
 Frontend can send just { "prompt": "hello" } or full { "messages": [{...}] }.
 Both Gemini and Ollama expect req.Messages to be populated — never just a raw prompt.
 If messages is empty, wraps the prompt into a single user message so both models
@@ -76,35 +77,38 @@ In web servers, every incoming HTTP request has its own context.
 
 flusher is an object that implements the http.Flusher interface.
 w.(http.Flusher) is a type assertion: it checks if w (the http.ResponseWriter) also supports the Flush() method (needed for streaming).
-If ok is true, flusher is the same as w, but now you can call flusher.Flush() which
+If ok is true, flusher is the same as w, but now can call flusher.Flush() which
 forces Go’s HTTP server to immediately send any data written (with fmt.Fprintf, etc.) to the client, instead of waiting for the buffer to fill up.
 chunk is a string received from the channel (ch), which may contain multiple lines separated by \n.
 for _, line := range strings.Split(chunk, "\n") splits the chunk into individual lines, and each line is sent as a separate SSE message: fmt.Fprintf(w, "data: %s\n", line).
 After all lines in the chunk are sent, fmt.Fprint(w, "\n") writes an extra newline. In SSE, a blank line (\n) signals the end of one event/message to the browser.
 flusher.Flush() is called after writing all lines and the extra newline, forcing Go to send everything to the client immediately.
-You want to send a complete SSE event (all lines + the blank line) as one unit, then flush. This ensures the browser receives a full, well-formed SSE message right away.
-If you flushed before the final newline, the browser might see an incomplete event and not process it until the next flush.
+We want to send a complete SSE event (all lines + the blank line) as one unit, then flush. This ensures the browser receives a full, well-formed SSE message right away.
+If we flushed before the final newline, the browser might see an incomplete event and not process it until the next flush.
 The first flusher.Flush() (inside the loop) sends each streamed chunk to the client as soon as it’s ready, so the user sees updates in real time.
 
 The second flusher.Flush() (after fmt.Fprintf(w, "event: end\ndata: \n\n")) is for the final SSE event that signals the end of the stream. It ensures that this last message is also sent immediately, not left in the buffer.
 
 Even though there’s nothing more to send after that, it’s good practice to flush after the final event to guarantee the client receives the “end” signal right away, especially if there’s any data left in the buffer.
-
-Summary:
-
-First flush: for each streamed chunk/event.
+*/
+/*
+First flush: for each streamed chunk/event to be read by browser
 Second flush: for the final “end” event, to guarantee delivery.
 */
-func GenerateText(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GenerateText(): method=%s path=%s", r.Method, r.URL.Path)
-	if !setHeaders(w, r) { return }
+func GenerateGeminiText(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GenerateGeminiText(): method=%s path=%s", r.Method, r.URL.Path)
+	if !setHeaders(w, r) {
+		return
+	}
 
 	var req models.TextRequest
-	if !validateTextReq(w, r, &req) { return }
+	if !validateTextReq(w, r, &req) {
+		return
+	}
 
-	ch, err := services.StreamLLM(r.Context(), req) // receiving from gemini
+	ch, err := services.StreamGemini(r.Context(), req)
 	if err != nil {
-		log.Printf("GenerateText: StreamLLM error: %v", err)
+		log.Printf("GenerateGeminiText: StreamGemini error: %v", err)
 		http.Error(w, "LLM Service Error: "+err.Error(), http.StatusBadGateway)
 		return
 	}

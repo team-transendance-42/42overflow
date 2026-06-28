@@ -1,0 +1,53 @@
+roughly whisper models: base and small diff:
+============================================
+base — fine for clear speech, single speaker, English, quiet background. Struggles with accents, fast speech, technical terms.
+small — handles accents better, more robust to noise, better with uncommon vocabulary and non-native speakers.
+============================================
+
+python main.py
+    │
+    ├── loads Whisper model into RAM
+	 Machine RAM — the physical memory of whatever server is running the container. When the Python process starts, the OS allocates heap memory for
+  it, and the model weights (the .bin file on disk) are read into that heap. From that point on, the weights live in RAM as a large float array.
+   The "program" part — WhisperModel("base", ...) does two things at once:
+  1. Reads the model file from disk into RAM (the weights — ~140MB of numbers)
+  2. Initializes the CTranslate2 inference engine around those weights — allocates internal buffers, sets up the computation graph, prepares the
+  int8 quantized tensors
+
+  After that, the Python process is the running Whisper program. It's just a process sitting in memory holding those weights.
+  Every transcribe() call reuses the same weights already in RAM — no disk read, no reload. That's why startup is slow (~2-3s) but each subsequent
+  request is fast.
+    ├── creates FastAPI app with CORS middleware
+    └── starts uvicorn on port 8091
+              │
+              └── incoming POST /convert_audio
+                        │
+                        ├── reads audio bytes from request
+                        ├── writes to temp .wav file
+                        ├── runs Whisper transcription (CPU)
+                        ├── joins text segments
+                        ├── deletes temp file
+                        └── returns {"text": "..."} as JSON
+
+===============================================
+
+allow_credentials=True tells the browser: "you are allowed to send cookies and auth headers cross-origin."
+
+What it controls
+By default, browsers strip credentials from cross-origin requests for security. This flag lifts that restriction.
+
+"Credentials" means any of these:
+
+Cookies (session tokens, JWT in a cookie)
+Authorization headers (Authorization: Bearer <token>)
+TLS client certificates
+===============================================
+TODO:
+When allow_credentials=True, you cannot use allow_origins=["*"]. The browser will refuse it as a security violation. You must list exact origins:
+
+# This will BREAK with allow_credentials=True
+allow_origins=["*"]
+
+# This is correct — explicit origins only
+allow_origins=["http://localhost:5173"]
+todo in prod: allow_origins=["http://localhost:5173", "https://ourdomain.com"]

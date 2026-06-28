@@ -1,0 +1,28 @@
+Network travel is negligible.
+
+  All containers — Svelte app, Go server, Python RAG, ChromaDB, Ollama — are on the same Docker bridge network (app-net). A container-to-container
+  HTTP call on a Docker bridge takes < 1ms because it never leaves the host machine. It's just a virtual ethernet hop in kernel space.
+
+  │                       Step                       │           Where           │       Time       │
+  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
+  │ Svelte → Go                                      │ Docker bridge             │ < 1ms            │
+  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
+  │ Go → Python /rag/retrieve (embed + BM25 + numpy) │ Docker bridge + fastembed │ ~200-300ms       │
+  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
+  │ Go parses result, builds prompt                  │ In Go process             │ < 1ms            │
+  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
+  │ Go → Ollama /api/chat                            │ Docker bridge             │ < 1ms to connect │
+  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
+  │ Ollama generates tokens on CPU                   │ Inside ollama container   │ 15-30s           │
+  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
+  │ Token stream back to browser                     │ SSE chunks                │ < 1ms each chunk │
+
+
+ Gemma3:4b on CPU generates roughly 3-7 tokens/second. A 100-token answer takes 15-30 seconds. With GPU it would be 30-100 tokens/second, meaning
+  1-3 seconds. You're on CPU, so you wait.
+
+  The network between Go and Python adds maybe 300ms total to the 25s(not noticable)
+  =======================
+  current flow: Browser → [Go: rate limiter → queue → cache check → RAG retrieve → relevance gates → Ollama stream → cache write → SSE → Browser]
+  =======================
+

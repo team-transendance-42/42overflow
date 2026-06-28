@@ -192,6 +192,30 @@
     ]
   },
   {
+    "question": "What is concurrency in systems programming?",
+    "answer": "Concurrency means multiple tasks making progress at the same time by sharing CPU time or running in parallel across cores. In systems programming, concurrency is achieved through threads: each thread is an independent execution path within the same process, sharing heap memory but with its own stack and instruction pointer. The core challenge is coordinating access to shared memory — without coordination, two threads can read and modify the same variable simultaneously, producing unpredictable results (race conditions). Codexion teaches concurrency through the Dining Philosophers problem: N coder threads compete for shared dongle resources, must avoid starving each other, and must be scheduled fairly according to a policy (FIFO, RR, or EDF). The key abstractions are mutexes (prevent two threads accessing the same resource simultaneously) and condition variables (let a thread sleep until a specific condition is met). Concurrency differs from parallelism: parallelism means tasks physically execute at the same time (multiple cores), while concurrency means tasks make logical progress over time by interleaving (possible even on a single core). Codexion uses POSIX threads (pthreads), which the OS may schedule across any available cores.",
+    "topic": "codexion",
+    "tags": ["concept", "concurrency", "threads", "parallelism", "fundamentals"]
+  },
+  {
+    "question": "What is a mutex and why is it needed in concurrent programs?",
+    "answer": "A mutex (mutual exclusion lock) ensures only one thread can execute a critical section at a time. When a thread calls pthread_mutex_lock(), it either acquires the lock immediately (if available) or blocks until the current holder releases it with pthread_mutex_unlock(). Only the thread that locked a mutex can unlock it. In Codexion, each dongle is a mutex — a coder must lock both its left and right dongle mutex before compiling. The critical section is everything between acquiring both locks and releasing them after compiling. A mutex only protects what you put inside the critical section: a variable is only safe if EVERY thread that touches it holds the same mutex. A common mistake is protecting writes with a mutex but reading without it — the read still races. Another mistake is using two different mutexes to protect the same variable, giving each thread a different lock and no actual exclusion.",
+    "topic": "codexion",
+    "tags": ["concept", "mutex", "mutual-exclusion", "critical-section", "pthreads"]
+  },
+  {
+    "question": "What is a race condition and how does it cause bugs?",
+    "answer": "A race condition occurs when correctness depends on the relative timing of multiple threads. The classic example: thread A reads counter (value=5), thread B reads counter (value=5), thread A writes counter+1 (value=6), thread B writes counter+1 (value=6) — the counter is now 6 instead of 7. In Codexion, without mutexes the dongle availability flag could be read by two coders simultaneously — both see 'available', both take it, and the same dongle is in two hands. In C, even seemingly atomic operations like x = y + 1 are not atomic at the machine level: they compile to a load, add, and store instruction — a context switch between any two creates a race. Race conditions are non-deterministic: they may not reproduce under a debugger (which changes timing), may appear only under high load, and may produce different wrong results each run. The fix is always a mutex around every access (read and write) to shared mutable state.",
+    "topic": "codexion",
+    "tags": ["concept", "race-condition", "concurrency", "bug", "fundamentals"]
+  },
+  {
+    "question": "What is a condition variable and how does it differ from a mutex?",
+    "answer": "A condition variable lets a thread sleep until a specific condition becomes true, without busy-waiting. A thread calls pthread_cond_wait(&cond, &mutex) which atomically releases the mutex and puts the thread to sleep — the release and sleep are atomic so no signal can be missed between them. Another thread calls pthread_cond_signal(&cond) to wake one sleeper, or pthread_cond_broadcast(&cond) to wake all. The woken thread re-acquires the mutex before returning from wait. The difference from a mutex: a mutex controls access to a resource (can I enter?), a condition variable waits for a state change (has the resource become available?). You always use them together. In Codexion's EDF implementation, each coder has a dedicated condition variable. When a coder cannot acquire a dongle, it sleeps on its own condition variable. When a dongle is released, the releasing thread signals only the top-priority coder's condition variable from the EDF heap — waking exactly the right thread without a thundering herd.",
+    "topic": "codexion",
+    "tags": ["concept", "condition-variable", "pthread_cond_wait", "synchronization", "fundamentals"]
+  },
+  {
     "question": "In Codexion, why must you use a dedicated condition variable per coder for EDF wakeup?",
     "answer": "pthread_cond_broadcast wakes ALL threads waiting on a condition variable, causing a thundering herd: every coder wakes up, checks if the dongle is available, the highest-priority one takes it, and all others go back to sleep — wasting CPU on N-1 pointless wakeups. pthread_cond_signal wakes ONE thread, but which one is undefined by POSIX — the OS may wake any waiting thread, not the highest-priority EDF coder. The correct EDF implementation: each coder has its own dedicated condition variable (cond_t coder_cond[MAX_CODERS]). When a dongle is released and the EDF heap is non-empty, extract the top-priority coder from the heap and signal specifically its condition variable: pthread_cond_signal(&coder_cond[top_id]). This wakes exactly the right coder with O(1) overhead. The releasing coder must hold the dongle's mutex when signaling to prevent the woken coder from checking the dongle before it has been released.",
     "topic": "codexion",

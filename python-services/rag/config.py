@@ -17,3 +17,6 @@ CHROMA_URL = os.getenv("CHROMA_URL", "http://localhost:8000")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 # todo: use a real DB URL in prod, empty string disables DB sync and falls back to seed-only mode
 DB_URL = os.getenv("DATABASE_URL", "")
+# Secret token required in X-Admin-Token header to call /admin/* endpoints.
+# If not set, admin endpoints are disabled (return 403).
+ADMIN_TOKEN = os.getenv("RAG_ADMIN_TOKEN", "")

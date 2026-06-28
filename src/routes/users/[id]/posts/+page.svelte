@@ -76,10 +76,10 @@
 					<div class="post-actions">
 						<form method="POST" action="?/deletePost" onsubmit={confirmDelete}>
 							<input type="hidden" name="postId" value={post.id} />
-							<button type="submit" style="background-color: red;">Delete Post</button>
+							<button type="submit" class="button unsubscribe">Delete Post</button>
 						</form>
-						<a href={`/posts/${post.id}`} style="color: blue;">View Post</a>
-					</div>					
+						<a href={`/posts/${post.id}`} class="button primary">View Post</a>
+					</div>
 				</section>
 			{/each}
 		{/if}

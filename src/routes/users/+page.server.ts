@@ -3,6 +3,10 @@ import { db } from '$lib/server/db';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
+	
+	if (!locals.user) {
+		throw error(403, 'Forbidden');
+	}
 
 	const  currentUser = await db.user.findUnique({
 		where: { id: locals.user?.id },

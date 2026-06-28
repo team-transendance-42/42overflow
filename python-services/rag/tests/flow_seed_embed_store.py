@@ -32,7 +32,7 @@ async def run() -> None:
 
     # 3. embed
     text = format_doc(last["question"], last["answer"])
-    doc_id = make_doc_id(last["question"])
+    doc_id = make_doc_id(last["question"], last["answer"])
     doc_hash = make_doc_hash(last["question"], last["answer"])
 
     print("\n[embed] sending to Ollama...")

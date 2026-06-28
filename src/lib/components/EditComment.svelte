@@ -77,6 +77,12 @@
         }
     }
 
+    function removeOldImage() {
+		previewUrl = '';
+		formData.image = undefined;
+		removeImage = true;
+	}
+
     // Handle form submission
     async function handleSubmit(event: Event) {
         if (isSubmitting) return; // Prevent multiple submissions
@@ -111,15 +117,9 @@
             if (response.ok) {
                 showPopover = false;
                 previewUrl = '';
-                // Refresh page to show new comment
+                // Refresh page to show updated comment
                 location.reload();
             } else {
-                if (response.status === 409) {
-                    errors = { ...errors, name: ['A comment with that name already exists.'] };
-                    const element = document.getElementById('name') as HTMLInputElement | null;
-                    element?.focus();
-                    return;
-                }
                 alert('An error occurred while editing the comment. Please try again.');
             }
         } catch (error) {
@@ -194,6 +194,11 @@
                     {#if errors.image}
                         <p class="error">{errors.image[0]}</p>
                     {/if}
+                    {#if previewUrl}
+                        <button type="button" class="button unsubscribe" onclick={removeOldImage}>
+                            <strong>Remove Image</strong>
+                        </button>
+                    {/if}
                 </div>
 
                 <button class="button secondary" onclick={() => showPopover = false}>
@@ -201,7 +206,7 @@
                 </button>
 
                 {#if isSubmitting}
-                    <button type="button" class="button secondary" disabled>
+                    <button type="button" class="button primary" disabled>
                         Submitting...
                     </button>
                 {:else}

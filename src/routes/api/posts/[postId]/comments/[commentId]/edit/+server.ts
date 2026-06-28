@@ -1,5 +1,5 @@
 import { json, error, type RequestEvent } from '@sveltejs/kit';
-import { uploadProductImage } from '$lib/fileUpload.ts';
+import { uploadProductImage } from '$lib/fileUpload';
 import { CommentSchema } from '$lib/zodTypes.js';
 import { db } from '$lib/server/db';
 import { z } from 'zod';
@@ -68,6 +68,7 @@ export const POST = async ({ locals, request, params }: RequestEvent) => {
 
         let toUpdateData: any = {
             content: data.content.trim(),
+			isEdited: true,
         };
 
         // Don't update image if no new image is provided (imageUrl is null)
