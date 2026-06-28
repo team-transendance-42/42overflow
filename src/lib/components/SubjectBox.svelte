@@ -88,7 +88,7 @@
 
 	<div class="actions">
 		{#if !isLoggedIn}
-			<a class="action subscribe" href="/login">Subscribe</a>
+			<a class="button subscribe" href="/login">Subscribe</a>
 		{:else if isMember}
 			<button class="button unsubscribe" on:click={unsubscribe}>Unsubscribe</button>
 		{:else}

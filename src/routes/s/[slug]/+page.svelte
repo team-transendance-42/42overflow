@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {page} from '$app/stores';
+	import {page} from '$app/state';
 	import type { ComponentProps } from 'svelte';
 	import PostCard from '$lib/components/PostCard.svelte';
 	import { onMount } from 'svelte';
@@ -16,7 +16,7 @@
 	let hasPermission: boolean = data.hasPermission ? true : false;
 
 	async function loadSubject() {
-		const res = await fetch(`/api/subjects/${$page.params.slug}/post?page=${currentPage}&limit=${limit}`);
+		const res = await fetch(`/api/subjects/${page.params.slug}/post?page=${currentPage}&limit=${limit}`);
 		const json = await res.json();
 
 		if (!res.ok) {
@@ -32,7 +32,10 @@
 		goto(`/post-question?subject=${data.subject.name}`);
 	}
 
-	onMount(loadSubject);
+	$effect(() => {
+		const slug = page.params.slug;
+		loadSubject();
+	});
 
 </script>
 
