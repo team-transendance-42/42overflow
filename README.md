@@ -69,10 +69,16 @@ Major (2 PT): Standard user management and authentication. (DW)
 Users can update their profile information. Users can upload an avatar (with a default avatar if none provided). Users can add other users as friends and see their online status.Users have a profile page displaying their information.
 Justification: This is a user friendly web application geared towards a user that would return to the site for information/content, etc. The behavior implies a log-in, profile, and additional information. This is a relevant part of our web app. Implementation: This tied in nicely with the custom-made design system, and each page was built separately (SvelteKit makes this simple with a route to the page and then consistent ways to code the FE and BE functionality for each page), e.g. log-in, sign-up, profile page, settings for logging out, and editing of the profile, etc. In addition, there was design/UX/UI elements to be considered for the user in addition to the coding. 
 
-MAJOR (2PT): Advanced permissions system (EA)
-The app has three site wide roles: USER, MODERATOR, and ADMIN, set on each user account. ADMINs can view, edit, and delete any user and change user roles. MODERATORs can view users and moderate content by deleting posts and comments. USER is the default role for authenticated users. Permission checks are enforced in server side layout loads, API route handlers, and form actions throughout the app, ensuring consistent access control at every level.
-MAJOR (2PT): An organization system (EA)
-Users can create, edit, and delete organizations (called "Subjects" in the codebase) that act as group spaces. Each organization has MEMBER, CURATOR, and OWNER roles. Owners can edit the organization, manage members, and archive it. CURATORs can view member lists. Any authenticated user can discover, join, or create organizations and interact with posts within them. The system uses the Prisma Subject model with a SubjectMember join table for memberships, slug based URLs for clean linking, and permission checks in both layout loads and API routes.
+#### MAJOR (2PT): Advanced permissions system - *(Elroy)*
+*The app has three site wide roles: USER, MODERATOR, and ADMIN. ADMINs can view, edit, and delete users and change user roles and moderate content by deleting posts and comments. MODERATORs can only view users and moderate content by deleting posts and comments.*\
+**justification**: An open platform like ours has a risk of users posting low quality or harmful content. The roles ensure that trusted community members (MODERATORs) and staff (ADMINs) can remove inappropriate content.\
+**implementation**: The permission system is implemented in the database with a Role enum (USER, MODERATOR, ADMIN). In our app MODERATORs and ADMINs will see the ability to delete posts and comments in the same way the author would. ADMINs and MODERATORs have the ability to navigate to the /users/ page where they see an overview of all users. ADMINs can edit various fields of the USERs and both ADMINs and MODERATORs can see USERs posts and comments and delete them.
+#### MAJOR (2PT): An organization system - *(Elroy)*
+*Users can create, edit, and delete organizations (called "Subjects" in the codebase) that act as group spaces. Each subject has MEMBER, CURATOR, and OWNER roles. Owners can edit the subject, manage members, archive it and moderate content. CURATORs can view members and moderate content. Any logged in user can discover, join, or create subjects and interact with posts within them.*\
+**justification**: Subjects allow students to organize around specific projects. Keeping discussions relevant. The different roles ensure that each subject is self moderating.\
+**implementation**: The system uses a Prisa Subject model with a SubjectMember table and a SubjectRole enum (MEMBER, CURATOR, OWNER). 
+
+
 MAJOR (2PT): Implement a complete RAG (PK)
 MAJOR (2PT): Implement a complete LLM system interface (PK)
 MINOR (1PT): Voice/speech integration for accessibility or interaction (PK)
