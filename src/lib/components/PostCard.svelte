@@ -50,10 +50,10 @@
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { openPostPage(); } }}
     >
 		{#if post.isEdited}
-			<div class="break-all line-clamp-1"><em>[Edited]</em></div>
+			<div class="break-all line-clamp-1 text-sm"><em>[Edited]</em></div>
 		{/if}
-        <div class="break-all line-clamp-1"><strong>Project:</strong> {post.title}</div>
-        <div class="break-all line-clamp-2"><strong>Question:</strong> {post.content}</div>
+        <div class="break-all line-clamp-1 text-lg"><strong>{post.title}</strong></div>
+        <div class="break-all line-clamp-2 text-sm">{post.content}</div>
     </div>
 
     <!-- Buttons -->
