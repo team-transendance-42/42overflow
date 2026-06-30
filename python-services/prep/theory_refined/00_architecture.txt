@@ -1,28 +1,131 @@
-Network travel is negligible.
+ Browser
+    │
+    ▼
+  Caddy :8443 (TLS=transport layer security; termination, gzip)
+    │
+    ▼
+  SvelteKit app :5173  ◄──── Postgres :5432 (via Prisma)
+    │                               ▲
+    │  (BFF=backend for frontend proxy layer)  │
+    ├──────────────────────────────────────────────────
+    │                                                 │
+    │  /api/auth/[...all]  GET/POST                   │
+    │    └─► Better Auth (session / signup / login)   │
+    │                                                 │
+    │  /api/ping  POST                                │
+    │    └─► UPDATE user.last_seen                    │
+    │                                                 │
+    │  /api/posts  GET                                │
+    │    └─► SELECT posts (paginated)                 │
+    │                                                 │
+    │  /api/posts/create  POST                        │
+    │    └─► INSERT post                              │
+    │                                                 │
+    │  /api/posts/[id]/comments/create  POST          │
+    │    └─► upload image → INSERT comment → SSE broadcast
+    │                                                 │
+    │  /api/posts/[id]/comments/stream  GET           │
+    │    └─► SSE (Server-Sent Events) — live comments │
+    │                                                 │
+    │  /api/subjects  GET                             │
+    │    └─► SELECT subjects + membership counts      │
+    │                                                 │
+    │  /api/subjects/create  POST                     │
+    │    └─► INSERT subject + OWNER membership        │
+    │                                                 │
+    │  /api/subjects/archive  POST                    │
+    │    └─► soft-delete (sets deleted_at)            │
+    │                                                 │
+    │  /api/subjects/[slug]/subscriptions  POST/DELETE│
+    │    └─► upsert/delete SubjectMember row          │
+    │                                                 │
+    ├── /api/ai-assist  POST (streaming)
+    │     └─► Go llm-server :8081  POST /api/ai-assist
+    │           └─► Gemini API (Google)  ──► stream SSE back
+    │
+    ├── /api/ollama  POST (streaming)
+    │     └─► Go llm-server :8081  POST /api/ollama
+    │           └─► Ollama :11434  POST /api/chat (gemma3:4b)  ──► stream SSE back
+    │
+    ├── /api/community  POST (streaming)  ← RAG flow ─────────────────────────────────┐
+    │     └─► Go llm-server :8081  POST /api/community                                │
+    │           │                                                                      │
+    │           ├─ [cache HIT?]  ──► stream cached answer immediately                 │
+    │           │                                                                      │
+    │           └─ [cache MISS]                                                        │
+    │                 │                                                                │
+    │                 ▼                                                                │
+    │           Python RAG :8090  POST /rag/retrieve                                  │
+    │             ├─► BM25 index (keyword search)  ┐                                  │
+    │             └─► NumpyIndex (cosine similarity)┘ → hybrid RRF → top-4 contexts   │
+    │                 [ChromaDB :8000 used for sync/admin, not live retrieval]         │
+    │                 │                                                                │
+    │                 ▼                                                                │
+    │           confidence gate (RRF ≥ 0.02, cosine ≥ 0.55)                          │
+    │                 │ pass                                                           │
+    │                 ▼                                                                │
+    │           Ollama :11434  POST /api/chat (gemma3:4b, stream=true)                │
+    │                 │                                                                │
+    │                 └─► stream tokens back ──► cache answer ──────────────────────►─┘
+    │
+    └── /api/stt  POST (multipart audio)
+          └─► Python STT :8091  POST /convert_audio
+                └─► faster-whisper (small model, CPU) → JSON { text }
 
-  All containers — Svelte app, Go server, Python RAG, ChromaDB, Ollama — are on the same Docker bridge network (app-net). A container-to-container
-  HTTP call on a Docker bridge takes < 1ms because it never leaves the host machine. It's just a virtual ethernet hop in kernel space.
 
-  │                       Step                       │           Where           │       Time       │
-  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
-  │ Svelte → Go                                      │ Docker bridge             │ < 1ms            │
-  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
-  │ Go → Python /rag/retrieve (embed + BM25 + numpy) │ Docker bridge + fastembed │ ~200-300ms       │
-  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
-  │ Go parses result, builds prompt                  │ In Go process             │ < 1ms            │
-  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
-  │ Go → Ollama /api/chat                            │ Docker bridge             │ < 1ms to connect │
-  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
-  │ Ollama generates tokens on CPU                   │ Inside ollama container   │ 15-30s           │
-  ├──────────────────────────────────────────────────┼───────────────────────────┼──────────────────┤
-  │ Token stream back to browser                     │ SSE chunks                │ < 1ms each chunk │
+  Caddy handles TLS termination — meaning:
+
+  1. The browser connects to Caddy over HTTPS (port 8443), with an encrypted TLS connection
+  2. Caddy decrypts (terminates) that TLS connection
+  3. Caddy then forwards the request to SvelteKit over plain HTTP internally (port 5173)
+
+  This means only Caddy needs to manage certificates. The internal services (SvelteKit, Go llm-server, Python services) communicate over unencrypted
+  HTTP on the local network/container network, which is fine since they're not exposed to the public internet.
+
+  "Termination" = the TLS encryption ends at Caddy; it doesn't pass through to the backend.
+
+  Go llm-server middleware stack (applied to all routes):
+    ErrorRecovery → InternalSecret (X-Internal-Secret header) → RateLimiter
 
 
- Gemma3:4b on CPU generates roughly 3-7 tokens/second. A 100-token answer takes 15-30 seconds. With GPU it would be 30-100 tokens/second, meaning
-  1-3 seconds. You're on CPU, so you wait.
+  Python RAG admin routes (require X-Admin-Token):
+    POST /admin/sync-chroma   → read Postgres → sync to ChromaDB → rebuild indexes
+    POST /admin/seed-postgres → insert fake test data into Postgres
+    POST /admin/wipe          → delete all Postgres data + ChromaDB docs
+    GET  /admin/metrics       → retrieve_total, errors, corpus_size, uptime
 
-  The network between Go and Python adds maybe 300ms total to the 25s(not noticable)
-  =======================
-  current flow: Browser → [Go: rate limiter → queue → cache check → RAG retrieve → relevance gates → Ollama stream → cache write → SSE → Browser]
-  =======================
+  ---
+  How it works — short description per layer
+          └─► Python STT :8091  POST /convert_audio
+                └─► faster-whisper (small model, CPU) → JSON { text }
 
+
+  Go llm-server middleware stack (applied to all routes):
+    ErrorRecovery → InternalSecret (X-Internal-Secret header) → RateLimiter
+
+
+  Python RAG admin routes (require X-Admin-Token):
+    POST /admin/sync-chroma   → read Postgres → sync to ChromaDB → rebuild indexes
+    POST /admin/seed-postgres → insert fake test data into Postgres
+    POST /admin/wipe          → delete all Postgres data + ChromaDB docs
+    GET  /admin/metrics       → retrieve_total, errors, corpus_size, uptime
+
+  ---
+  Caddy terminates TLS and reverse-proxies everything to SvelteKit.
+
+  SvelteKit is both the frontend and a BFF (Backend for Frontend). Page routes (/login, /subjects, /posts, etc.) render server-side with Prisma. API
+  routes (/api/*) are thin proxies or direct DB handlers. Auth is handled by Better Auth — sessions stored in Postgres.
+
+  Go llm-server is the LLM gateway, guarded by an X-Internal-Secret header and a rate limiter. It exposes three AI endpoints:
+  - /api/ai-assist → streams from Gemini (external API)
+  - /api/ollama → streams from local Ollama (gemma3:4b)
+  - /api/community → RAG flow: check in-memory cache → call Python RAG → gate on confidence → stream from Ollama → cache the answer
+
+  Python RAG service builds two in-memory indexes on startup (BM25 for keywords + NumpyIndex for cosine similarity). On each /rag/retrieve call it
+  runs a hybrid search fusing both scores with RRF, returns top-4 context docs. ChromaDB is only used during admin sync — live retrieval is fully
+  in-memory.
+
+  Python STT service receives a multipart audio file, saves it to a temp file, runs faster-whisper (small model, CPU), returns the transcript as
+  JSON.
+
+  Ollama runs gemma3:4b locally — used by both the plain Ollama endpoint and the RAG community endpoint.

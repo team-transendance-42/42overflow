@@ -1,0 +1,17 @@
+in on a dict(js map) checks keys only
+
+  self._bm25.idf == {
+      "malloc":  2.1,
+      "pointer": 1.8,
+      "segfault": 3.4,
+      ...
+  }
+
+  t = "malloc"
+  t in self._bm25.idf  # True — token is known
+
+  t = "foobar"
+  t in self._bm25.idf  # False — never seen during buildstop
+
+  if not any(t in self._bm25.idf for t in tokens):
+  if not any key in bm25 == at least 1 token

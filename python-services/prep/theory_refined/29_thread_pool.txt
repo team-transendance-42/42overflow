@@ -1,0 +1,44 @@
+ Thread pool — what, where, how
+
+  The problem first
+
+  This code uses async / await (FastAPI is async). Async means one Python thread handles all requests
+  by switching between them rapidly — when one request is waiting for I/O (DB query, network call),
+  the thread handles another request.
+
+  This works great for I/O. But fastembed is CPU-bound — it actually crunches numbers (matrix
+  multiplications through the transformer). There is no "waiting", just pure computation. If you run
+  it directly in the async function it blocks the entire event loop — no other request can be answered
+  for 100-300ms. That's a freeze.
+  ---
+
+  What is a thread pool?
+
+  A thread pool is a pre-created set of OS threads that sit idle, waiting for work. When you submit a
+  job to it, an idle thread picks it up and runs it. The thread pool in Python's asyncio is called
+  ThreadPoolExecutor and it's created automatically.
+
+  Main async thread (event loop)
+  │
+  ├── handles request A (waiting for DB)  ← non-blocking, fine
+  ├── handles request B (waiting for network) ← non-blocking, fine
+  └── submits "run fastembed" to thread pool ──→ [Worker Thread 1]
+                                                  runs _embed_sync()
+                                                  crunches CPU for 200ms
+      ↑ event loop is FREE during this!          returns result
+      ↑ can still handle A, B, new requests ←──── done
+
+asyncio.to_thread(fn, args) is the entry point.
+----
+  # Single text (with LRU cache):
+  result_tuple = await asyncio.to_thread(_embed_one_cached, key)
+
+  # Batch (startup, bypass cache):
+  return await asyncio.to_thread(_embed_sync, texts)
+
+  asyncio.to_thread does exactly this:
+  1. Takes _embed_sync (a regular blocking function)
+  2. Submits it to the default ThreadPoolExecutor thread pool
+  3. await-s a future — the event loop is free while the thread runs
+  4. When the thread finishes, returns the result to the async caller
+

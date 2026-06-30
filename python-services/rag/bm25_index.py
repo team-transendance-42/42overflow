@@ -1,5 +1,6 @@
 import re
 
+import numpy as np
 from rank_bm25 import BM25Plus
 
 
@@ -46,7 +47,7 @@ class BM25Index:
         """
         if not documents:
             raise ValueError("Cannot build BM25 index from an empty document list")
-        tokenized = [_tokenize(doc) for doc in documents]
+        tokenized: list[list[str]] = [_tokenize(doc) for doc in documents]
         self._bm25 = BM25Plus(tokenized)
         self._ids = list(ids)
         self._topics = list(topics) if topics else [""] * len(ids)
@@ -78,20 +79,23 @@ class BM25Index:
         if self._bm25 is None:
             return []
 
-        tokens = _tokenize(query)
+        tokens: list[str] = _tokenize(query)
         if not tokens:
             return []
 
         # Return [] when no query token exists in the index vocabulary.
         # BM25+ gives a positive floor score to every doc even with zero term
         # overlap — returning those results would be semantically meaningless.
+        # idf=dict[str, float] idf score(inverse doc frequency) 
+        # a mapping from every token seen during build() to its IDF score
+        # Keys are the vocabulary terms; values are the precomputed IDF weights.
         if not any(t in self._bm25.idf for t in tokens):
             return []
 
-        scores = self._bm25.get_scores(tokens)
-        ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+        scores: np.ndarray = self._bm25.get_scores(tokens)
+        ranked: list[tuple[int, float]] = sorted(enumerate(scores), key=lambda x: x[1], reverse=True) # enum() wrap each el with its index (0, 0.2), (1, 0.9),, lambda: sorts by score(second)
 
-        results = []
+        results: list[dict] = []
         for idx, score in ranked:
             if topic_filter and self._topics[idx] != topic_filter:
                 continue

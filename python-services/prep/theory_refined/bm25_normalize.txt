@@ -1,0 +1,21 @@
+Imagine you have 3 topics: cats, dogs, math.
+
+  Each topic has a centroid vector (pretend embeddings are only 2 numbers to keep it simple):
+
+  cats: [6, 8]
+  dogs: [3, 4]
+  math: [0, 5]
+
+  ---
+  Step 1 — compute each vector's length:
+
+  cats: sqrt(6² + 8²) = sqrt(36+64) = sqrt(100) = 10
+  dogs: sqrt(3² + 4²) = sqrt(9+16)  = sqrt(25)  = 5
+  math: sqrt(0² + 5²) = sqrt(0+25)  = sqrt(25)  = 5
+
+  ---
+  Step 2 — divide each vector by its own length:
+
+  cats: [6/10, 8/10] = [0.6, 0.8]
+  dogs: [3/5,  4/5]  = [0.6, 0.8]
+  math: [0/5,  5/5]  = [0.0, 1.0]

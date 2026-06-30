@@ -1,0 +1,22 @@
+how classes work in py, example:
+__init__ is called automatically by Python — you never call it directly.
+what happens when you write idx = NumpyIndex():
+
+  1. Python calls NumpyIndex.__new__(NumpyIndex) — allocates the object
+  in memory
+  2. Python automatically calls __init__(self) on that new object — sets
+  up its starting state
+  3. The finished object is returned and bound to idx
+---
+
+  Why __init__ exists
+  Without it, NumpyIndex() would give you an object with no attributes.
+  __init__ guarantees the object starts in a known state:
+
+  def __init__(self) -> None:
+      self._matrix = None   # not ready yet
+      self._ids = []
+      self._topics = []
+      self._documents = []
+---
+

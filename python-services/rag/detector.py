@@ -14,7 +14,7 @@ Why numpy:
   per dot product. numpy.dot dispatches ONE C/BLAS call. Measured speedup:
   ~1000x per cosine call; ~100x for full centroid matrix multiply.
 
-No hardcoded keywords. Centroids are derived purely from your seed data.
+No hardcoded keywords. Centroids are derived purely from our seed data.
 Adding new topics or more pairs updates centroids automatically at restart.
 
 Edge cases:
@@ -23,8 +23,7 @@ Edge cases:
   - Single topic → second-best score = 0.0, margin = best_score
   - Empty centroids dict → return early, no numpy call
 """
-
-import numpy as np
+import numpy as np #for fast numerical computation on arrays
 
 _CONFIDENCE_THRESHOLD = 0.70   # minimum similarity score to trust detection
 _MARGIN_THRESHOLD = 0.08   # best must beat second-best by at least this much
@@ -33,10 +32,8 @@ _MARGIN_THRESHOLD = 0.08   # best must beat second-best by at least this much
 def cosine_similarity(a: list[float], b: list[float]) -> float:
     """
     Cosine similarity between two equal-length vectors. Range: [-1, 1].
-
-    Theory: cos(θ) = dot(a,b) / (||a|| * ||b||)
+    cos(θ) = dot(a,b) / (||a|| * ||b||)
     numpy.dot + linalg.norm replace Python sum/zip loops → ~1000x faster.
-
     Edge cases:
       - Empty input → 0.0
       - Zero-norm vector → 0.0 (avoids division by zero)
@@ -45,15 +42,16 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     if not a or not b:
         return 0.0
 
-    va = np.array(a, dtype=np.float32)
+    va = np.array(a, dtype=np.float32) # numpy datatype, np.array store raw C numbers back-to-back in a contiguous memory block
     vb = np.array(b, dtype=np.float32)
 
     # Guard: replace any NaN/inf from corrupt model output before math
-    va = np.nan_to_num(va)
+    va = np.nan_to_num(va) # replace each el if nan or inf with 0.0, otherwise keep the value
     vb = np.nan_to_num(vb)
 
-    norm_a = np.linalg.norm(va)
-    norm_b = np.linalg.norm(vb)
+    norm_a = np.linalg.norm(va) # compute the L2 norm (Euclidean length) of the vector va 
+    # ||va|| = sqrt(va[0]² + va[1]² + ... + va[767]²)
+    norm_b = np.linalg.norm(vb) # Cosine similarity is defined as: cos(θ) = dot(a, b) / (||a|| * ||b||)
 
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
@@ -61,18 +59,14 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return float(np.dot(va, vb) / (norm_a * norm_b))
 
 
-def build_topic_centroids(
-    pairs: list[dict],
-    embeddings: list[list[float]],
-) -> dict[str, list[float]]:
+# list[list[float]] is 2d array of floats, each inner list is a 768-dim embedding vector
+def build_topic_centroids( pairs: list[dict], embeddings: list[list[float]], ) -> dict[str, list[float]]:
     """
     Compute per-topic centroid vectors from QA pairs and their embeddings.
-
-    Theory:
-      Centroid = element-wise mean of all embeddings belonging to a topic.
-      np.stack + np.mean(axis=0) computes this in one C call instead of
-      nested Python loops (O(N*D) in C vs O(N*D) interpreted Python).
-
+    Centroid = element-wise mean of all embeddings belonging to a topic.
+    np.stack + np.mean(axis=0) computes this in one C call instead of
+    nested Python loops.
+    
     Args:
         pairs:      QA pair dicts, each must have a 'topic' key.
         embeddings: embedding vectors, same length and order as pairs.
@@ -97,30 +91,19 @@ def build_topic_centroids(
 
     # Compute centroid: stack into (N_docs, D) matrix, take mean over axis=0
     centroids: dict[str, list[float]] = {}
-    for topic, vecs in topic_vecs.items():
+    for topic, vecs in topic_vecs.items(): # key, val
         matrix = np.stack(vecs)          # shape: (n_docs, dim)
         centroid = np.mean(matrix, axis=0)  # shape: (dim,)
-        centroids[topic] = centroid.tolist()
+        centroids[topic] = centroid.tolist() # convert np.ndarray back to list[float] for JSON serialization
 
     return centroids
 
 
-def detect_topic(
-    question_embedding: list[float],
-    centroids: dict[str, list[float]],
-) -> tuple[str | None, float]:
+def detect_topic( question_embedding: list[float], centroids: dict[str, list[float]],) -> tuple[str | None, float]:
     """
     Detect which topic a question belongs to using centroid similarity.
-
-    Theory:
-      Stack all centroid vectors into a matrix C of shape (T, D).
-      Normalize both C rows and query q to unit length.
-      scores = C_normed @ q_normed  → all T cosine similarities in ONE call.
-      This is O(T*D) in C vs O(T) Python calls each doing O(D) work.
-
-    Returns:
-        (topic, confidence) if detection is confident.
-        (None, best_similarity) if no topic is clearly dominant.
+    Returns: (topic, confidence) if detection is confident.
+             (None, best_similarity) if no topic is clearly dominant.
 
     Detection requires BOTH:
       - best similarity >= _CONFIDENCE_THRESHOLD  (absolute quality)
@@ -135,10 +118,12 @@ def detect_topic(
     if not centroids:
         return None, 0.0
 
-    topics = list(centroids.keys())
+    topics = list(centroids.keys()) # topic names in insertion order.
 
-    # Stack centroids: shape (T, D)
-    C = np.stack([np.array(v, dtype=np.float32) for v in centroids.values()])
+# np.stack(...) — takes a list of same-shape 1D arrays (e.g. shape (768,) each) and stacks them along
+#   a new axis 0. Result is a 2D matrix of shape (N, D) where N = number of centroids, D = embedding
+#   dimension.
+    C = np.stack([np.array(v, dtype=np.float32) for v in centroids.values()]) # numpy datatype=dtype
 
     q = np.array(question_embedding, dtype=np.float32)
     q = np.nan_to_num(q)

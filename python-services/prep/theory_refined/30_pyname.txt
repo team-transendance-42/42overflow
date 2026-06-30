@@ -1,0 +1,70 @@
+  if __name__ == "__main__":
+
+  Every Python file has a built-in variable called __name__. When you
+  run the file directly (python dev_populate.py), Python sets __name__
+  to the string "__main__". When another file imports this file,
+  __name__ is set to the module's filename instead. So this condition is
+  a gate: "only run the code below if this file was invoked directly,
+  not imported."
+
+  The comment confirms: guards against running on import.
+
+  ---
+  parser = argparse.ArgumentParser(description="...")
+
+  argparse is a standard library for parsing command-line arguments.
+  ArgumentParser is a class — parser is an instance (object) of it.
+  description= is a keyword argument; it shows up in --help output.
+
+  ---
+  parser.add_argument("--clean", action="store_true", help="...")
+
+  Registers a flag called --clean. action="store_true" means: if the
+  user passes --clean on the command line, set this argument's value to
+  True; if they omit it, it defaults to False. No value needed — it's a
+  boolean switch.
+
+  parser = argparse.ArgumentParser(description="...")
+
+  argparse is a standard library for parsing command-line arguments. ArgumentParser is a class —
+  parser is an instance (object) of it. description= is a keyword argument; it shows up in --help
+  output.
+
+  ---
+  parser.add_argument("--clean", action="store_true", help="...")
+
+  Registers a flag called --clean. action="store_true" means: if the user passes --clean on the
+  command line, set this argument's value to True; if they omit it, it defaults to False. No value
+  needed — it's a boolean switch.
+
+  ---
+  args = parser.parse_args()
+
+  Reads sys.argv (the actual command-line words the user typed) and returns a namespace object. After
+  this, args.clean is either True or False depending on whether --clean was passed.
+
+  ---
+  asyncio.run(main(clean=args.clean))
+
+  main is an async function (defined elsewhere with async def main(...)). Async functions don't run
+  immediately when called — they return a coroutine object. asyncio.run() starts the event loop, runs
+  that coroutine to completion, then exits the loop. It's the standard entry point for async Python
+  programs.
+
+  clean=args.clean passes the boolean as a keyword argument into main.
+
+  ---
+  Summary flow:
+
+  python dev_populate.py --clean
+           │
+           ▼
+  __name__ == "__main__"  ✓ → enters block
+           │
+           ▼
+  parse args → args.clean = True
+           │
+           ▼
+  asyncio.run(main(clean=True))  → starts event loop → runs async main
+
+  Without --clean: args.clean = False, so main runs the insert path instead.

@@ -10,7 +10,7 @@ making the before/after difference obvious both in the browser and in RAG.
 
 Usage (stack must be up, run from python-services/rag/):
   uv run python dev_populate.py           # insert all fake posts
-  uv run python dev_populate.py --clean   # delete bot posts first, re-insert
+  uv run python dev_populate.py --clean   # delete all fake posts, no re-insert
 
 After running, trigger RAG sync (from project root):
   bash reload_rag.sh
@@ -22,22 +22,23 @@ Then visit https://localhost:8443/posts to see the posts in the browser.
 import argparse
 import asyncio
 import os
+from typing import Any
 
 import asyncpg
 
-USERS = [
+USERS: list[dict[str, str]] = [
     {"id": "fake-user-happyface22",    "email": "happyface22@overflow.local",    "name": "HappyFace22"},
     {"id": "fake-user-revolution12",   "email": "revolution12@overflow.local",   "name": "Revolution12"},
     {"id": "fake-user-mysteryuser",    "email": "mysteryuser@overflow.local",    "name": "Mystery User"},
 ]
 
-HF = USERS[0]["id"]   # HappyFace22
-RV = USERS[1]["id"]   # Revolution12
-MY = USERS[2]["id"]   # Mystery User
+HF: str = USERS[0]["id"]   # HappyFace22
+RV: str = USERS[1]["id"]   # Revolution12
+MY: str = USERS[2]["id"]   # Mystery User
 
 # Each post has an author, a title (project name), a question, and a list of
 # comments — each comment has its own author so it looks like a real thread.
-POSTS = [
+POSTS: list[dict[str, Any]] = [
     {
         "author": HF,
         "title": "push_swap",
@@ -245,7 +246,7 @@ POSTS = [
 ]
 
 
-async def ensure_users(conn) -> None:
+async def upsert_users(conn: asyncpg.Connection) -> None:
     for u in USERS:
         await conn.execute(
             """
@@ -255,26 +256,26 @@ async def ensure_users(conn) -> None:
             """,
             u["id"], u["email"], u["name"],
         )
-    names = ", ".join(u["name"] for u in USERS)
+    names: str = ", ".join(u["name"] for u in USERS)
     print(f"[users] ready: {names}")
 
 
-async def ensure_subjects(conn) -> dict[str, int]:
+async def get_or_create_subjects(conn: asyncpg.Connection) -> dict[str, int]:
     """For each unique title in POSTS: use existing Subject or create one.
     Returns {title: subject_id} map for use in insert_posts."""
-    unique_titles = list(dict.fromkeys(entry["title"] for entry in POSTS))
+    unique_titles: list[str] = list(dict.fromkeys(entry["title"] for entry in POSTS))
     subject_map: dict[str, int] = {}
 
     for title in unique_titles:
-        slug = title.lower().strip().replace(" ", "-")
-        existing_id = await conn.fetchval(
+        slug: str = title.lower().strip().replace(" ", "-")
+        existing_id: int | None = await conn.fetchval(
             'SELECT id FROM "Subject" WHERE slug = $1', slug
         )
         if existing_id is not None:
             subject_map[title] = existing_id
             print(f"[subjects] using existing: {title!r} → id={existing_id}")
         else:
-            new_id = await conn.fetchval(
+            new_id: int | None = await conn.fetchval(
                 """
                 INSERT INTO "Subject" (name, slug, created_at, updated_at)
                 VALUES ($1, $2, NOW(), NOW())
@@ -288,18 +289,24 @@ async def ensure_subjects(conn) -> dict[str, int]:
     return subject_map
 
 
-async def clean_posts(conn) -> None:
-    ids = [u["id"] for u in USERS]
-    comment_ids = await conn.fetch(
+#   USERS (list[dict])
+#     → ids (list[str])          — userId strings
+#         → comment_ids (list[Record])  — DB rows matching those users
+#             → comment_id_list (list[int])  — integer PKs from those rows
+#   asyncpg always returns full Record objects from conn.fetch(), even if you only SELECT
+#   id.
+async def clean_posts(conn: asyncpg.Connection) -> None:
+    ids: list[str] = [u["id"] for u in USERS]
+    comment_ids: list[asyncpg.Record] = await conn.fetch(
         'SELECT id FROM "Comment" WHERE "userId" = ANY($1::text[])', ids
     )
-    post_ids = await conn.fetch(
+    post_ids: list[asyncpg.Record] = await conn.fetch(
         'SELECT id FROM "Post" WHERE "userId" = ANY($1::text[])', ids
     )
-    comment_id_list = [r["id"] for r in comment_ids]
-    post_id_list    = [r["id"] for r in post_ids]
+    comment_id_list: list[int] = [r["id"] for r in comment_ids]
+    post_id_list: list[int]    = [r["id"] for r in post_ids]
 
-    like_count = await conn.fetchval(
+    like_count: int = await conn.fetchval(
         'SELECT COUNT(*) FROM "Like" WHERE "commentId" = ANY($1::int[]) OR "postId" = ANY($2::int[])',
         comment_id_list, post_id_list,
     )
@@ -312,13 +319,13 @@ async def clean_posts(conn) -> None:
     print(f"[clean] deleted {len(post_id_list)} posts, {len(comment_id_list)} comments, {like_count} likes")
 
 
-async def insert_posts(conn, subject_map: dict[str, int]) -> tuple[int, int]:
-    inserted = 0
-    skipped = 0
+async def insert_posts(conn: asyncpg.Connection, subject_map: dict[str, int]) -> tuple[int, int]:
+    inserted: int = 0
+    skipped: int = 0
 
     for entry in POSTS:
-        subject_id = subject_map[entry["title"]]
-        existing = await conn.fetchval(
+        subject_id: int = subject_map[entry["title"]]
+        existing: int | None = await conn.fetchval(
             'SELECT id FROM "Post" WHERE "userId" = $1 AND title = $2 AND content = $3',
             entry["author"], entry["title"], entry["content"],
         )
@@ -326,7 +333,7 @@ async def insert_posts(conn, subject_map: dict[str, int]) -> tuple[int, int]:
             skipped += 1
             continue
 
-        post_id = await conn.fetchval(
+        post_id: int | None = await conn.fetchval(
             """
             INSERT INTO "Post" (title, content, "userId", "subjectId", created_at, updated_at)
             VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id
@@ -343,7 +350,8 @@ async def insert_posts(conn, subject_map: dict[str, int]) -> tuple[int, int]:
                 comment["content"], post_id, comment["author"],
             )
 
-        author_name = next(u["name"] for u in USERS if u["id"] == entry["author"])
+        # next() returns the first item from an iterator.
+        author_name: str = next(u["name"] for u in USERS if u["id"] == entry["author"])
         print(f"[insert] Post #{post_id} by {author_name}: [{entry['title']}] {entry['content'][:55]}...")
         inserted += 1
 
@@ -351,25 +359,31 @@ async def insert_posts(conn, subject_map: dict[str, int]) -> tuple[int, int]:
 
 
 async def main(clean: bool) -> None:
-    db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/transcendance_db")
+    db_url: str | None = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL is required. Example:\n"
+            "  export DATABASE_URL=postgresql://user:pass@localhost:5433/transcendance_db"
+        )
     print(f"[db] connecting to {db_url.split('@')[-1]}")
-    conn = await asyncpg.connect(db_url)
+    conn: asyncpg.Connection = await asyncpg.connect(db_url)
     try:
-        await ensure_users(conn)
-        subject_map = await ensure_subjects(conn)
         if clean:
             await clean_posts(conn)
-        inserted, skipped = await insert_posts(conn, subject_map)
-        print(f"\n[done] inserted={inserted}  skipped={skipped}  total={len(POSTS)} posts")
-
-        if inserted > 0:
-            print("\nNext: call POST /admin/seed-postgres, then POST /admin/sync-chroma.")
+            print("[done] fake posts removed.")
+        else:
+            await upsert_users(conn)
+            subject_map = await get_or_create_subjects(conn)
+            inserted, skipped = await insert_posts(conn, subject_map)
+            print(f"\n[done] inserted={inserted}  skipped={skipped}  total={len(POSTS)} posts")
+            if inserted > 0:
+                print("\nNext: call POST /admin/seed-postgres, then POST /admin/sync-chroma.")
     finally:
         await conn.close()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # guards against running on import; asyncio.run() starts the event loop
     parser = argparse.ArgumentParser(description="Insert fake dev posts for RAG testing")
-    parser.add_argument("--clean", action="store_true", help="Delete all fake posts first, then re-insert")
+    parser.add_argument("--clean", action="store_true", help="Delete all fake posts (no re-insert)")
     args = parser.parse_args()
     asyncio.run(main(clean=args.clean))

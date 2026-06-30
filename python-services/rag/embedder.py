@@ -12,7 +12,14 @@ both produce the same 768 floats. Very long chunks are truncated at the model's
 token limit (~512 tokens), so extremely large chunks lose their tail content.
 
 The dot product / cosine similarity happens at search time inside pgvector,
-not inside fastembed — fastembed only produces the vectors.
+fastembed only produces the vectors.
+
+!!NB!! fastembed is CPU-bound — There is no "waiting", just pure computation. If you run
+  it directly in the async function it blocks the entire event loop — no other request can be answered
+  for 100-300ms. That's a freeze.
+  A thread pool is a pre-created set of OS threads that sit idle, waiting for work. When you submit a
+  job to it, an idle thread picks it up and runs it. The thread pool in Python's asyncio is called
+  ThreadPoolExecutor and it's created automatically.
 """
 
 import asyncio
@@ -40,7 +47,6 @@ def format_doc(question: str, answer: str, tags: list[str] | None = None) -> str
     """Format a QA pair for BM25 indexing and embedding.
 
     Tags are appended so both BM25 and the embedding model see them.
-    tags=None or [] produces the same output as before (backward compatible).
     """
     base = f"Q: {question}\nA: {answer}"
     if tags:
@@ -72,8 +78,10 @@ def _embed_sync(texts: list[str]) -> list[list[float]]:
         raise RuntimeError(f"Embedding failed for {len(texts)} text(s): {exc}") from exc
 
 
+# lru cache takes the return value of _embed_one_cached and stores it in RAM for future calls with the same key.
+# we dont need to call the func: the decorator does that for us. the cache is cleared on container restart, so the first call after restart will take 100-300ms, but subsequent calls with the same text will be O(1) and return in ~0ms.
 @lru_cache(maxsize=_CACHE_SIZE)
-def _embed_one_cached(text: str) -> tuple[float, ...]:
+def _embed_one_cached(text: str) -> tuple[float, ...]: # a tuple of any length where every element is a float
     """
     Embed a single normalised text with LRU caching.
 
@@ -95,7 +103,7 @@ def _embed_one_cached(text: str) -> tuple[float, ...]:
     On cache miss: calls _embed_sync([text]) — CPU-bound, takes 100-300ms.
     On cache hit: returns the stored tuple — O(1), ~0ms.
     """
-    return tuple(_embed_sync([text])[0])
+    return tuple(_embed_sync([text])[0]) # unwrap the single-item list and convert to tuple for caching
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:

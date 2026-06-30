@@ -5,18 +5,16 @@
 # Token is from llm-system-interface/.env — hardcoded below to avoid shell expansion issues.(replace with the one from .env)
 # See docdev.md "RAG — Sync & Populate" for manual runs, including delete test data
 
-# -T disables pseudo-TTY allocation — without it, docker compose exec opens an
-# interactive terminal session that can block script execution between commands.
-echo "==> Step 1: seed-postgres"
-docker compose exec -T python-rag curl -s -X POST \
+echo "==== step 1: seed-postgres ========"
+docker compose exec python-rag curl -X POST \
     http://localhost:8090/admin/seed-postgres \
     -H 'Content-Type: application/json' \
     -H 'X-Admin-Token: Tra-la-la' \
     -d '{}'
 echo ""
 
-echo "==> Step 2: sync-chroma"
-docker compose exec -T python-rag curl -s -X POST \
+echo "==== step 2: sync-chroma ========"
+docker compose exec python-rag curl -X POST \
     http://localhost:8090/admin/sync-chroma \
     -H 'X-Admin-Token: Tra-la-la'
 echo ""

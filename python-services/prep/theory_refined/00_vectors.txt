@@ -1,0 +1,21 @@
+┌───────────────────┬───────────────────┬─────────────────────────┐
+  │      Concern      │     Tool used     │           Why           │
+  ├───────────────────┼───────────────────┼─────────────────────────┤
+  │ Generating        │ FastEmbed         │ Runs ONNX transformer   │
+  │ vectors           │ (_model.embed)    │ locally, no network,    │
+  │                   │                   │ CPU-only                │
+  ├───────────────────┼───────────────────┼─────────────────────────┤
+  │ Storing vectors   │ NumPy             │ In-process RAM matrix,  │
+  │ for dense search  │ (NumpyIndex)      │ 0.05ms per search       │
+  ├───────────────────┼───────────────────┼─────────────────────────┤
+  │ Storing raw docs  │ PostgreSQL (via   │ Source of truth: posts, │
+  │ / metadata        │ db.py)            │  comments, topics       │
+  └───────────────────┴───────────────────┴─────────────────────────┘
+
+   ChromaDB's role — it would have handled both storage and search (it
+  stores vectors + runs HNSW similarity search). The code explicitly
+  explains why it was dropped (retriever.py:12-16, numpy_index.py:7-9):
+
+  ▎ ChromaDB runs in a separate container — every query was a network
+  ▎ roundtrip (~50–150ms). NumpyIndex does the same cosine similarity in
+  ▎ ~0.05ms in-process with a single matrix-vector multiply.

@@ -1,0 +1,24 @@
+ np.ndarray
+
+  The core NumPy data structure — an N-dimensional array of a single
+  type (e.g., float32). Think of it as a grid of numbers with a fixed
+  shape like (100, 384) meaning 100 rows, 384 columns.
+
+  a = np.array([[1.0, 2.0], [3.0, 4.0]])  # shape (2, 2), dtype float64
+  a.shape   # (2, 2)
+  a.dtype   # float64
+----
+
+  np.stack(vectors)
+
+  Takes a list of arrays with the same shape and stacks them into a new
+  array along a new axis (default: axis 0).
+
+  v1 = np.array([0.1, 0.2, 0.3])  # shape (3,)
+  v2 = np.array([0.4, 0.5, 0.6])  # shape (3,)
+  v3 = np.array([0.7, 0.8, 0.9])  # shape (3,)
+
+  result = np.stack([v1, v2, v3])  # shape (3, 3)
+  # [[0.1, 0.2, 0.3],
+  #  [0.4, 0.5, 0.6],
+  #  [0.7, 0.8, 0.9]]

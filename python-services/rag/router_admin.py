@@ -4,7 +4,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from config import ADMIN_TOKEN, DB_URL
-from dev_populate import clean_posts, ensure_subjects, ensure_users, insert_posts
+from dev_populate import clean_posts, get_or_create_subjects, insert_posts, upsert_users
 from indexer import load_and_index
 from metrics import Metrics
 from store import clear_collection
@@ -47,8 +47,8 @@ async def admin_seed_postgres(clean: bool = False, _: None = Depends(require_adm
         raise HTTPException(status_code=503, detail=f"Cannot connect to Postgres: {exc}")
 
     try:
-        await ensure_users(conn)
-        subject_map = await ensure_subjects(conn)
+        await upsert_users(conn)
+        subject_map = await get_or_create_subjects(conn)
         if clean:
             await clean_posts(conn)
         inserted, skipped = await insert_posts(conn, subject_map)
@@ -86,6 +86,7 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
         await conn.execute('DELETE FROM "SubjectMember"')
         await conn.execute('DELETE FROM "Comment"')
         await conn.execute('DELETE FROM "Post"')
+        await conn.execute('DELETE FROM "SubjectMember"')
         await conn.execute('DELETE FROM "Subject"')
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -99,7 +100,6 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
 
     print(f"[wipe] deleted {post_count} posts, {comment_count} comments, {subject_count} subjects, {like_count} likes, {membership_count} memberships, {chroma_count} chroma docs")
 
-    summary = await load_and_index(request.app, label="wipe", include_db=False)
     return {
         "status": "ok",
         "deleted": {
@@ -110,8 +110,6 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
             "postgres_subjects": subject_count,
             "chroma_docs": chroma_count,
         },
-        "indexes_rebuilt_from": "seed",
-        **summary,
     }
 
 

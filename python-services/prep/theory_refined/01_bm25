@@ -1,0 +1,24 @@
+ The pipeline is:
+
+  1. Tokenize — text is split into subword tokens (WordPiece/BPE). "overflow" → ["over", "##flow"]
+  2. Transformer forward pass — each token gets a 384 (or 768) dimensional hidden state via
+  self-attention across all layers
+  3. Pooling — the per-token hidden states are collapsed into one vector. BAAI uses mean pooling
+  (average all token vectors). The result is our embedding.
+  4. L2 normalize — the vector is normalized to unit length so cosine similarity = dot product
+
+  The dot product comes at query time, not during embedding creation. ChromaDB uses it to find nearest neighbors.
+  ---
+  nomic handles long documents much better (8192 vs 512 tokens). For
+  our seed Q&A pairs that are short, BAAI is fine. If we start indexing long theory docs from
+  python-services/prep/theory_refined/, BAAI will silently truncate anything past ~380 words — nomic won't.
+
+  When to switch to nomic-embed
+
+  - we're on a machine with ≥4 GB free RAM
+  - we're indexing long documents (our .txt theory files)
+  - we want better semantic quality on nuanced questions
+
+  Switch by setting EMBED_MODEL=nomic-ai/nomic-embed-text-v1.5 in our .env, then wipe ChromaDB volume
+  and run ./reload_rag.sh — the dimensions are incompatible so we can't mix vectors from both models
+  in the same collection.

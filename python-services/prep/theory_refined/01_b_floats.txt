@@ -1,0 +1,65 @@
+
+  0.55 — minCosineSimilarity in rag.go:188
+
+  This is the semantic gate: blocks questions unrelated to our topics before calling Ollama (which costs time/GPU).
+
+  How to read it: cosine of 0.0 = completely unrelated, 1.0 = identical.
+
+  ┌───────────────────────────────┬──────────────────────────┐
+  │         Question type         │ Typical cosine vs corpus │
+  ├───────────────────────────────┼──────────────────────────┤
+  │ "what is the meaning of life" │ ~0.10–0.25               │
+  ├───────────────────────────────┼──────────────────────────┤
+  │ "how do I use git rebase"     │ ~0.65–0.90               │
+  ├───────────────────────────────┼──────────────────────────┤
+  │ Borderline (vaguely related)  │ ~0.35–0.55               │
+  └───────────────────────────────┴──────────────────────────┘
+
+  0.55 sits in the gap between "clearly off-topic" and "clearly on-topic".
+
+  Edge case: when has_embeddings=false (embedding service crashed at startup), best_similarity is always 0.0 — applying the gate would block
+  everything. So the gate is skipped and falls back to RRF confidence alone (rag.go).
+
+  0.020 — minRagConfidence
+
+  This is the BM25/RRF gate (Layer 1). RRF score for rank 1 = 1/(1+60) ≈ 0.0164. A doc ranked first in both dense and BM25 gets 2 * 0.0164 ≈ 0.033.
+  A score of 0.020 means "at least one retriever found something meaningful". Greetings ("hi", "hello") match nothing in BM25 → score = 0.0 →
+  blocked before even hitting the semantic gate.
+
+  0.70 — _CONFIDENCE_THRESHOLD in detector.py
+
+  This is the topic detection gate. When the question embedding's cosine similarity to a topic's centroid is ≥ 0.70, the system narrows search to
+  that topic only (e.g., only "git" docs, not all docs). Below 0.70 it's too uncertain which topic the user means — use the full corpus instead.
+
+  0.08 — _MARGIN_THRESHOLD in detector.py
+
+  Even if the best topic scores 0.85, if the second-best topic also scores 0.80, the margin is only 0.05 — the question might belong to either. The
+  0.08 margin requirement says "the winner must be clearly ahead, not just barely ahead". Prevents misclassification on ambiguous questions.
+
+  ---
+  4. Why distance = 1.0 - similarity (in numpy_index.py)
+
+  Cosine similarity is [0, 1] for normalized embeddings in practice (most embedding models produce non-negative activations). But the API convention
+  for search results is usually "distance" (lower = better), not "similarity" (higher = better). So:
+
+  distance = 1.0 - cosine_similarity
+  # 0.0 = identical (best match)
+  # 1.0 = completely unrelated
+
+  This lets the retriever return results in "ascending distance" order using standard sort conventions.
+
+  ---
+
+  ┌──────────────────────────┬─────────────────────────────┬─────────────┬─────────────────────────┐
+  │         Concept          │      What it measures       │    Range    │        Threshold        │
+  ├──────────────────────────┼─────────────────────────────┼─────────────┼─────────────────────────┤
+  │ Dot product (pre-normed) │ = cosine similarity (trick) │ [-1, 1]     │ —                       │
+  ├──────────────────────────┼─────────────────────────────┼─────────────┼─────────────────────────┤
+  │ best_similarity          │ question vs closest doc     │ [0, 1]      │ 0.55 to call Ollama     │
+  ├──────────────────────────┼─────────────────────────────┼─────────────┼─────────────────────────┤
+  │ confidence (RRF)         │ retrieval agreement         │ [0, ~0.033] │ 0.020 minimum           │
+  ├──────────────────────────┼─────────────────────────────┼─────────────┼─────────────────────────┤
+  │ Topic centroid score     │ question vs topic cluster   │ [0, 1]      │ 0.70 to filter by topic │
+  ├──────────────────────────┼─────────────────────────────┼─────────────┼─────────────────────────┤
+  │ Margin                   │ best - second-best topic    │ [0, 1]      │ 0.08 to trust detection │
+  └──────────────────────────┴─────────────────────────────┴─────────────┴─────────────────────────┘

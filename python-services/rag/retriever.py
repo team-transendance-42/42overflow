@@ -36,6 +36,9 @@ _RRF_K = 60   # standard RRF constant — dampens rank-1 dominance
 _MIN_FILTERED = 3    # if fewer results after topic filter, fall back to full corpus
 
 
+    # 1. Embed question — needed for both dense retrieval and centroid detection.
+    #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
+    #    On failure: log and fall back to BM25-only (has_embeddings=False).
 async def hybrid_search(
     question:        str,
     bm25_index:      BM25Index,
@@ -75,9 +78,6 @@ async def hybrid_search(
           meaningful. False when NumpyIndex is empty (embedding failed at
           startup) — Go skips the semantic gate and relies on RRF confidence alone.
     """
-    # 1. Embed question — needed for both dense retrieval and centroid detection.
-    #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
-    #    On failure: log and fall back to BM25-only (has_embeddings=False).
     question_embedding: list[float] | None = None
     try:
         question_embedding = (await embed_texts([question]))[0]

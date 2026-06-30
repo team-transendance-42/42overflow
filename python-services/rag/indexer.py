@@ -21,7 +21,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     augmented = [
         {
             **p,
-            "_id":   make_doc_id(p["question"], p.get("answer", "")),
+            "_id":   make_doc_id(p["question"]),
             "_hash": make_doc_hash(p["question"], p["answer"]),
             "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
         }
@@ -102,7 +102,7 @@ def _prepare_corpus(pairs: list[dict], label: str) -> dict:
 
     for p in pairs:
         text = format_doc(p["question"], p["answer"], p.get("tags", []))
-        doc_id = make_doc_id(p["question"], p.get("answer", ""))
+        doc_id = make_doc_id(p["question"])
         topic = p.get("topic", "unknown")
 
         all_texts.append(text)

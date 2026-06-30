@@ -274,7 +274,7 @@ def test_seed_postgres_happy_path():
         with patch("admin_router.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
              patch("admin_router.DB_URL", "postgresql://fake/testdb"), \
              patch("admin_router.ensure_users", new_callable=AsyncMock), \
-             patch("admin_router.ensure_subjects", new_callable=AsyncMock, return_value={"push_swap": 1}), \
+             patch("admin_router.get_or_create_subjects", new_callable=AsyncMock, return_value={"push_swap": 1}), \
              patch("admin_router.clean_posts", new_callable=AsyncMock), \
              patch("admin_router.insert_posts", new_callable=AsyncMock, return_value=(3, 0)):
             mock_conn = AsyncMock()
@@ -304,7 +304,7 @@ def test_seed_postgres_clean_param_calls_clean_posts():
         with patch("admin_router.asyncpg.connect", new_callable=AsyncMock) as mock_connect, \
              patch("admin_router.DB_URL", "postgresql://fake/testdb"), \
              patch("admin_router.ensure_users", new_callable=AsyncMock), \
-             patch("admin_router.ensure_subjects", new_callable=AsyncMock, return_value={}), \
+             patch("admin_router.get_or_create_subjects", new_callable=AsyncMock, return_value={"push_swap": 1}), \
              patch("admin_router.clean_posts", new_callable=AsyncMock) as mock_clean, \
              patch("admin_router.insert_posts", new_callable=AsyncMock, return_value=(0, 0)):
             mock_connect.return_value = AsyncMock()
