@@ -9,10 +9,15 @@ Seed content is already in RAG at startup. These posts appear only after sync,
 making the before/after difference obvious both in the browser and in RAG.
 
 Usage (stack must be up, run from python-services/rag/):
-  uv run python dev_populate.py           # insert all fake posts
-  uv run python dev_populate.py --clean   # delete all fake posts, no re-insert
+  uv run python dev_populate.py             # insert fake posts into Postgres (does NOT touch Chroma)
+  uv run python dev_populate.py --clean     # delete fake posts from Postgres (does NOT touch Chroma)
+  uv run python dev_populate.py --sync-real # rebuild Chroma/numpy/BM25 from real Postgres posts only
+                                            # (fake posts stay in Postgres — only excluded from the index)
 
-After running, trigger RAG sync (from project root):
+--sync-real requires RAG_ADMIN_TOKEN env var (same value as in .env).
+RAG_SERVICE_URL defaults to http://localhost:8090.
+
+After inserting fake posts, trigger full Chroma sync (from project root):
   bash reload_rag.sh
   # or: docker compose exec python-rag curl -s -X POST http://localhost:8090/admin/sync-chroma -H "X-Admin-Token: <token>"
 
@@ -25,6 +30,7 @@ import os
 from typing import Any
 
 import asyncpg
+import httpx
 
 USERS: list[dict[str, str]] = [
     {"id": "fake-user-happyface22",    "email": "happyface22@overflow.local",    "name": "HappyFace22"},
@@ -55,7 +61,6 @@ POSTS: list[dict[str, Any]] = [
             {
                 "author": MY,
                 "content": (
-                    "Also worth knowing: hardcode the 6 orderings for 3 elements as a lookup. "
                     "With 5 elements you push 2 to B, solve the 3-element case, then insert. "
                     "This is faster than a generic algorithm for small sizes."
                 ),
@@ -358,7 +363,31 @@ async def insert_posts(conn: asyncpg.Connection, subject_map: dict[str, int]) ->
     return inserted, skipped
 
 
-async def main(clean: bool) -> None:
+async def _trigger_sync_real() -> None:
+    """POST to /admin/sync-real — rebuilds Chroma/numpy/BM25 excluding fake user posts."""
+    admin_token: str | None = os.environ.get("RAG_ADMIN_TOKEN")
+    if not admin_token:
+        print("[sync-real] WARNING: RAG_ADMIN_TOKEN not set — skipping Chroma sync")
+        print("[sync-real] Run manually: POST /admin/sync-real with X-Admin-Token header")
+        return
+
+    rag_url: str = os.environ.get("RAG_SERVICE_URL", "http://localhost:8090")
+    print(f"[sync-real] calling {rag_url}/admin/sync-real ...")
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{rag_url}/admin/sync-real",
+            headers={"X-Admin-Token": admin_token},
+            timeout=120.0,
+        )
+        resp.raise_for_status()
+    print(f"[sync-real] done — {resp.json()}")
+
+
+async def main(clean: bool, sync_real: bool) -> None:
+    if sync_real:
+        await _trigger_sync_real()
+        return
+
     db_url: str | None = os.environ.get("DATABASE_URL")
     if not db_url:
         raise RuntimeError(
@@ -370,20 +399,22 @@ async def main(clean: bool) -> None:
     try:
         if clean:
             await clean_posts(conn)
-            print("[done] fake posts removed.")
+            print("[done] fake posts removed from Postgres.")
         else:
             await upsert_users(conn)
             subject_map = await get_or_create_subjects(conn)
             inserted, skipped = await insert_posts(conn, subject_map)
             print(f"\n[done] inserted={inserted}  skipped={skipped}  total={len(POSTS)} posts")
             if inserted > 0:
-                print("\nNext: call POST /admin/seed-postgres, then POST /admin/sync-chroma.")
+                print("\nNext: run reload_rag.sh or POST /admin/sync-chroma to push into Chroma.")
     finally:
         await conn.close()
 
 
 if __name__ == "__main__":  # guards against running on import; asyncio.run() starts the event loop
-    parser = argparse.ArgumentParser(description="Insert fake dev posts for RAG testing")
-    parser.add_argument("--clean", action="store_true", help="Delete all fake posts (no re-insert)")
+    parser = argparse.ArgumentParser(description="Dev tool for fake Postgres posts and RAG index sync")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--clean",     action="store_true", help="Delete fake posts from Postgres (Chroma untouched)")
+    group.add_argument("--sync-real", action="store_true", help="Rebuild Chroma/numpy/BM25 with real posts only (Postgres untouched)")
     args = parser.parse_args()
-    asyncio.run(main(clean=args.clean))
+    asyncio.run(main(clean=args.clean, sync_real=args.sync_real))

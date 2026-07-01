@@ -122,23 +122,26 @@ const (
 
 /* ForwardAndAccumulate reads chunks from rawCh, forwards each to outCh, and calls
  onDone with the full accumulated text when rawCh drains naturally. If ctx is
- cancelled before rawCh drains, the goroutine exits without calling onDone —
- preventing partial answers from being cached.
+ cancelled, forwarding and caching stop but rawCh is still fully drained —
+ returning early would block readOllamaToChannel on its unbuffered send and leak
+ the goroutine + resp.Body.
  */
 func ForwardAndAccumulate(ctx context.Context, rawCh <-chan string, outCh chan<- string, onDone func(string)) {
 	defer close(outCh)
 	var sb strings.Builder
+	cancelled := false
 	for chunk := range rawCh {
+		if cancelled {
+			continue // drain without forwarding to unblock the producer
+		}
 		sb.WriteString(chunk)
 		select {
 		case outCh <- chunk:
 		case <-ctx.Done():
-			return
+			cancelled = true // stop forwarding; keep ranging to drain rawCh
 		}
 	}
-	// Guard against the race where rawCh drains just as ctx is cancelled:
-	// only call onDone on a truly natural completion.
-	if ctx.Err() == nil {
+	if !cancelled && ctx.Err() == nil {
 		onDone(sb.String())
 	}
 }

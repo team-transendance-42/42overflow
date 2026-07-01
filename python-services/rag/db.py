@@ -68,6 +68,9 @@ _QUERY = """
       AND p.content    <> ''
       AND r.rn         <= 15
 """
+# Used by load_db_pairs(exclude_user_ids=...) to filter out specific authors (e.g. fake test users)
+_QUERY_EXCLUDE_USERS = _QUERY + '\n  AND p."userId" != ALL($1::text[])'
+
 # <> not equal
 _TABLES_READY_QUERY = """
     SELECT COUNT(*) FROM information_schema.tables
@@ -76,7 +79,7 @@ _TABLES_READY_QUERY = """
 """
 
 
-async def load_db_pairs() -> list[dict]:
+async def load_db_pairs(exclude_user_ids: list[str] | None = None) -> list[dict]:
     # Mask password in logs: show only the host/db part
     safe_url = DB_URL.split("@")[-1] if DB_URL and "@" in DB_URL else DB_URL or "(not set)"
     print(f"[db] connecting to: {safe_url}")
@@ -106,7 +109,11 @@ async def load_db_pairs() -> list[dict]:
             print("[db] Post, Comment, or Subject table missing — skipping DB sync (schema not migrated yet)")
             return []
 
-        rows = await conn.fetch(_QUERY)
+        if exclude_user_ids:
+            rows = await conn.fetch(_QUERY_EXCLUDE_USERS, exclude_user_ids)
+            print(f"[db] fetched rows excluding {len(exclude_user_ids)} user(s)")
+        else:
+            rows = await conn.fetch(_QUERY)
         print(f"[db] fetched {len(rows)} posts with at least one comment")
 
         pairs = [_row_to_pair(row) for row in rows]

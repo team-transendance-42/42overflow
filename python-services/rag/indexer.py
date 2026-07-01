@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from bm25_index import BM25Index
 from db import load_db_pairs
 from detector import build_topic_centroids
-from embedder import embed_texts, format_doc, make_doc_hash
+from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
 from numpy_index import NumpyIndex
 from seed import load_seed
 from store import get_embeddings, get_existing_hashes, upsert
@@ -21,7 +21,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     augmented = [
         {
             **p,
-            "_id":   make_doc_hash(p["question"], p["answer"]),
+            "_id":   make_doc_id(p),
             "_hash": make_doc_hash(p["question"], p["answer"]),
             "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
         }
@@ -68,7 +68,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     return {p["_id"]: emb for p, emb in zip(to_update, embeddings)}
 
 
-async def _load_pairs(include_db: bool, label: str) -> list[dict]:
+async def _load_pairs(include_db: bool, label: str, exclude_user_ids: list[str] | None = None) -> list[dict]:
     """Load seed + (optionally) Postgres pairs and validate required fields.
 
     Raises ValueError if any pair is missing 'question' or 'answer' — a
@@ -77,7 +77,7 @@ async def _load_pairs(include_db: bool, label: str) -> list[dict]:
     seed_pairs = load_seed()
     print(f"[{label}] step 1 — {len(seed_pairs)} pairs from seed")
 
-    db_pairs = await load_db_pairs() if include_db else []
+    db_pairs = await load_db_pairs(exclude_user_ids=exclude_user_ids) if include_db else []
     pairs = seed_pairs + db_pairs
 
     bad = [i for i, p in enumerate(pairs) if "question" not in p or "answer" not in p]
@@ -102,7 +102,7 @@ def _prepare_corpus(pairs: list[dict], label: str) -> dict:
 
     for p in pairs:
         text = format_doc(p["question"], p["answer"], p.get("tags", []))
-        doc_id = make_doc_hash(p["question"], p["answer"])
+        doc_id = make_doc_id(p)
         topic = p.get("topic", "unknown")
 
         all_texts.append(text)
@@ -197,10 +197,10 @@ def _build_indexes(
     return bm25, numpy_idx
 
 
-async def load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True) -> dict:
+async def load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True, exclude_user_ids: list[str] | None = None) -> dict:
     """Orchestrate: load pairs → sync Chroma → build indexes → apply to app.state.
     Returns a summary dict. Called at startup and by /admin/sync-chroma."""
-    pairs = await _load_pairs(include_db, label)
+    pairs = await _load_pairs(include_db, label, exclude_user_ids=exclude_user_ids)
     app.state.qa_pairs = pairs
 
     topic_counts = Counter(p.get("topic", "unknown") for p in pairs)

@@ -55,11 +55,17 @@ def format_doc(question: str, answer: str, tags: list[str] | None = None) -> str
 
 
 def make_doc_hash(question: str, answer: str) -> str:
-    """Stable SHA-256 fingerprint of a question+answer pair.
-    Pass answer="" to key by question only (stable doc ID).
-    Pass full answer to detect content changes (change detection hash).
-    """
+    """SHA-256 fingerprint of a question+answer pair. Used as the change-detection hash."""
     return hashlib.sha256((question + answer).encode()).hexdigest()
+
+
+def make_doc_id(pair: dict) -> str:
+    """Stable Chroma document ID for a Q&A pair.
+    DB pairs carry an 'id' field (e.g. 'db-comment-42') that is stable across edits.
+    Seed pairs are immutable files, so hash(question) is stable enough."""
+    if "id" in pair:
+        return pair["id"]
+    return hashlib.sha256(pair["question"].encode()).hexdigest()
 
 
 def _embed_sync(texts: list[str]) -> list[list[float]]:

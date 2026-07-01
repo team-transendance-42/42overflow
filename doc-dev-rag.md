@@ -6,12 +6,9 @@ Replace `<RAG_ADMIN_TOKEN>` with the value of `RAG_ADMIN_TOKEN` from your `.env`
 
 ## 1. Seed PostgreSQL with test data
 
-Populates the PostgreSQL database with sample:
+Populates the PostgreSQL database with fake dev users, subjects, posts, and comments.
 
-- Users
-- Subjects
-- Posts
-- Comments
+**Via HTTP (stack must be up):**
 
 ```bash
 docker compose exec python-rag curl -X POST \
@@ -21,16 +18,45 @@ docker compose exec python-rag curl -X POST \
   -d '{}'
 ```
 
+**Via `dev_populate.py` (from `python-services/rag/`, stack must be up):**
+
+```bash
+uv run python dev_populate.py             # insert fake posts into Postgres
+uv run python dev_populate.py --clean     # delete fake posts from Postgres (Chroma untouched)
+uv run python dev_populate.py --sync-real # rebuild Chroma/numpy/BM25 with real posts only
+```
+
+`--clean` and `--sync-real` are mutually exclusive.
+
 ---
 
 ## 2. Sync PostgreSQL data to ChromaDB
 
-Reads the relevant data from PostgreSQL, generates embeddings, and stores them in ChromaDB.
+Reads **all** PostgreSQL posts (including any fake/test data), generates embeddings, and stores them in ChromaDB.
 
 ```bash
 docker compose exec python-rag curl -X POST \
   http://localhost:8090/admin/sync-chroma \
   -H "X-Admin-Token: Tra-la-la"
+```
+
+---
+
+## 2b. Sync real posts only (no fake/test data)
+
+Same as above but excludes fake dev users (`dev_populate.py` users). Fake posts stay in Postgres — they are just not indexed in Chroma/numpy/BM25.
+
+```bash
+docker compose exec python-rag curl -X POST \
+  http://localhost:8090/admin/sync-real \
+  -H "X-Admin-Token: Tra-la-la"
+```
+
+Or via `dev_populate.py` (requires `RAG_ADMIN_TOKEN` and `RAG_SERVICE_URL` env vars; `RAG_SERVICE_URL` defaults to `http://localhost:8090`):
+
+```bash
+# from python-services/rag/
+uv run python dev_populate.py --sync-real
 ```
 
 ---
