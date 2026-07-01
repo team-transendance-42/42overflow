@@ -67,8 +67,9 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 	}
 
 	resp, err := withRetry(ctx, func() (*http.Response, error) {
-		// Fresh reader on every attempt — bytes.NewReader is rewindable
-		// because we hold the full slice, not a stream.
+		/* Fresh reader on every attempt — bytes.NewReader is rewindable
+		because we hold the full slice, not a stream.
+		*/
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(b))
 		if err != nil {
 			return nil, fmt.Errorf("build request: %w", err)

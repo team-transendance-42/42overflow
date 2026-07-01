@@ -14,3 +14,34 @@ has_embeddings=true. Default Ollama temp is 0.8 (high randomness). 0.3 makes the
 model more deterministic — same question is more likely to get the same answer.
 Alternative simpler approach: set temperature 0.3 for ALL calls unconditionally
 (remove the has_embeddings check) — same benefit, less code.
+=======================================
+!!NB!!!
+======================================
+  Here's the distinction:
+
+  Real RAG (Retrieval-Augmented Generation) means:
+  1. Embed the query
+  2. Retrieve relevant chunks from a vector store
+  3. Feed chunks + query to the LLM → generate a fresh answer
+
+  What we have at 0.82+ similarity:
+  - Embed the query
+  - Find a past query that's nearly identical
+  - Return the cached LLM response verbatim
+
+  This skips steps 2 and 3 entirely — we're not retrieving documents,
+  we're retrieving a prior LLM output. That's semantic response
+  caching, not RAG.
+
+  Is it legitimate? Yes — if two queries are semantically 0.82+ similar,
+  the answer is almost certainly the same. we're trading correctness
+  risk (stale/wrong cache hit) for speed and cost savings.
+
+  The real risks:
+  - 0.82 might be too low — a subtly different question gets a wrong
+  answer with no warning
+  - Cached answers can go stale (underlying facts change)
+  - numpy cosine similarity on raw embeddings is fine, but the threshold
+  is empirical — worth logging cache hits and auditing them
+
+  The label for this pattern: semantic cache + RAG fallback.

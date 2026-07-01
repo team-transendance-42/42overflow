@@ -14,7 +14,7 @@ from router_health import router as health_router
 async def lifespan(app: FastAPI):
     """Startup: build indexes into app.state."""
     app.state.metrics = Metrics()
-    await load_and_index(app, label="startup", include_db=False)
+    await load_and_index(app, label="startup", include_db=True)
 
     yield  # FastAPI serves requests while suspended here
     # Stays here until server stops(Ctrl+C or signal)
