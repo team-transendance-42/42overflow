@@ -6,25 +6,32 @@ Transcendence is the final project for the Codam Core curriculum, and must be co
 
 ## INSTRUCTIONS 
 
-(section containing any relevant information about compilation, installation, and/or execution.)
- Step by step instructions to run the project. The app uses docker, and runs on one command - Docker Compose Up (e.g. Docker Compose up -d --build or Docker compose up --d) 
- Prerequisites include: SvelteKit, Prisma, PostgreSQL, bycrypt, better-auth, .env setup, 
+Docker (v29.x) and Docker Compose (v5.x) are required
+.env at the root and .env for the llm system in the llm-system-interface directory
+The app uses docker, and runs on one command - docker compose up (e.g. docker compose up -- build // docker compose up -d --build) 
+The app will be available at https://localhost:8443 
+The browser will show a security warning due to a self-signed certificate - please proceed.
+
 
 ## RESOURCES 
 
 We leveraged several resources: 
 
-https://svelte.dev/docs/kit/load https://better-auth.com/ http://better-auth.com/docs/adapters/postgresql
-Description for how AI was used...
+https://svelte.dev/docs/kit/ 
+https://better-auth.com/ 
+http://better-auth.com/docs/adapters/postgresql
+https://zod.dev/
+
+AI was used for tutorials, debugging, tests, clarifications, and questions.
 
 ## TEAM INFO
 
 | Name | Intra | Roles |
 |------|------|-------------|
-| Noah | (nmattos-) | PO + TL + Developer |
-| Diane | (diwang) | PM + PO + Developer |
-| Petya | (pekatsar) | PM + PO + Developer |
-| Elroy | (eandela) | TL + Developer |
+| Noah | (nmattos-) | PO + TL + Developer | defined the product vision and oversaw technical decisions and architecure | make tech stack decisions
+| Diane | (diwang) | PM + PO + Developer | defined the product vision, prioritized features, tracks progress and deadlines, ensures team comms
+| Petya | (pekatsar) | PM + PO + Developer | organizes team meetings, ensures team comms, manages risk and blockers, defines product vision, and prioritizes features
+| Elroy | (eandela) | TL + Developer | ensures code quality and implement features and modules
 
 ## PROJECT MANAGEMENT 
 
@@ -39,7 +46,10 @@ Description for how AI was used...
 * ORM: **Prisma**
 * Authentication: **Better-auth**
 
-TODO: Database system and why it was chosen. Any other significant technologies or libraries. Justification for major technical choices.
+SvelteKit was chosen over React due to very positive reviews from peers and from additional research; using SvelteKit was an almost seamless process, and is a very impressive framework
+Prisma is a nice layer/object relational mapper over the database (no SQL queries needed), ensuring type safety, and handles schema migrations 
+PostgreSQL works well with Prisma and is considered the standard combination in software development  
+Better-auth makes the authentication process straightforward and is easy to integrate
 
 ## DATABASE SCHEMA
 ```mermaid
@@ -196,7 +206,7 @@ TODO
 ### Petya
  TODO
 ### Diane
- For the mandatory part, I completed the Privacy Policy and Terms of Service. I also completed the Custom Design Module and Standard user management and authentication. This includes a profile page that can be edited, an avatar photo that can be added, or a default provided, and the ability to add/remove friends, and see that person's status online. Also, the Home page, Log In, Sign In, Profile, Edit Profile, Settings, Post page. This includes most of the front-end, including small features. I created a google doc for the project as well to aid with the organization and contributed to the README.
+ For the mandatory part, I completed the Privacy Policy and Terms of Service. I also completed the Custom Design Module and Standard user management and authentication. This includes a profile page that can be edited, an avatar photo that can be added, or a default provided, and the ability to add/remove friends, and see that person's status online. Also, the Home page, Log In, Sign In, Profile, Edit Profile, Settings, Post page. This includes most of the front-end, including small features. I created a google doc for the project as well to aid with the organization and contributed to the README.  The challenges faced were around timing and communication (for example, 2 members were also working on another large project <webserv> however they did an incredible job managing both project workloads) There will always be challenges working with groups, however many positives and learnings due to working in a group setting.
 
 ### Noah
 | Category        		| Description                           									|
