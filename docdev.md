@@ -43,9 +43,6 @@ docker system prune -af --volumes   # everything including volumes (be careful!)
 # Production stack
 docker compose up --build
 
-# Fresh build, no cache (use after prune)
-docker compose build --no-cache && docker compose up -d
-
 # Use --build only when you changed:
 #   - Dockerfile / base image
 #   - package.json or lockfile
@@ -86,33 +83,13 @@ sudo dockerd &                      # fallback: start daemon manually in backgro
 **Files involved:**
 - `reload_rag.sh` — calls the RAG admin endpoint to reload from DB (run from project root)
 - `python-services/rag/dev_populate.py` — inserts fake users/posts/comments into Postgres for testing
-- `llm-system-interface/.env` — contains `RAG_ADMIN_TOKEN` (token is hardcoded in `reload_rag.sh`)
+- `llm-system-interface/.env` — contains `RAG_ADMIN_TOKEN`
 - `python-services/rag/seed/` — static Q&A seed data loaded at RAG startup (not from DB)
 
 > **Note:** A post must have at least one comment to be picked up by the RAG.
 
 ### 1. Reload RAG from real DB posts only
-
-```bash
-bash reload_rag.sh
-```
-
-### 2. Insert fake dev data (HappyFace22, Revolution12, Mystery User) then reload
-
-```bash
-# First time (or to add more posts without wiping existing ones):
-cd python-services/rag && uv run python dev_populate.py && cd ../..
-bash reload_rag.sh
-
-# Re-insert clean (wipes all fake posts first, then re-inserts):
-cd python-services/rag && uv run python dev_populate.py --clean && cd ../..
-bash reload_rag.sh
-```
-
-`dev_populate.py` connects to Postgres on **localhost:5433** (the host-mapped port).
-The stack must be running. Run it from the host, not inside a container.
-
----
+see doc-dev-rag.md for more details
 
 ## Ollama / LLM Model Management
 

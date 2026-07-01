@@ -29,36 +29,6 @@ _CONFIDENCE_THRESHOLD = 0.70   # minimum similarity score to trust detection
 _MARGIN_THRESHOLD = 0.08   # best must beat second-best by at least this much
 
 
-def cosine_similarity(a: list[float], b: list[float]) -> float:
-    """
-    Cosine similarity between two equal-length vectors. Range: [-1, 1].
-    cos(θ) = dot(a,b) / (||a|| * ||b||)
-    numpy.dot + linalg.norm replace Python sum/zip loops → ~1000x faster.
-    Edge cases:
-      - Empty input → 0.0
-      - Zero-norm vector → 0.0 (avoids division by zero)
-      - NaN values → treated as 0 via nan_to_num
-    """
-    if not a or not b:
-        return 0.0
-
-    va = np.array(a, dtype=np.float32) # numpy datatype, np.array store raw C numbers back-to-back in a contiguous memory block
-    vb = np.array(b, dtype=np.float32)
-
-    # Guard: replace any NaN/inf from corrupt model output before math
-    va = np.nan_to_num(va) # replace each el if nan or inf with 0.0, otherwise keep the value
-    vb = np.nan_to_num(vb)
-
-    norm_a = np.linalg.norm(va) # compute the L2 norm (Euclidean length) of the vector va 
-    # ||va|| = sqrt(va[0]² + va[1]² + ... + va[767]²)
-    norm_b = np.linalg.norm(vb) # Cosine similarity is defined as: cos(θ) = dot(a, b) / (||a|| * ||b||)
-
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 0.0
-
-    return float(np.dot(va, vb) / (norm_a * norm_b))
-
-
 # list[list[float]] is 2d array of floats, each inner list is a 768-dim embedding vector
 def build_topic_centroids( pairs: list[dict], embeddings: list[list[float]], ) -> dict[str, list[float]]:
     """

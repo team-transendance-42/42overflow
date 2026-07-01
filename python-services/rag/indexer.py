@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from bm25_index import BM25Index
 from db import load_db_pairs
 from detector import build_topic_centroids
-from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
+from embedder import embed_texts, format_doc, make_doc_hash
 from numpy_index import NumpyIndex
 from seed import load_seed
 from store import get_embeddings, get_existing_hashes, upsert
@@ -21,7 +21,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     augmented = [
         {
             **p,
-            "_id":   make_doc_id(p["question"]),
+            "_id":   make_doc_hash(p["question"], p["answer"]),
             "_hash": make_doc_hash(p["question"], p["answer"]),
             "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
         }
@@ -91,8 +91,8 @@ async def _load_pairs(include_db: bool, label: str) -> list[dict]:
 def _prepare_corpus(pairs: list[dict], label: str) -> dict:
     """Single pass over pairs building all derived text structures.
 
-    Doing this in one loop avoids calling format_doc and make_doc_id twice per
-    pair (the old code called them once here and again inside _sync_to_chroma).
+    Doing this in one loop avoids calling format_doc and make_doc_hash twice per
+    pair.
     Returns a dict with: all_texts, all_ids, all_topics, topic_intro_ids,
     id_to_text, id_to_topic."""
     all_texts: list[str] = []
@@ -102,7 +102,7 @@ def _prepare_corpus(pairs: list[dict], label: str) -> dict:
 
     for p in pairs:
         text = format_doc(p["question"], p["answer"], p.get("tags", []))
-        doc_id = make_doc_id(p["question"])
+        doc_id = make_doc_hash(p["question"], p["answer"])
         topic = p.get("topic", "unknown")
 
         all_texts.append(text)

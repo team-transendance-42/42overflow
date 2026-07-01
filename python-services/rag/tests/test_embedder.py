@@ -6,7 +6,7 @@ import asyncio
 import embedder as _embedder_module
 from unittest.mock import patch
 import pytest
-from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id, _embed_one_cached
+from embedder import embed_texts, format_doc, make_doc_hash, _embed_one_cached
 
 
 def test_embed_texts_no_http():
@@ -48,8 +48,8 @@ def test_helpers():
     result_no_tags = format_doc("What is X?", "X is Y.", tags=[])
     assert result_no_tags == "Q: What is X?\nA: X is Y."
 
-    assert make_doc_id("What is X?") == make_doc_id("What is X?"), "ID must be stable"
-    assert make_doc_id("What is X?") != make_doc_id("What is Y?"), "different Q → different ID"
+    assert make_doc_hash("What is X?", "") == make_doc_hash("What is X?", ""), "hash must be stable"
+    assert make_doc_hash("What is X?", "") != make_doc_hash("What is Y?", ""), "different Q → different hash"
 
     assert make_doc_hash("Q", "A") == make_doc_hash("Q", "A"), "hash must be stable"
     assert make_doc_hash("Q", "A1") != make_doc_hash("Q", "A2"), "hash must change with answer"

@@ -41,7 +41,7 @@ class BM25Index:
 
         Args:
             documents: formatted QA texts (output of format_doc).
-            ids:       stable doc IDs (output of make_doc_id), same order.
+            ids:       stable doc IDs (output of make_doc_hash), same order.
             topics:    optional topic label per doc, same order. If None,
                        topic filtering will not work but search still works.
         """

@@ -54,17 +54,11 @@ def format_doc(question: str, answer: str, tags: list[str] | None = None) -> str
     return base
 
 
-def make_doc_id(question: str, answer: str = "") -> str:
-    """Stable unique ID for a document, derived from question + answer.
-
-    Answer is included so that multiple comments on the same post (same question,
-    different answers) each get a distinct ID — hashing question alone caused
-    duplicate IDs when the DB query returns one row per comment.
-    """
-    return hashlib.sha256((question + answer).encode()).hexdigest()
-
-
 def make_doc_hash(question: str, answer: str) -> str:
+    """Stable SHA-256 fingerprint of a question+answer pair.
+    Pass answer="" to key by question only (stable doc ID).
+    Pass full answer to detect content changes (change detection hash).
+    """
     return hashlib.sha256((question + answer).encode()).hexdigest()
 
 

@@ -159,12 +159,6 @@ func RateLimiter(next http.Handler) http.Handler {
 			return
 		}
 
-		// --- global cap: check before per-student to protect Gemini API quota ---todo
-		if !globalLimiter.Allow() {
-			http.Error(w, "Server busy, try again shortly", http.StatusTooManyRequests)
-			return
-		}
-
 		// --- per-student limiter ---
 		entry, ok := getLimiter(extractClientKey(r))
 		if !ok {
@@ -195,13 +189,21 @@ func RateLimiter(next http.Handler) http.Handler {
 			return
 		}
 
-		// --- per-minute rate check --- todo: test do we see this text?
+		// --- per-minute rate check ---
 		if !entry.limiter.Allow() {
 			remaining := perStudentDailyMax - entry.dailyCnt
 			w.Header().Set("X-RateLimit-Day-Remaining", strconv.Itoa(remaining))
 			w.Header().Set("Retry-After", "30")
 			mu.Unlock()
 			http.Error(w, "Rate limit exceeded (5/min)", http.StatusTooManyRequests)
+			return
+		}
+
+		// Global cap checked after per-student gates: over-quota/throttled requests must not
+		// consume shared API quota tokens. rate.Limiter is goroutine-safe so calling inside mu is fine.
+		if !globalLimiter.Allow() {
+			mu.Unlock()
+			http.Error(w, "Server busy, try again shortly", http.StatusTooManyRequests)
 			return
 		}
 

@@ -12,7 +12,7 @@ Requires: Ollama + ChromaDB running (docker compose up -d)
 """
 import asyncio
 
-from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
+from embedder import embed_texts, format_doc, make_doc_hash
 from seed import load_seed
 from store import ensure_collection, retrieve, upsert
 
@@ -32,8 +32,7 @@ async def run() -> None:
 
     # 3. embed
     text = format_doc(last["question"], last["answer"])
-    doc_id = make_doc_id(last["question"], last["answer"])
-    doc_hash = make_doc_hash(last["question"], last["answer"])
+    doc_id = make_doc_hash(last["question"], last["answer"])
 
     print("\n[embed] sending to Ollama...")
     embeddings = await embed_texts([text])
@@ -50,7 +49,7 @@ async def run() -> None:
         metadatas=[{
             "topic": last.get("topic", ""),
             "difficulty": last.get("difficulty", ""),
-            "doc_hash": doc_hash,
+            "doc_hash": doc_id,
         }],
     )
     print(f"\n[store] upserted 1 doc  id={doc_id[:16]}...")
