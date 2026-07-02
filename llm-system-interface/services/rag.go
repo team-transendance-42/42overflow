@@ -109,9 +109,14 @@ context and must not fall back to its training knowledge or guess.
 Rule 1 says "reproduce the FULL answer" — small models (gemma3:4b) otherwise
 interpret "answer clearly" as "be concise" and return only the first sentence.
 */
+// ragRefusal is the exact string the model must return when the context has no answer.
+// Responses matching this must not be cached — the knowledge base may be updated
+// between this call and the next, so the next call should hit the RAG pipeline fresh.
+const ragRefusal = "I am here to help with 42 curriculum questions only. Shoot :)"
+
 func buildRAGPrompt(ctxStr, question string) string {
 	return "You are a 42 school tutor. Answer using ONLY the CONTEXT below. Reply thoroughly with all relevant info.\n" +
-		"If the answer is not in the CONTEXT, reply EXACTLY: \"I am here to help with 42 curriculum questions only. Shoot :)\"\n" +
+		"If the answer is not in the CONTEXT, reply EXACTLY: \"" + ragRefusal + "\"\n" +
 		"CONTEXT:\n" + ctxStr + "\n\n" +
 		"QUESTION:\n" + question + "\n\n" +
 		"ANSWER:"

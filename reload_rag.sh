@@ -15,6 +15,15 @@ if [ -z "${RAG_ADMIN_TOKEN}" ]; then
     exit 1
 fi
 
+if [ -z "${LLM_INTERNAL_SECRET}" ]; then
+    LLM_INTERNAL_SECRET=$(grep '^LLM_INTERNAL_SECRET=' llm-system-interface/.env | cut -d '=' -f2-)
+fi
+
+if [ -z "${LLM_INTERNAL_SECRET}" ]; then
+    echo "ERROR: LLM_INTERNAL_SECRET not found in environment or llm-system-interface/.env" >&2
+    exit 1
+fi
+
 echo "==== step 1: seed-postgres ========"
 docker compose exec -T python-rag curl -X POST \
     http://localhost:8090/admin/seed-postgres \
@@ -27,4 +36,10 @@ echo "==== step 2: sync-chroma ========"
 docker compose exec -T python-rag curl -X POST \
     http://localhost:8090/admin/sync-chroma \
     -H "X-Admin-Token: ${RAG_ADMIN_TOKEN}"
+echo ""
+
+echo "==== step 3: clear go rag cache ========"
+docker compose exec -T python-rag curl -X POST \
+    http://llm-server:8081/admin/clear-rag-cache \
+    -H "X-Internal-Secret: ${LLM_INTERNAL_SECRET}"
 echo ""

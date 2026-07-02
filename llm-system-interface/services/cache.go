@@ -51,6 +51,19 @@ func ragCacheGet(question string) (string, bool) {
 	return "", false
 }
 
+// ClearRAGCache wipes all cached RAG answers and returns the number of entries removed.
+// Called after /admin/sync-chroma so stale answers don't outlive a corpus update.
+func ClearRAGCache() int {
+	ragCacheMu.Lock()
+	defer ragCacheMu.Unlock()
+	n := len(ragCache)
+	ragCache = make(map[string]ragCacheEntry)
+	// [:0] sets len to 0 but keeps the backing array — no allocation on next append.
+	// nil would release the array (cap=0); []string{} is identical to nil here.
+	ragCacheOrder = ragCacheOrder[:0]
+	return n
+}
+
 func ragCacheSet(question, answer string) {
 	if strings.TrimSpace(answer) == "" {
 		return
