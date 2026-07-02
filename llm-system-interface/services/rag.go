@@ -125,11 +125,11 @@ func buildRAGPrompt(ctxStr, question string) string {
 const (
 	minRagConfidence       = 0.020
 	minCosineSimilarity    = 0.55
-	/* 0.82 instead of 0.85: questions with similarity in the 0.82–0.85 range
-	 have the correct top-1 doc but gemma3:4b still returns the fallback.
-	 Raise back to 0.85 if a better model handles those cases correctly.
+	/* gemma3:4b returns the fallback for similarity 0.82–0.85 even when the
+	 correct doc is retrieved — bypass Ollama for that range too.
+	 Raise to 0.85 if switching to a model that handles it correctly.
 	 */
-	directBypassSimilarity = 0.85
+	directBypassSimilarity = 0.82
 )
 
 /* ForwardAndAccumulate reads chunks from rawCh, forwards each to outCh, and calls
@@ -304,9 +304,11 @@ func streamOllama(ctx context.Context, question, prompt string) (<-chan string, 
 			}
 			return
 		}
-		// Cache all answers including model refusals — repeated off-topic queries
-		// should hit the cache (fast path) instead of triggering a new Ollama call.
-		ragCacheSet(question, answer)
+		// Do not cache refusals: the corpus may be updated before the next ask,
+		// and a rephrase of the same question might retrieve a valid answer.
+		if strings.TrimSpace(answer) != ragRefusal {
+			ragCacheSet(question, answer)
+		}
 	})
 	return outCh, nil
 }

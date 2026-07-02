@@ -25,7 +25,7 @@ if [ -z "${LLM_INTERNAL_SECRET}" ]; then
 fi
 
 echo "==== step 1: seed-postgres ========"
-docker compose exec -T python-rag curl -X POST \
+docker compose exec -T python-rag curl -sS -X POST \
     http://localhost:8090/admin/seed-postgres \
     -H 'Content-Type: application/json' \
     -H "X-Admin-Token: ${RAG_ADMIN_TOKEN}" \
@@ -33,13 +33,13 @@ docker compose exec -T python-rag curl -X POST \
 echo ""
 
 echo "==== step 2: sync-chroma ========"
-docker compose exec -T python-rag curl -X POST \
+docker compose exec -T python-rag curl -sS -X POST \
     http://localhost:8090/admin/sync-chroma \
     -H "X-Admin-Token: ${RAG_ADMIN_TOKEN}"
 echo ""
 
 echo "==== step 3: clear go rag cache ========"
-docker compose exec -T python-rag curl -X POST \
+docker compose exec -T python-rag curl -sS -X POST \
     http://llm-server:8081/admin/clear-rag-cache \
     -H "X-Internal-Secret: ${LLM_INTERNAL_SECRET}"
 echo ""
