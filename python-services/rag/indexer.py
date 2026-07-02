@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from bm25_index import BM25Index
 from db import load_db_pairs
 from detector import build_topic_centroids
-from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
+from embedder import embed_texts, format_doc, format_doc_for_embed, make_doc_hash, make_doc_id
 from numpy_index import NumpyIndex
 from seed import load_seed
 from store import get_embeddings, get_existing_hashes, upsert
@@ -21,9 +21,10 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     augmented = [
         {
             **p,
-            "_id":   make_doc_id(p),
-            "_hash": make_doc_hash(p["question"], p["answer"]),
-            "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
+            "_id":         make_doc_id(p),
+            "_hash":       make_doc_hash(p["question"], p["answer"]),
+            "_text":       format_doc(p["question"], p["answer"], p.get("tags", [])),
+            "_embed_text": format_doc_for_embed(p["question"], p["answer"], p.get("tags", [])),
         }
         for p in pairs
     ]
@@ -46,7 +47,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     print(f"[chroma] embedding {len(to_update)} new/changed docs (skipping {skip} unchanged)")
 
     try:
-        embeddings = await embed_texts([p["_text"] for p in to_update])
+        embeddings = await embed_texts([p["_embed_text"] for p in to_update])
     except Exception as exc:
         print(f"[chroma] ERROR: embedding failed for batch of {len(to_update)} docs — "
               f"skipping upsert, ChromaDB will be stale until next reload. Reason: {exc}")

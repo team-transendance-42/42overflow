@@ -29,7 +29,7 @@ from collections import defaultdict
 
 from bm25_index import BM25Index
 from detector import detect_topic
-from embedder import embed_texts
+from embedder import QUERY_PREFIX, embed_texts
 from numpy_index import NumpyIndex
 
 _RRF_K = 60   # standard RRF constant — dampens rank-1 dominance
@@ -77,7 +77,7 @@ async def hybrid_search(
     """
     question_embedding: list[float] | None = None
     try:
-        question_embedding = (await embed_texts([question]))[0]
+        question_embedding = (await embed_texts([QUERY_PREFIX + question]))[0]
     except Exception as exc:
         print(f"[retriever] WARNING: embedding failed — falling back to BM25-only: {exc}")
 

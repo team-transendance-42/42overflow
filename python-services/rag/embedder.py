@@ -42,16 +42,30 @@ except Exception as _load_exc:
 # LRU cache size: 512 slots x dim x 4 bytes ≈ 1.5 MB (nomic/768-dim).
 _CACHE_SIZE = 512
 
+# nomic-embed-text-v1.5 was trained with task instruction prefixes for asymmetric retrieval.
+# Using them signals to the model which side of the query/document pair it's encoding,
+# improving cosine similarity between user questions and stored QA documents.
+# BGE and other models do not use this convention — prefixes are gated on model name.
+_IS_NOMIC = "nomic" in EMBED_MODEL.lower()
+QUERY_PREFIX: str = "search_query: " if _IS_NOMIC else ""
+DOC_PREFIX: str   = "search_document: " if _IS_NOMIC else ""
+
 
 def format_doc(question: str, answer: str, tags: list[str] | None = None) -> str:
-    """Format a QA pair for BM25 indexing and embedding.
+    """Format a QA pair for BM25 indexing and display (no embedding prefix).
 
-    Tags are appended so both BM25 and the embedding model see them.
+    Used for: BM25 documents, id_to_text lookup, ChromaDB document storage.
+    For embedding, use format_doc_for_embed() instead.
     """
     base = f"Q: {question}\nA: {answer}"
     if tags:
         base += f"\ntags: {' '.join(tags)}"
     return base
+
+
+def format_doc_for_embed(question: str, answer: str, tags: list[str] | None = None) -> str:
+    """Format a QA pair for embedding — adds model task prefix when applicable."""
+    return DOC_PREFIX + format_doc(question, answer, tags)
 
 
 def make_doc_hash(question: str, answer: str) -> str:
