@@ -46,6 +46,7 @@ func normalizeMessages(w http.ResponseWriter, req *models.TextRequest) bool {
 		req.Messages = []models.Message{
 			{Role: models.RoleUser, Content: req.Prompt},
 		}
+		req.Prompt = "" // prevent buildGeminiContentsFromRequest from appending it a second time
 	}
 	return true
 }

@@ -12,6 +12,9 @@ node_modules
 .DS_Store
 Thumbs.db
 
+# Go binaries
+llm-system-interface/llm-system-interface
+
 # Python
 __pycache__/
 *.pyc

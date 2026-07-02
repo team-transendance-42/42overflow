@@ -204,7 +204,7 @@ async def load_and_index(app: FastAPI, label: str = "startup", include_db: bool 
     app.state.qa_pairs = pairs
 
     topic_counts = Counter(p.get("topic", "unknown") for p in pairs)
-    db_sourced = [p for p in pairs if p.get("source") == "db-post"]
+    db_sourced = [p for p in pairs if p.get("id", "").startswith("db-comment-")]
     print(f"[{label}] topics in corpus: {dict(sorted(topic_counts.items()))}")
     print(f"[{label}] DB-sourced pairs: {len(db_sourced)}")
 

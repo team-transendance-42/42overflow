@@ -166,13 +166,13 @@ def test_prepare_corpus_builds_all_fields():
 def test_prepare_corpus_duplicate_intro_keeps_first():
     """Duplicate intro tags for the same topic must keep the first, ignore the second."""
     from indexer import _prepare_corpus
-    from embedder import make_doc_hash
+    from embedder import make_doc_id
     pairs = [
         {"question": "Q1", "answer": "A1", "topic": "c", "tags": ["intro"]},
         {"question": "Q2", "answer": "A2", "topic": "c", "tags": ["intro"]},
     ]
     corpus = _prepare_corpus(pairs, label="test")
-    assert corpus["topic_intro_ids"]["c"] == make_doc_hash("Q1", "")
+    assert corpus["topic_intro_ids"]["c"] == make_doc_id(pairs[0])
 
 
 # ── _fetch_embeddings ─────────────────────────────────────────────────────────

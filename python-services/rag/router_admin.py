@@ -105,7 +105,6 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
         await conn.execute('DELETE FROM "SubjectMember"')
         await conn.execute('DELETE FROM "Comment"')
         await conn.execute('DELETE FROM "Post"')
-        await conn.execute('DELETE FROM "SubjectMember"')
         await conn.execute('DELETE FROM "Subject"')
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		subject: { select: { slug: true } }
 	  }
 	}),
-	db.post.count({ where: { deleted_at: null } })
+	db.post.count({ where: { deleted_at: null, subject: { deleted_at: null } } })
   ]);
 
   return json({ data: posts, total });

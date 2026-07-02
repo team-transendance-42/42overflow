@@ -58,6 +58,9 @@ func buildOllamaMessages(req models.TextRequest) []models.Message {
 	//create a slice(dynamic arr) with len 0, capacity(len(req.M)+1 on the heap)
 	msgs := make([]models.Message, 0, len(req.Messages)+1)
 	for _, m := range req.Messages {
+		if m.Role != "user" && m.Role != "assistant" {
+			continue
+		}
 		msgs = append(msgs, models.Message{Role: m.Role, Content: truncate(m.Content, maxContentLen)})
 	}
 	if strings.TrimSpace(req.Prompt) != "" {

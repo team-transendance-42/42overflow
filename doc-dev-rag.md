@@ -14,7 +14,7 @@ Populates the PostgreSQL database with fake dev users, subjects, posts, and comm
 docker compose exec python-rag curl -X POST \
   http://localhost:8090/admin/seed-postgres \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Token: Tra-la-la" \
+  -H "X-Admin-Token: <RAG_ADMIN_TOKEN>" \
   -d '{}'
 ```
 
@@ -37,7 +37,7 @@ Reads **all** PostgreSQL posts (including any fake/test data), generates embeddi
 ```bash
 docker compose exec python-rag curl -X POST \
   http://localhost:8090/admin/sync-chroma \
-  -H "X-Admin-Token: Tra-la-la"
+  -H "X-Admin-Token: <RAG_ADMIN_TOKEN>"
 ```
 
 ---
@@ -49,7 +49,7 @@ Same as above but excludes fake dev users (`dev_populate.py` users). Fake posts 
 ```bash
 docker compose exec python-rag curl -X POST \
   http://localhost:8090/admin/sync-real \
-  -H "X-Admin-Token: Tra-la-la"
+  -H "X-Admin-Token: <RAG_ADMIN_TOKEN>"
 ```
 
 Or via `dev_populate.py` (requires `RAG_ADMIN_TOKEN` and `RAG_SERVICE_URL` env vars; `RAG_SERVICE_URL` defaults to `http://localhost:8090`):
@@ -72,7 +72,7 @@ Deletes all seeded:
 ```bash
 docker compose exec python-rag curl -X POST \
   http://localhost:8090/admin/wipe \
-  -H "X-Admin-Token: Tra-la-la"
+  -H "X-Admin-Token: <RAG_ADMIN_TOKEN>"
 ```
 
 ---
@@ -109,7 +109,7 @@ Used by the Go service to determine whether the RAG service is ready to serve re
 ```bash
 docker compose exec python-rag \
   curl -s http://localhost:8090/admin/metrics \
-  -H "X-Admin-Token: Tra-la-la"
+  -H "X-Admin-Token: <RAG_ADMIN_TOKEN>"
 ```
 
 ---
@@ -144,7 +144,7 @@ docker compose restart chromadb
 ```bash
 docker compose exec python-rag \
   curl -s \
-  -H "X-Admin-Token: Tra-la-la" \
+  -H "X-Admin-Token: <RAG_ADMIN_TOKEN>" \
   -X POST http://localhost:8090/admin/sync-chroma \
   | python3 -m json.tool
 ```

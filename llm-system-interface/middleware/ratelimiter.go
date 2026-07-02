@@ -142,14 +142,9 @@ func StartCleanup() {
 //   - Global: shared token bucket across all clients (10 req/min, burst 5) to protect upstream API quota.
 //   - Per-client: individual token bucket keyed by IP (5 req/min, burst 2) with a daily cap of 20 requests.
 //
-// Sets X-RateLimit-* response headers and returns 429 on limit breach. CORS preflight (OPTIONS) is bypassed.
+// Sets X-RateLimit-* response headers and returns 429 on limit breach.
 func RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodOptions { // if method is OPTIONS, skip rate limiting and just return 200 OK for CORS preflight requests
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		// Health check probes must never consume rate-limit tokens.
 		// Docker hits /healthz every 10s from 127.0.0.1; the per-student
 		// limit (5/min) would eventually deplete that bucket → 429 →
@@ -173,6 +168,9 @@ func RateLimiter(next http.Handler) http.Handler {
 		w.Header().Set("X-RateLimit-Minute", "5")
 		w.Header().Set("X-RateLimit-Day", strconv.Itoa(perStudentDailyMax))
 
+		// No defer mu.Unlock() here — mu must be released BEFORE calling next.ServeHTTP.
+		// Using defer would hold the lock for the entire downstream handler, serialising all requests.
+		// Each return path unlocks explicitly; the happy path unlocks before ServeHTTP.
 		mu.Lock()
 		// re-check day rollover inside the lock (getLimiter may have run slightly earlier)
 		today := now.Format("2006-01-02")

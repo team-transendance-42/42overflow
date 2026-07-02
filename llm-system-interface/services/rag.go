@@ -60,7 +60,11 @@ func extractAnswer(text string) string {
 sends a JSON HTTP request with automatic retry logic
 out must be a pointer (e.g. &myStruct) — json.Decode silently does nothing if it isn't
 */
-func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) error {
+func ragAdminToken() string {
+	return os.Getenv("RAG_ADMIN_TOKEN")
+}
+
+func doJSONWithRetry(ctx context.Context, method, url string, in any, out any, extraHeaders map[string]string) error {
 	b, err := json.Marshal(in)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
@@ -75,6 +79,9 @@ func doJSONWithRetry(ctx context.Context, method, url string, in any, out any) e
 			return nil, fmt.Errorf("build request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		for k, v := range extraHeaders {
+			req.Header.Set(k, v)
+		}
 		return http.DefaultClient.Do(req)
 	})
 	if err != nil {
@@ -117,7 +124,7 @@ const (
 	 have the correct top-1 doc but gemma3:4b still returns the fallback.
 	 Raise back to 0.85 if a better model handles those cases correctly.
 	 */
-	directBypassSimilarity = 0.82
+	directBypassSimilarity = 0.85
 )
 
 /* ForwardAndAccumulate reads chunks from rawCh, forwards each to outCh, and calls
@@ -159,7 +166,8 @@ func staticChan(text string) <-chan string {
 func fetchRAGContexts(ctx context.Context, question string) (models.RagRetrieveResponse, error) {
 	var r models.RagRetrieveResponse
 	if err := doJSONWithRetry(ctx, http.MethodPost, pyRagURL()+"/rag/retrieve",
-		map[string]any{"question": question}, &r); err != nil {
+		map[string]any{"question": question}, &r,
+		map[string]string{"X-Admin-Token": ragAdminToken()}); err != nil {
 		return r, fmt.Errorf("retrieve contexts: %w", err)
 	}
 	log.Printf("[RAG] retrieved %d contexts, confidence=%.4f, best_similarity=%.4f, has_embeddings=%v",
@@ -285,15 +293,15 @@ func streamOllama(ctx context.Context, question, prompt string) (<-chan string, 
 	go ForwardAndAccumulate(ctx, rawCh, outCh, func(answer string) {
 		log.Printf("[RAG] ollama final answer len=%d: %q", len(answer), answer)
 		if answer == "" {
-			outCh <- models.StreamErrSentinel + "empty model answer"
+			select {
+			case outCh <- models.StreamErrSentinel + "empty model answer":
+			case <-ctx.Done():
+			}
 			return
 		}
-		// gemma3:4b often paraphrases the exact no-info reply; check the two
-		// invariant fragments that cover all observed variants.
-		isNoInfo := strings.Contains(answer, "42 curriculum") || strings.Contains(answer, "curriculum questions")
-		if !isNoInfo {
-			ragCacheSet(question, answer)
-		}
+		// Cache all answers including model refusals — repeated off-topic queries
+		// should hit the cache (fast path) instead of triggering a new Ollama call.
+		ragCacheSet(question, answer)
 	})
 	return outCh, nil
 }
@@ -322,7 +330,16 @@ func StreamRagAnswer(ctx context.Context, question string) (<-chan string, error
 		return staticChan("Hi! I can only help with 42 curriculum projects. Shoot :)"), nil
 	}
 	if isDirectBypass(retrieved) {
-		answer := "From community: " + extractAnswer(retrieved.Contexts[0].Text)
+		// Python pins the topic intro doc at Contexts[0] with rrf_score=0.0 regardless
+		// of whether it is the best-matching doc.  The actual best match has the highest
+		// RRFScore, so we pick that instead of always taking the intro at index 0.
+		best := retrieved.Contexts[0]
+		for _, c := range retrieved.Contexts[1:] {
+			if c.RRFScore > best.RRFScore {
+				best = c
+			}
+		}
+		answer := "From community: " + extractAnswer(best.Text)
 		log.Printf("[RAG] direct answer (similarity=%.4f) — skipping Ollama", retrieved.BestSimilarity)
 		ragCacheSet(question, answer)
 		return staticChan(answer), nil

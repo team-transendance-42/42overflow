@@ -64,6 +64,16 @@ func ragCacheSet(question, answer string) {
 	// and TTL already handles staleness. True LRU would cost a write on
 	// every read, which defeats the RWMutex read-concurrency we set up.
 	if _, exists := ragCache[key]; !exists {
+		// Trim ghost keys from the front: entries deleted by ragCacheGet (expired)
+		// leave their key in ragCacheOrder but not in ragCache.  Without this trim,
+		// ragCacheOrder grows beyond ragCacheMaxSize when entries expire faster than
+		// new ones are inserted (ghost keys accumulate without bound).
+		for len(ragCacheOrder) > 0 {
+			if _, alive := ragCache[ragCacheOrder[0]]; alive {
+				break
+			}
+			ragCacheOrder = ragCacheOrder[1:]
+		}
 		for len(ragCache) >= ragCacheMaxSize {
 			oldest := ragCacheOrder[0]
 			ragCacheOrder = ragCacheOrder[1:]

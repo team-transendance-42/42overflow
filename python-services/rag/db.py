@@ -28,7 +28,6 @@ def _row_to_pair(row: Record) -> dict:
         "answer": row["answer"] or "",
         "topic": topic,
         "tags": [topic],
-        "source": "db-post",
     }
 
 

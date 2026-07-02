@@ -89,10 +89,12 @@ func readGeminiSSEToChannel(resp *http.Response, ch chan string) {
 }
 
 func doGEMINIRequest(ctx context.Context, client *http.Client, body []byte, apiKey string) (*http.Response, error) {
+	// GEMINI_URL must contain the full endpoint including model name
+	// (e.g. .../models/gemini-2.0-flash:streamGenerateContent?alt=sse).
+	// GEMINI_MODEL is not used here — changing the model means changing GEMINI_URL.
 	url := os.Getenv("GEMINI_URL")
-	model := os.Getenv("GEMINI_MODEL")
-	if model == "" || url == "" {
-		return nil, fmt.Errorf("GEMINI_URL and GEMINI_MODEL must be set")
+	if url == "" {
+		return nil, fmt.Errorf("GEMINI_URL must be set")
 	}
 
 	return withRetry(ctx, func() (*http.Response, error) {
