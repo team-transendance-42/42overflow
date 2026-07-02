@@ -1,0 +1,56 @@
+---
+  Dense hits (numpy_index.search)
+
+  NumpyIndex._matrix stores every dimension filled — a 768-float
+  vector where nearly every value is non-zero (produced by a neural
+  embedding model like fastembed).
+
+  - What it captures: semantic meaning — "memory allocation" and
+  "malloc" land near each other even if no shared words exist
+  - Similarity measure: cosine similarity — scores = matrix @ q_hat
+  (line 134 of numpy_index.py), which is the angle between vectors
+  - Returned as distance = 1 - cosine_similarity (line 165), so 0 =
+  identical, 2 = opposite
+
+  Sparse hits (bm25_index.search)
+
+  BM25 works on a term-frequency matrix where most cells are 0 — a doc
+  about "git" has 0 in every column for words that don't appear in it.
+  Only the words actually present get non-zero weights.
+
+  - What it captures: exact/near-exact word overlap — finds docs
+  containing the same keywords
+  - Score formula: BM25 weighs term frequency + document length
+  normalization
+  - Returns ranked list of docs that share tokens with the query
+
+  Why both matter
+
+  ┌──────────────────┬──────────────────────┬──────────────────────┐
+  │                  │        Dense         │        Sparse        │
+  ├──────────────────┼──────────────────────┼──────────────────────┤
+  │ Query: "how does │                      │ finds docs           │
+  │  memory work in  │ finds "stack/heap    │ containing the       │
+  │ C?"              │ allocation" docs     │ literal word         │
+  │                  │                      │ "memory"             │
+  ├──────────────────┼──────────────────────┼──────────────────────┤
+  │ Query: "segfault │ finds "runtime       │ finds docs with      │
+  │  debugging"      │ errors, crashes"     │ "segfault" in them   │
+  │                  │ docs                 │                      │
+  ├──────────────────┼──────────────────────┼──────────────────────┤
+  │                  │ query is rare jargon │ user paraphrases (no │
+  │ Fails when...    │  with no training    │  word overlap)       │
+  │                  │ signal               │                      │
+  └──────────────────┴──────────────────────┴──────────────────────┘
+
+  RRF merges them (line 144–148 in retriever.py)
+
+  rrf_scores[hit["id"]] += 1.0 / (rank + 60)
+
+  A doc ranked top-5 in both lists beats a doc ranked #1 in only one.
+  This is intentional — the rank position matters, not the raw score
+  magnitude (cosine 0.9 vs BM25 3.2 are incomparable scales, so you
+  can't just add them).
+
+  Your intuition about the vector shapes is correct: dense = all values
+  filled (dense vector), sparse = mostly zeros (sparse vector).

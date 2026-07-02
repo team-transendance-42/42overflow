@@ -29,7 +29,7 @@ from collections import defaultdict
 
 from bm25_index import BM25Index
 from detector import detect_topic
-from embedder import embed_texts
+from embedder import QUERY_PREFIX, embed_texts
 from numpy_index import NumpyIndex
 
 _RRF_K = 60   # standard RRF constant — dampens rank-1 dominance
@@ -75,12 +75,9 @@ async def hybrid_search(
           meaningful. False when NumpyIndex is empty (embedding failed at
           startup) — Go skips the semantic gate and relies on RRF confidence alone.
     """
-    # 1. Embed question — needed for both dense retrieval and centroid detection.
-    #    Runs in a thread pool (fastembed is CPU-bound, must not block event loop).
-    #    On failure: log and fall back to BM25-only (has_embeddings=False).
     question_embedding: list[float] | None = None
     try:
-        question_embedding = (await embed_texts([question]))[0]
+        question_embedding = (await embed_texts([QUERY_PREFIX + question]))[0]
     except Exception as exc:
         print(f"[retriever] WARNING: embedding failed — falling back to BM25-only: {exc}")
 
@@ -104,7 +101,7 @@ async def hybrid_search(
             detected_topic, _ = detect_topic(question_embedding, centroids)
         except Exception as exc:
             print(f"[retriever] WARNING: topic detection failed: {exc}")
-    use_filter = detected_topic is not None
+    use_filter: bool = detected_topic is not None
 
     # 3a. Filtered retrieval when topic is confidently detected.
     if use_filter and question_embedding is not None:
@@ -141,7 +138,7 @@ async def hybrid_search(
     #    rank 0 (best) → 1/60 ≈ 0.0167.
     #    A doc ranked top-5 in BOTH lists beats a doc ranked #1 in only one.
     #    This is robust to score scale differences between dense and sparse.
-    rrf_scores: dict[str, float] = defaultdict(float)
+    rrf_scores: dict[str, float] = defaultdict(float) # any missing key automatically gets 0.0 as its default value
     for rank, hit in enumerate(dense_hits):
         rrf_scores[hit["id"]] += 1.0 / (rank + _RRF_K)
     for rank, hit in enumerate(sparse_hits):
@@ -151,9 +148,9 @@ async def hybrid_search(
     #    NumpyIndex.search() returns "document" field, but id_to_text is the
     #    authoritative source — covers BM25-only hits not in dense results.
     dense_text: dict[str, str] = {hit["id"]: hit["document"] for hit in dense_hits}
-    top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k]
+    top_ids = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)[:top_k] # keys, ordered by value
 
-    results = []
+    results: list[dict] = []
     for id_ in top_ids:
         text = dense_text.get(id_) or id_to_text.get(id_, "")
         if not text:

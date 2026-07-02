@@ -86,10 +86,10 @@ def test_row_to_pair_uses_comment_id_in_doc_id():
     assert pair["id"] == "db-comment-42"
 
 
-def test_row_to_pair_source_is_db_comment():
+def test_row_to_pair_has_no_source():
     row = _FakeRow(comment_id=1, project_name="minishell", question="Q?", answer="A.")
     pair = _row_to_pair(row)
-    assert pair["source"] == "db-comment"
+    assert "source" not in pair
 
 
 def test_row_to_pair_answer_field():

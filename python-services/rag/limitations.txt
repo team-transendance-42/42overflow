@@ -1,0 +1,8 @@
+  Gemma3:4b — even at temp 0.3, this model ignores "reproduce
+  the COMPLETE answer word for word" for long answers. It summarizes to the
+  first sentence. This is a well-known limitation of small 4B models: they
+  default to brevity regardless of instructions.
+    Why it truncates every time, not randomly — temp 0.3 makes the model
+  consistently pick the most probable (short) completion. At temp 0.8 it
+  occasionally reproduced more, but also hallucinated. At temp 0.3 it reliably
+  truncates but doesn't invent.

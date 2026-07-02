@@ -1,0 +1,21 @@
+
+  Postgres (Post + Subject + Comment)
+           ↓  db.py: _QUERY joins Post → Subject → uses s.slug as topic
+           ↓
+       db_pairs  (each pair has topic = "minishell", "push_swap", etc.)
+           ↓
+  indexer.py: pairs = seed_pairs + db_pairs
+           ↓
+  _sync_to_chroma() → embeds all docs
+           ↓
+  build_topic_centroids(pairs, all_embeddings)
+           ↓
+  app.state.centroids = {"minishell": [...768 floats...], "push_swap":
+  [...], ...}
+           ↓
+  detect_topic(question_embedding, centroids)  ← detector reads these
+
+  PostgreSQL subjects ARE used for centroids automatically — every
+  subject slug that has at least one post+comment in Postgres becomes a
+  topic in the centroid map.
+  subjects with posts but zero comments won't appear 

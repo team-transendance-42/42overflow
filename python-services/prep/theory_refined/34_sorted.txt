@@ -1,0 +1,6 @@
+=======================================
+ sorted() on a dict gives you the keys
+=======================================
+we return only keys which are sorted by their values
+sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)
+  # → ["doc_1", "doc_7", "doc_3"]   ← keys, ordered by value

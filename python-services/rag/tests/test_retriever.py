@@ -11,7 +11,7 @@ import asyncio
 
 from bm25_index import BM25Index
 from detector import build_topic_centroids
-from embedder import embed_texts, format_doc, make_doc_id
+from embedder import embed_texts, format_doc, format_doc_for_embed, make_doc_hash, make_doc_id
 from numpy_index import NumpyIndex
 from retriever import hybrid_search
 from seed import load_seed
@@ -28,8 +28,9 @@ def _build_test_fixtures(with_centroids: bool = False):
     Edge case: fastembed loads the model on first call (~2s), cached thereafter.
     """
     pairs = load_seed()
-    all_texts = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
-    all_ids = [make_doc_id(p["question"], p.get("answer", "")) for p in pairs]
+    all_texts       = [format_doc(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
+    all_embed_texts = [format_doc_for_embed(p["question"], p["answer"], p.get("tags", [])) for p in pairs]
+    all_ids = [make_doc_id(p) for p in pairs]
     all_topics = [p.get("topic", "unknown") for p in pairs]
 
     id_to_text = dict(zip(all_ids, all_texts))
@@ -39,7 +40,8 @@ def _build_test_fixtures(with_centroids: bool = False):
     bm25.build(documents=all_texts, ids=all_ids, topics=all_topics)
 
     # Always embed — NumpyIndex needs real vectors for meaningful dense search.
-    embeddings = asyncio.run(embed_texts(all_texts))
+    # Use format_doc_for_embed (with task prefix) to match production indexing.
+    embeddings = asyncio.run(embed_texts(all_embed_texts))
 
     numpy_idx = NumpyIndex()
     numpy_idx.build(
@@ -162,7 +164,7 @@ def _build_topic_intro_ids() -> dict[str, str]:
     """Build {topic: intro_doc_id} from seed — mirrors what main.py will do."""
     pairs = load_seed()
     return {
-        p["topic"]: make_doc_id(p["question"], p.get("answer", ""))
+        p["topic"]: make_doc_id(p)
         for p in pairs
         if "intro" in p.get("tags", [])
     }

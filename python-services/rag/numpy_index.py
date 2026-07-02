@@ -3,7 +3,7 @@ In-memory brute-force cosine similarity index using numpy.
 
 Why this instead of ChromaDB at query time:
   ChromaDB HNSW is designed for millions of docs and adds a network roundtrip
-  (~50–150ms) even when the data is trivially small. For 200 docs, a single
+  (~50-150ms) even when the data is trivially small. For 200 docs, a single
   matrix-vector multiply in C/BLAS is exact, ~0.05ms, and needs no network.
 
 Theory — pre-normalised dot product trick:
@@ -15,7 +15,7 @@ Theory — pre-normalised dot product trick:
   This is ONE BLAS dgemv call for all N docs simultaneously.
 
 Pros:
-  - ~0.05ms per search for N=200, D=768 (vs 50–150ms ChromaDB HTTP)
+  - ~0.05ms per search for N=200, D=768 (vs 50-150ms ChromaDB HTTP)
   - Exact results (HNSW approximates)
   - No network dependency at query time
   - Safe for concurrent async reads (matrix is immutable after build)
@@ -131,7 +131,7 @@ class NumpyIndex:
         q_hat = q / q_norm
 
         # All cosine similarities in one matrix-vector multiply.
-        scores = self._matrix @ q_hat   # shape (N,)
+        scores = self._matrix @ q_hat   # @ is Python's matrix multiplication operator shape(N,) 1 socre per doc
 
         # Apply topic filter: set scores to -inf for non-matching docs so they
         # rank last and get cut off by the top-n slice. Post-filter is correct

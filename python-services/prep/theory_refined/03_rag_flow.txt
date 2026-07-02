@@ -1,0 +1,31 @@
+Browser → POST /api/ai/community
+      → SvelteKit (src/routes/api/ai/community/+server.ts)
+      → Go handler: RagAskStreaming()
+          → acquires ragQueue slot (capacity 1)
+          → services.StreamRagAnswer(ctx, prompt)
+              → check cache → miss
+              → fetchRAGContexts() → HTTP POST to Python /rag/retrieve
+              → isOffTopic? → no
+              → isDirectBypass? → no
+              → streamOllama(ctx, question, prompt)
+                  → HTTP POST to Ollama /api/chat (streaming)
+                  → goroutine 1: readOllamaToChannel(ctx, resp, rawCh)
+                      reads Ollama JSON stream → sends tokens into rawCh
+                  → goroutine 2: ForwardAndAccumulate(ctx, rawCh, outCh, onDone)
+                      for each chunk from rawCh:
+                          select {
+                          case outCh <- chunk:   ← happy path: forward to browser
+                          case <-ctx.Done():     ← client disconnected: exit, no cache
+                              return
+                          }
+                      when rawCh closes naturally → call onDone(fullAnswer)
+                          → log answer length
+                          → if not a "no info" reply → ragCacheSet(question, answer)
+                  → returns outCh
+          → returns outCh to handler
+          → streamSSE(w, outCh)  ← reads outCh, writes SSE to browser
+              → client disconnects mid-stream:
+                  ctx cancelled → goroutine 2 exits via ctx.Done()
+                  → defer close(outCh) fires → streamSSE exits range loop
+                  → no goroutine leak ✓
+                  → no partial answer cached ✓

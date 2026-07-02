@@ -2,7 +2,11 @@ Two completely different layers:
 
   Browser (Svelte)
         │
-        │  POST /ai-assist/ollama        ← our route, on our Go server :8081
+        │  POST /api/ai/ollama        ← SvelteKit route (auth-checked)
+        ▼
+  SvelteKit :5173
+        │
+        │  POST http://llm-server:8081/api/ai/ollama   ← proxied to Go
         ▼
   Go Backend (llm-system-interface)
         │
@@ -16,19 +20,18 @@ Two completely different layers:
   /api/chat is Ollama's own fixed REST endpoint — it's baked into the Ollama binary, not something we chose. we're calling Ollama the same way
   we'd call any local HTTP service. "Local" just means it runs in a Docker container on our network, not that it has a special protocol — it
   still speaks HTTP.
-  our routes (/ai-assist/ollama, /ai-assist/gemini, /ai-assist/community) are what the browser talks to. They're our API surface, our naming.
+  our routes (/api/ai/ollama, /api/ai/gemini, /api/ai/community) are what the browser talks to. They're our API surface, our naming.
   ---
   Full pipeline per request type:
 
   Browser
     └─▶ Caddy :8443  (HTTPS, only public port)
           └─▶ SvelteKit :5173  (auth check via locals.user)
-                ├─▶ /api/ollama     → Go :8081/ai-assist/ollama     → Ollama :11434/api/chat
-                ├─▶ /api/ai-assist  → Go :8081/ai-assist/gemini     → Gemini API (external)
-                ├─▶ /api/community  → Go :8081/ai-assist/community  → python-rag :8090/rag/retrieve
+                ├─▶ /api/ai/ollama     → Go :8081/api/ai/ollama     → Ollama :11434/api/chat
+                ├─▶ /api/ai/gemini     → Go :8081/api/ai/gemini     → Gemini API (external)
+                ├─▶ /api/ai/community  → Go :8081/api/ai/community  → python-rag :8090/rag/retrieve
                 │                                                       └─▶ ChromaDB :8000
                 │                                                       └─▶ Postgres :5432
                 │                                                    → Ollama :11434/api/chat
-                └─▶ /api/stt        → python-stt :8091/convert_audio  (Whisper)
+                └─▶ /api/stt           → python-stt :8091/convert_audio  (Whisper)
 ===================================
-

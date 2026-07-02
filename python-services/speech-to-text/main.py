@@ -23,10 +23,16 @@ model = WhisperModel("small", device="cpu", compute_type="int8")
 # 4. It returns the text as a JSON object.
 @app.post("/convert_audio") # The @ is a decorator — Python's way of wrapping a function with extra behavior. This one registers the next function as the handler for POST /convert_audio; Equivalent in Go Gin: app.POST("/convert_audio", convertAudio)
 async def convert_audio(file: UploadFile = File(...)): # UploadFile FastApi obj: file stream (you can read it without loading everything into memory)
+    # Reject oversized uploads before reading the body into RAM.
+    # Content-Length is optional so we check it first as a fast path, then enforce
+    # the limit again after reading (clients can lie about or omit the header).
+    if file.size is not None and file.size > 10 * 1024 * 1024:
+        return JSONResponse({"error": "file too large"}, status_code=413)
+
     # Create a temporary file that won't be deleted automatically until we are done
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:  # like Java's try-with-resources
         content = await file.read()
-        if len(content) > 10 * 1024 * 1024:  # 10MB
+        if len(content) > 10 * 1024 * 1024:  # 10MB hard limit after read
             return JSONResponse({"error": "file too large"}, status_code=413)
 
         tmp.write(content)

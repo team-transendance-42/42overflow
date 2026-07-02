@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field # data validation, parsing, and serialization
 # BaseModel checks that incoming data has the correct types and structure and automatically converts values when possible.
 # Field: add metadata, validation rules, defaults, descriptions, aliases, etc.
@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field # data validation, parsing, an
 
 
 from retriever import hybrid_search
+from router_admin import require_admin
 
 router = APIRouter()
 
@@ -39,8 +40,8 @@ class RetrieveResponse(BaseModel):
 #      ...
 #  } Starlette wraps that scope in a Request object, not to work with raw dicts.
 #  It's a lazy wrapper — it doesn't read the body until the await request.body()
-@router.post("/rag/retrieve", response_model=RetrieveResponse) 
-async def retrieve(body: AskRequest, request: Request) -> RetrieveResponse:
+@router.post("/rag/retrieve", response_model=RetrieveResponse)
+async def retrieve(body: AskRequest, request: Request, _: None = Depends(require_admin)) -> RetrieveResponse:
     """
     Retrieval only — no generation.
     Returns top-K context docs and the max RRF score as confidence.

@@ -1,0 +1,23 @@
+ ---
+  Cache 1: Go answer cache (services/cache.go)
+
+  What it stores: question (string) → full LLM answer (string)
+
+  Lives in: Go process RAM, in the ragCache map
+
+  TTL: 1 hour, max 500 entries
+
+  Cleared by: reload_rag.sh step 3 — POSTs to /admin/clear-rag-cache on the Go server
+
+  ---
+  Cache 2: Python embedding LRU (embedder.py:97)
+
+  What it stores: question text (string) → 768-dim float vector
+
+  Lives in: Python process RAM, via @lru_cache(maxsize=512)
+
+  TTL: none — evicts only when full (LRU), or on container restart
+
+  Does cache 2 need clearing after a corpus update?
+  No. The Python LRU only caches how a question embeds into a vector. That math is deterministic and doesn't depend on what's in our corpus.
+  Whether we have 10 or 1000 Q&A pairs, "what is malloc" always embeds to the same 768-dim vector.

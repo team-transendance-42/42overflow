@@ -1,0 +1,30 @@
+
+● @ is Python's matrix multiplication operator
+  self._matrix  # shape (N, D) — N docs, each a 768-dim unit vector
+  q_hat         # shape (D,)   — the query, also a unit vector
+
+  scores = self._matrix @ q_hat  # shape (N,) — one score per doc
+
+  It computes the dot product of every doc vector against the query
+  vector simultaneously in one operation. Equivalent to:
+
+  scores[i] = sum(self._matrix[i][j] * q_hat[j] for j in range(768))
+  ...but done for all N docs at once in C/BLAS (not a Python loop).
+
+  Why this equals cosine similarity:
+
+  Normally cosine similarity = dot(a, b) / (||a|| * ||b||). But both
+  self._matrix rows and q_hat were L2-normalized to unit length
+  beforehand (build() normalizes the matrix, search() normalizes the
+  query). So ||a|| = ||b|| = 1, and the formula collapses to just dot(a,
+  b) — which is exactly what @ computes.
+
+  The result:
+
+  scores is a 1D array of N floats, each in range [-1, 1]:
+  - 1.0 = identical direction (perfect match)
+  - 0.0 = orthogonal (unrelated)
+  - -1.0 = opposite direction
+
+  Then distance = 1 - scores[i] converts it to [0, 2] where 0 = best
+  match.

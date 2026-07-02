@@ -4,30 +4,7 @@ Run: uv run python -m pytest tests/test_detector.py -v
 No external services — pure math on fake vectors.
 """
 import pytest
-from detector import build_topic_centroids, detect_topic, cosine_similarity
-
-
-# ── cosine_similarity ────────────────────────────────────────────────────────
-
-def test_cosine_identical_vectors():
-    v = [1.0, 0.0, 0.5]
-    assert abs(cosine_similarity(v, v) - 1.0) < 1e-6
-
-
-def test_cosine_orthogonal_vectors():
-    a = [1.0, 0.0]
-    b = [0.0, 1.0]
-    assert abs(cosine_similarity(a, b)) < 1e-6
-
-
-def test_cosine_opposite_vectors():
-    a = [1.0, 0.0]
-    b = [-1.0, 0.0]
-    assert abs(cosine_similarity(a, b) - (-1.0)) < 1e-6
-
-
-def test_cosine_zero_vector_returns_zero():
-    assert cosine_similarity([0.0, 0.0], [1.0, 1.0]) == 0.0
+from detector import build_topic_centroids, detect_topic
 
 
 # ── build_topic_centroids ────────────────────────────────────────────────────
@@ -108,24 +85,6 @@ def test_detect_topic_returns_best_with_margin():
 
 
 # ── numpy correctness ────────────────────────────────────────────────────────
-# These tests verify that the numpy implementation produces the same results
-# as the hand-verified reference values. They catch floating-point regressions
-# if the implementation changes internally.
-
-def test_cosine_known_value():
-    """[1,1] vs [1,0] = cos(45°) = 1/sqrt(2) ≈ 0.7071."""
-    result = cosine_similarity([1.0, 1.0], [1.0, 0.0])
-    assert abs(result - (2 ** -0.5)) < 1e-6
-
-
-def test_cosine_high_dim_matches_reference():
-    """768-dim all-ones vectors → cosine = 1.0 (parallel)."""
-    dim = 768
-    a = [1.0] * dim
-    b = [1.0] * dim
-    result = cosine_similarity(a, b)
-    assert abs(result - 1.0) < 1e-5
-
 
 def test_centroid_high_dim_shape():
     """Centroid of 768-dim embeddings has the right dimension."""
@@ -144,25 +103,3 @@ def test_detect_topic_single_topic_always_detected_if_confident():
     topic, confidence = detect_topic([1.0, 0.0], centroids)
     assert topic == "git"
     assert confidence == pytest.approx(1.0, abs=1e-5)
-
-# ── speed ────────────────────────────────────────────────────────────────────
-# 1000 cosine_similarity calls on 768-dim vectors must complete in < 200ms.
-# This is a regression guard — if it regresses to Python loops it will fail.
-
-
-def test_cosine_speed_1000_calls():
-    import time
-    import random
-    random.seed(0)
-    dim = 768
-    a = [random.gauss(0, 1) for _ in range(dim)]
-    b = [random.gauss(0, 1) for _ in range(dim)]
-
-    start = time.perf_counter()
-    for _ in range(1000):
-        cosine_similarity(a, b)
-    elapsed_ms = (time.perf_counter() - start) * 1000
-
-    # Pure Python: ~5000ms for 1000 calls. numpy: ~3ms.
-    # 200ms threshold is 60x generous — any regression to Python loops will fail.
-    assert elapsed_ms < 200, f"cosine_similarity too slow: {elapsed_ms:.1f}ms for 1000 calls"

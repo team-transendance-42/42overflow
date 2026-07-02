@@ -1,0 +1,60 @@
+A plain Python list is just the built-in [] syntax — no imports
+  needed.
+
+  # plain Python list
+  vecs = [1, 2, 3]
+
+  # list of lists
+  vecs = [[0.1, 0.9], [0.3, 0.7]]
+
+  It's just a container. It has no math operations, no shape, no concept of rows/columns.
+
+  vecs = [[0.1, 0.9], [0.3, 0.7]]
+
+  vecs.shape      # ERROR — lists don't have .shape
+  vecs * 2        # gives [[0.1, 0.9], [0.3, 0.7], [0.1, 0.9], [0.3, 0.7]]
+                  # just repeats the list, does NOT multiply the numbers
+
+  Contrast with NumPy:
+  import numpy as np
+  matrix = np.array([[0.1, 0.9], [0.3, 0.7]])
+
+  matrix.shape    # (2, 2)  ✓
+  matrix * 2      # [[0.2, 1.8], [0.6, 1.4]]  ✓ — multiplies every
+  number
+
+  One-liner: a plain list is a dumb container; a NumPy array is a
+  math-aware grid.
+----
+shape tells you the dimensions of the array.
+
+  matrix = np.array([[0.1, 0.9],
+                     [0.3, 0.7]])
+
+  matrix.shape  # (2, 2)
+
+  Read (2, 2) as: 2 rows, 2 columns.
+
+  ---
+  More examples to make it concrete:
+
+  np.array([1, 2, 3]).shape                    # (3,)      → 1D, 3
+  elements
+
+  np.array([[1, 2, 3],
+            [4, 5, 6]]).shape                  # (2, 3)    → 2 rows, 3
+  columns
+
+  np.array([[[1, 2],
+             [3, 4]],
+            [[5, 6],
+             [7, 8]]]).shape                   # (2, 2, 2) → 3D
+
+  ---
+  Why it matters:
+
+  (n_docs, dim) in the comment means:
+  - first number = how many documents
+  - second number = how many dimensions each embedding has
+
+  So shape (5, 384) means 5 documents, each with a 384-dimension vector.

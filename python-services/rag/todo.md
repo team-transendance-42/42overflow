@@ -1,5 +1,0 @@
-everywhere, including main: handle exeptions from embedder and log them. If embedding fails, we don't want to crash the whole app, but we can log the error and skip the update for that batch of pairs. This way, we can still serve requests with existing data while investigating the embedding issue. GRACEFULLY; check every func call: if it fails how is handled? If not, add try-except and logging. This is especially important for external calls (like to the embedding service) that might fail due to network issues or service downtime.
-
- If any valid question gets refused, lower minCosineSimilarity from
-  0.45 toward 0.35. If off-topic questions still pass, raise it toward
-  0.55.

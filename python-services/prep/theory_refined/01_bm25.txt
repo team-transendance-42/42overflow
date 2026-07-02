@@ -1,0 +1,8 @@
+  User asks: "how does malloc work"
+  BM25 finds documents that contain the words malloc, work — ranked by
+  how rare+frequent those words are.
+
+  It knows nothing about meaning. "allocate memory" scores zero even
+  though it means the same thing. That's why you also have embeddings
+  (the dense vector search) — embeddings catch meaning, BM25 catches
+  exact words. Together they cover both cases.

@@ -44,6 +44,10 @@ func RagAskStreaming(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
+	if len(req.Prompt) > 20000 {
+		http.Error(w, "prompt too large, max 20000 chars", http.StatusRequestEntityTooLarge)
+		return
+	}
 
 	ch, err := services.StreamRagAnswer(r.Context(), req.Prompt)
 	if err != nil {

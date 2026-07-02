@@ -1,0 +1,39 @@
+  ---
+  1. Cosine Similarity vs Dot Product — what's the difference?
+
+  Dot product of two vectors a and b:
+  dot(a, b) = a[0]*b[0] + a[1]*b[1] + ... + a[D]*b[D]
+  This measures both angle (direction overlap) AND magnitude (how long the vectors are). A long vector will always score higher even if it points in
+  the same direction as a short one. That's a problem — a sentence repeated 10 times would get 10× the score.
+
+  Cosine similarity fixes that by dividing out the lengths:
+  cosine(a, b) = dot(a, b) / (||a|| * ||b||)
+  ||a|| is the L2 norm = sqrt(sum of squares). The result is always in [-1, 1]:
+  - 1.0 = same direction (identical meaning)
+  - 0.0 = perpendicular (unrelated)
+  - -1.0 = opposite directions
+
+  So cosine gives pure angle — direction-only, length-stripped. That's what is wanted for semantic similarity.
+  ------
+    2. Why our code uses dot product but gets cosine similarity
+
+  This is the pre-normalization trick in numpy_index.py:build():
+
+  norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+  self._matrix = matrix / norms   # ALL doc vectors are now unit-length
+
+  Then at query time (search()):
+  q_hat = q / q_norm             # query also normalized to unit length
+  scores = self._matrix @ q_hat  # dot product of unit vectors
+
+  Why this equals cosine similarity:
+  cosine(a, b) = dot(a, b) / (||a|| * ||b||)  //  ||a|| is the L2 norm = sqrt(sum of squares). The result is always in [-1, 1]:
+
+  If ||a|| = 1 and ||b|| = 1:
+  cosine(a_hat, b_hat) = dot(a_hat, b_hat) / (1 * 1) = dot(a_hat, b_hat)
+
+  Pre-normalizing once at build time means every search is just a matrix multiply — one BLAS call (M @ q_hat) computes all N cosine similarities
+  simultaneously in C. No per-query division. For 200 docs that's ~0.05ms instead of 50–150ms for ChromaDB over HTTP.
+  -----
+
+

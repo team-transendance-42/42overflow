@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from bm25_index import BM25Index
 from db import load_db_pairs
 from detector import build_topic_centroids
-from embedder import embed_texts, format_doc, make_doc_hash, make_doc_id
+from embedder import embed_texts, format_doc, format_doc_for_embed, make_doc_hash, make_doc_id
 from numpy_index import NumpyIndex
 from seed import load_seed
 from store import get_embeddings, get_existing_hashes, upsert
@@ -15,16 +15,16 @@ from store import get_embeddings, get_existing_hashes, upsert
 
 async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     """Sync question-answer pairs to ChromaDB — only embeds new or changed docs.
-
     Returns {doc_id: embedding} for every doc that was freshly embedded this
     call. Empty dict when nothing changed or embedding failed. The caller uses
     this to avoid a redundant GET for docs whose vectors are already in memory."""
     augmented = [
         {
             **p,
-            "_id":   make_doc_id(p["question"], p.get("answer", "")),
-            "_hash": make_doc_hash(p["question"], p["answer"]),
-            "_text": format_doc(p["question"], p["answer"], p.get("tags", [])),
+            "_id":         make_doc_id(p),
+            "_hash":       make_doc_hash(p["question"], p["answer"]),
+            "_text":       format_doc(p["question"], p["answer"], p.get("tags", [])),
+            "_embed_text": format_doc_for_embed(p["question"], p["answer"], p.get("tags", [])),
         }
         for p in pairs
     ]
@@ -47,7 +47,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     print(f"[chroma] embedding {len(to_update)} new/changed docs (skipping {skip} unchanged)")
 
     try:
-        embeddings = await embed_texts([p["_text"] for p in to_update])
+        embeddings = await embed_texts([p["_embed_text"] for p in to_update])
     except Exception as exc:
         print(f"[chroma] ERROR: embedding failed for batch of {len(to_update)} docs — "
               f"skipping upsert, ChromaDB will be stale until next reload. Reason: {exc}")
@@ -69,7 +69,7 @@ async def _sync_to_chroma(pairs: list[dict]) -> dict[str, list[float]]:
     return {p["_id"]: emb for p, emb in zip(to_update, embeddings)}
 
 
-async def _load_pairs(include_db: bool, label: str) -> list[dict]:
+async def _load_pairs(include_db: bool, label: str, exclude_user_ids: list[str] | None = None) -> list[dict]:
     """Load seed + (optionally) Postgres pairs and validate required fields.
 
     Raises ValueError if any pair is missing 'question' or 'answer' — a
@@ -78,7 +78,7 @@ async def _load_pairs(include_db: bool, label: str) -> list[dict]:
     seed_pairs = load_seed()
     print(f"[{label}] step 1 — {len(seed_pairs)} pairs from seed")
 
-    db_pairs = await load_db_pairs() if include_db else []
+    db_pairs = await load_db_pairs(exclude_user_ids=exclude_user_ids) if include_db else []
     pairs = seed_pairs + db_pairs
 
     bad = [i for i, p in enumerate(pairs) if "question" not in p or "answer" not in p]
@@ -92,8 +92,8 @@ async def _load_pairs(include_db: bool, label: str) -> list[dict]:
 def _prepare_corpus(pairs: list[dict], label: str) -> dict:
     """Single pass over pairs building all derived text structures.
 
-    Doing this in one loop avoids calling format_doc and make_doc_id twice per
-    pair (the old code called them once here and again inside _sync_to_chroma).
+    Doing this in one loop avoids calling format_doc and make_doc_hash twice per
+    pair.
     Returns a dict with: all_texts, all_ids, all_topics, topic_intro_ids,
     id_to_text, id_to_topic."""
     all_texts: list[str] = []
@@ -103,7 +103,7 @@ def _prepare_corpus(pairs: list[dict], label: str) -> dict:
 
     for p in pairs:
         text = format_doc(p["question"], p["answer"], p.get("tags", []))
-        doc_id = make_doc_id(p["question"], p.get("answer", ""))
+        doc_id = make_doc_id(p)
         topic = p.get("topic", "unknown")
 
         all_texts.append(text)
@@ -198,14 +198,14 @@ def _build_indexes(
     return bm25, numpy_idx
 
 
-async def load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True) -> dict:
+async def load_and_index(app: FastAPI, label: str = "startup", include_db: bool = True, exclude_user_ids: list[str] | None = None) -> dict:
     """Orchestrate: load pairs → sync Chroma → build indexes → apply to app.state.
     Returns a summary dict. Called at startup and by /admin/sync-chroma."""
-    pairs = await _load_pairs(include_db, label)
+    pairs = await _load_pairs(include_db, label, exclude_user_ids=exclude_user_ids)
     app.state.qa_pairs = pairs
 
     topic_counts = Counter(p.get("topic", "unknown") for p in pairs)
-    db_sourced = [p for p in pairs if p.get("source") == "db-post"]
+    db_sourced = [p for p in pairs if p.get("id", "").startswith("db-comment-")]
     print(f"[{label}] topics in corpus: {dict(sorted(topic_counts.items()))}")
     print(f"[{label}] DB-sourced pairs: {len(db_sourced)}")
 

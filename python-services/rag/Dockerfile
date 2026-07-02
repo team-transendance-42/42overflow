@@ -17,7 +17,7 @@ RUN uv sync --no-dev
 # Pre-download the default embedding model so the container never needs network at startup.
 # Must be BEFORE COPY . ./ so this layer is cached independently of source changes.
 # Default: BAAI/bge-small-en-v1.5 (384-dim, ~100 MB RAM) — for memory-constrained machines.
-# School computers: set EMBED_MODEL=nomic-ai/nomic-embed-text-v1.5 at runtime (downloads on first start).
+# we use: set EMBED_MODEL=nomic-ai/nomic-embed-text-v1.5 at runtime (downloads on first start).
 # Changing EMBED_MODEL also requires wiping the ChromaDB volume (dimension mismatch otherwise).
 RUN uv run python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
 

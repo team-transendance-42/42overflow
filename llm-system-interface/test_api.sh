@@ -8,7 +8,7 @@ docker compose exec llm-server sh /tmp/test_api.sh
 # run: ./llm-system-interface/test_api.sh
 
 # Configuration
-API_URL="http://localhost:8081/api/ai-assist"
+API_URL="http://localhost:8081/api/ai/gemini"
 SECRET=${LLM_INTERNAL_SECRET:-$(grep LLM_INTERNAL_SECRET llm-system-interface/.env | cut -d= -f2)}
 GREEN='\033[0;32m'
 RED='\033[0;31m'

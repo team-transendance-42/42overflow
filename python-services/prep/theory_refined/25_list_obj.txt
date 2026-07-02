@@ -1,0 +1,13 @@
+Python lists store each element as a full Python object (header + pointer + value = ~28 bytes
+per float). numpy arrays store raw C numbers back-to-back in a contiguous memory block. 
+  - np.dot(va, vb) dispatches a single BLAS C call that operates on that
+  contiguous block — the CPU can vectorize it (SIMD)
+  - A Python sum(x*y for x,y in zip(a,b)) does 768 bytecode dispatches,
+  768 Python float allocations, 768 multiplications, 768 additions — all
+  in the interpreter
+  - Measured difference: ~1000x slower in pure Python for 768-dim vectors
+
+np.array(a, ...) — converting a Python list to a numpy array
+dtype=np.float32 — forcing 32-bit float instead of numpy's default 64-bit
+Without dtype=, numpy infers from the input. A Python float is 64-bit,
+so np.array([1.0, 2.0]) gives float64 by default.

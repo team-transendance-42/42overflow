@@ -1,0 +1,64 @@
+list[dict] = [
+      {"name": "Alice", "age": 30},
+      {"city": "Paris", "country": "France"},
+      {"x": 1},
+]
+
+  Each dict can have any keys/values. If you want stricter typing:
+
+  list[dict[str, int]]  # keys are str, values are int
+  # e.g. [{"score": 99}, {"score": 42}]
+--------------
+ If you want consistent keys, use TypedDict:
+
+  from typing import TypedDict
+
+  class User(TypedDict):
+      name: str
+      age: int
+
+  users: list[User] = [
+      {"name": "Alice", "age": 30},
+      {"name": "Bob",   "age": 25},
+  ]
+
+  This enforces structure at the type-checker level (e.g. mypy), but still not at runtime
+  -------
+   topic_vecs.setdefault(topic, [])
+   
+    if key doesn't exist in the dict, it
+    inserts key: default and returns default
+    If key already exists, it returns the existing value (no change)
+---
+  .append(np.array(vec, dtype=np.float32))
+
+  - Converts vec (likely a list of floats) to a NumPy float32 array
+  - Appends it to the list returned above
+
+  Equivalent long form
+
+  if topic not in topic_vecs:
+      topic_vecs[topic] = []
+  topic_vecs[topic].append(np.array(vec, dtype=np.float32))
+  ----
+    Example
+
+  import numpy as np
+
+  topic_vecs = {}
+
+  rows = [
+      ("math",    [0.1, 0.2, 0.3]),
+      ("science",  [0.4, 0.5, 0.6]),
+      ("math",    [0.7, 0.8, 0.9]),  # second math vector
+  ]
+
+  for topic, vec in rows:
+      topic_vecs.setdefault(topic, []).append(np.array(vec,
+  dtype=np.float32))
+
+  # Result:
+  # {
+  #   "math":    [array([0.1, 0.2, 0.3]), array([0.7, 0.8, 0.9])],
+  #   "science": [array([0.4, 0.5, 0.6])]
+  # }

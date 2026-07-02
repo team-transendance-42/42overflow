@@ -3,9 +3,9 @@
 
   Browser
     └── Caddy :8443 (reverse proxy, gzip)
-          ├── /api/*      → llm-server (Go) :8081
-          ├── /stt/*      → python-stt (Whisper) :8091
           └── /*          → app (SvelteKit) :5173
+                              ├── /api/ai/*   → llm-server (Go) :8081
+                              └── /api/stt    → python-stt (Whisper) :8091
 
   llm-server ──► python-rag (FastAPI) :8090
                       └──► chromadb (vector DB) :8000

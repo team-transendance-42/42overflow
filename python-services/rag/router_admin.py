@@ -4,7 +4,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from config import ADMIN_TOKEN, DB_URL
-from dev_populate import clean_posts, ensure_subjects, ensure_users, insert_posts
+from dev_populate import USERS, clean_posts, get_or_create_subjects, insert_posts, upsert_users
 from indexer import load_and_index
 from metrics import Metrics
 from store import clear_collection
@@ -31,6 +31,21 @@ async def admin_sync_chroma(request: Request, _: None = Depends(require_admin)) 
         return {"status": "ok", **summary}
 
 
+# docker compose exec python-rag curl -H "X-Admin-Token: $ADMIN_TOKEN" -X POST http://localhost:8090/admin/sync-real
+@router.post("/admin/sync-real")
+async def admin_sync_real(request: Request, _: None = Depends(require_admin)) -> dict:
+    """Rebuild Chroma/numpy/BM25 from seed + real Postgres posts only.
+    Fake test users (from dev_populate.USERS) are excluded from the index.
+    Does NOT touch Postgres — fake rows stay in the DB."""
+    if _sync_lock.locked():
+        return {"status": "already running"}
+    fake_ids: list[str] = [u["id"] for u in USERS]
+    async with _sync_lock:
+        print(f"[sync-real] triggered via /admin/sync-real — excluding {len(fake_ids)} fake user(s)")
+        summary = await load_and_index(request.app, label="sync-real", include_db=True, exclude_user_ids=fake_ids)
+        return {"status": "ok", **summary}
+
+
 # docker compose exec python-rag curl -H "X-Admin-Token: $ADMIN_TOKEN" http://localhost:8000/admin/seed-postgres
 @router.post("/admin/seed-postgres")
 async def admin_seed_postgres(clean: bool = False, _: None = Depends(require_admin)) -> dict:
@@ -47,8 +62,8 @@ async def admin_seed_postgres(clean: bool = False, _: None = Depends(require_adm
         raise HTTPException(status_code=503, detail=f"Cannot connect to Postgres: {exc}")
 
     try:
-        await ensure_users(conn)
-        subject_map = await ensure_subjects(conn)
+        await upsert_users(conn)
+        subject_map = await get_or_create_subjects(conn)
         if clean:
             await clean_posts(conn)
         inserted, skipped = await insert_posts(conn, subject_map)
@@ -65,10 +80,14 @@ async def admin_seed_postgres(clean: bool = False, _: None = Depends(require_adm
 @router.post("/admin/wipe")
 async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict:
     """Wipe all posts, comments, and subjects from Postgres and all docs from ChromaDB.
-    Rebuilds in-memory indexes from seed so the service stays healthy.
+    Rebuilds in-memory indexes (BM25, NumpyIndex, qa_pairs) from seed only so the
+    service stays healthy and /rag/ask never serves deleted data.
     Call /admin/seed-postgres then /admin/sync-chroma to repopulate."""
     if not DB_URL:
         raise HTTPException(status_code=503, detail="DATABASE_URL not set — cannot wipe Postgres")
+
+    if _sync_lock.locked():
+        return {"status": "already running"}
 
     try:
         conn = await asyncpg.connect(DB_URL, timeout=10.0)
@@ -76,10 +95,14 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
         raise HTTPException(status_code=503, detail=f"Cannot connect to Postgres: {exc}")
 
     try:
-        comment_count = await conn.fetchval('SELECT COUNT(*) FROM "Comment"')
-        post_count    = await conn.fetchval('SELECT COUNT(*) FROM "Post"')
-        subject_count = await conn.fetchval('SELECT COUNT(*) FROM "Subject"')
+        comment_count       = await conn.fetchval('SELECT COUNT(*) FROM "Comment"')
+        post_count          = await conn.fetchval('SELECT COUNT(*) FROM "Post"')
+        subject_count       = await conn.fetchval('SELECT COUNT(*) FROM "Subject"')
+        like_count          = await conn.fetchval('SELECT COUNT(*) FROM "Like"')
+        membership_count    = await conn.fetchval('SELECT COUNT(*) FROM "SubjectMember"')
 
+        await conn.execute('DELETE FROM "Like"')
+        await conn.execute('DELETE FROM "SubjectMember"')
         await conn.execute('DELETE FROM "Comment"')
         await conn.execute('DELETE FROM "Post"')
         await conn.execute('DELETE FROM "Subject"')
@@ -93,19 +116,23 @@ async def admin_wipe(request: Request, _: None = Depends(require_admin)) -> dict
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"ChromaDB wipe failed: {exc}")
 
-    print(f"[wipe] deleted {post_count} posts, {comment_count} comments, {subject_count} subjects, {chroma_count} chroma docs")
+    print(f"[wipe] deleted {post_count} posts, {comment_count} comments, {subject_count} subjects, {like_count} likes, {membership_count} memberships, {chroma_count} chroma docs")
 
-    summary = await load_and_index(request.app, label="wipe", include_db=False)
+    async with _sync_lock:
+        print("[wipe] rebuilding in-memory indexes from seed")
+        index_summary = await load_and_index(request.app, label="wipe", include_db=False)
+
     return {
         "status": "ok",
         "deleted": {
+            "postgres_likes": like_count,
+            "postgres_memberships": membership_count,
             "postgres_comments": comment_count,
             "postgres_posts": post_count,
             "postgres_subjects": subject_count,
             "chroma_docs": chroma_count,
         },
-        "indexes_rebuilt_from": "seed",
-        **summary,
+        "index": index_summary,
     }
 
 

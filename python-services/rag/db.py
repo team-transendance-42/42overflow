@@ -9,7 +9,7 @@ A post with no answer has no knowledge to offer the LLM.
 
 from config import DB_URL
 import asyncpg
-from asyncpg import Record # a high-performance PostgreSQL client library for Python, built specifically for use with asyncio (Python's async/await framework)
+from asyncpg import Record # high-performance PostgreSQL client library for Python, built specifically for use with asyncio (Python's async/await framework)
 
 
 def _normalize_topic(title: str) -> str:
@@ -18,20 +18,6 @@ def _normalize_topic(title: str) -> str:
     """
     return title.lower().strip().replace(" ", "-")
 
-
-# ── OLD _row_to_pair (per-post, kept for comparison) ─────────────────────────
-# def _row_to_pair(row: Record) -> dict: # exact, documents what actually gets passed in.
-#     """Map one asyncpg Row (from the JOIN query) to a RAG pair dict."""
-#     topic = _normalize_topic(row["project_name"])
-#     return {
-#         "id": f"db-post-{row['id']}",
-#         "question": row["question"],
-#         "answer": row["answers"] or "",
-#         "topic": topic,
-#         "tags": [topic],   # project name as the only tag — improves BM25 keyword matching
-#         "source": "db-post",
-#     }
-# ── END OLD _row_to_pair ──────────────────────────────────────────────────────
 
 def _row_to_pair(row: Record) -> dict:
     """Map one asyncpg Row (one comment) to a RAG pair dict."""
@@ -42,42 +28,8 @@ def _row_to_pair(row: Record) -> dict:
         "answer": row["answer"] or "",
         "topic": topic,
         "tags": [topic],
-        "source": "db-comment",
     }
 
-
-# ── OLD per-post query (kept for comparison) ──────────────────────────────────
-# Fetch all posts that have at least one non-deleted top-level comment.
-# JOIN (not LEFT JOIN) — posts with zero qualifying comments are excluded.
-# Nested thread replies (parentId IS NOT NULL) excluded to avoid noise.
-# Subject JOIN provides the canonical slug used as topic/tag.
-# || concat symbol is used to combine title + content into a single question string.
-# str_agg() turn many rows into one string
-# _QUERY = """
-#     SELECT
-#         p.id,
-#         s.slug                                              AS project_name,
-#         p.title || E'\\n\\n' || p.content                  AS question,
-#         string_agg(
-#             c.content,
-#             E'\\n\\n'
-#             ORDER BY c.created_at ASC
-#         ) FILTER (
-#             WHERE c.deleted_at IS NULL
-#               AND c."parentId" IS NULL
-#         )                                                   AS answers
-#     FROM "Post" p
-#     JOIN "Subject" s ON s.id = p."subjectId"
-#     JOIN "Comment" c
-#         ON  c."postId"   = p.id
-#         AND c.deleted_at IS NULL
-#         AND c."parentId" IS NULL
-#     WHERE p.deleted_at IS NULL
-#       AND p.content     IS NOT NULL
-#       AND p.content     <> ''
-#     GROUP BY p.id, s.slug, p.title, p.content
-# """
-# ── END OLD query ─────────────────────────────────────────────────────────────
 
 # Per-comment query: each comment becomes its own RAG document (capped at 15
 # newest per post after byte-identical dedup).
@@ -108,14 +60,17 @@ _QUERY = """
         r.comment_content                   AS answer,
         r.comment_id
     FROM "Post" p
-    JOIN "Subject" s ON s.id = p."subjectId"
+    JOIN "Subject" s ON s.id = p."subjectId" AND s.deleted_at IS NULL
     JOIN ranked r    ON r."postId" = p.id
     WHERE p.deleted_at IS NULL
       AND p.content    IS NOT NULL
       AND p.content    <> ''
       AND r.rn         <= 15
 """
+# Used by load_db_pairs(exclude_user_ids=...) to filter out specific authors (e.g. fake test users)
+_QUERY_EXCLUDE_USERS = _QUERY + '\n  AND p."userId" != ALL($1::text[])'
 
+# <> not equal
 _TABLES_READY_QUERY = """
     SELECT COUNT(*) FROM information_schema.tables
     WHERE table_schema = 'public'
@@ -123,7 +78,7 @@ _TABLES_READY_QUERY = """
 """
 
 
-async def load_db_pairs() -> list[dict]:
+async def load_db_pairs(exclude_user_ids: list[str] | None = None) -> list[dict]:
     # Mask password in logs: show only the host/db part
     safe_url = DB_URL.split("@")[-1] if DB_URL and "@" in DB_URL else DB_URL or "(not set)"
     print(f"[db] connecting to: {safe_url}")
@@ -153,7 +108,11 @@ async def load_db_pairs() -> list[dict]:
             print("[db] Post, Comment, or Subject table missing — skipping DB sync (schema not migrated yet)")
             return []
 
-        rows = await conn.fetch(_QUERY)
+        if exclude_user_ids:
+            rows = await conn.fetch(_QUERY_EXCLUDE_USERS, exclude_user_ids)
+            print(f"[db] fetched rows excluding {len(exclude_user_ids)} user(s)")
+        else:
+            rows = await conn.fetch(_QUERY)
         print(f"[db] fetched {len(rows)} posts with at least one comment")
 
         pairs = [_row_to_pair(row) for row in rows]

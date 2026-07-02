@@ -1,0 +1,28 @@
+ =========================================
+ nomic asymmetric retrieval prefixes
+ ==========================================
+  document embeddings for better cosine similarity:
+   QUERY_PREFIX = "search_query: " and DOC_PREFIX = "search_document: " (gated on "nomic" in model
+  name); added format_doc_for_embed() that prepends DOC_PREFIX
+  - indexer.py — switched embedding from format_doc() → format_doc_for_embed() (docs now embedded with search_document:
+  prefix)
+  - retriever.py — prepends QUERY_PREFIX to the user's question before embedding it
+  - tests/test_retriever.py — test fixtures updated to use format_doc_for_embed() to match production
+  =================================
+    - Query = the user's question (a short, incomplete sentence like "how do I fix segfault in C?")
+  - Document = a stored QA pair formatted as "Q: ...\nA: ...\nTags: ..." (the full question+answer+tags blob stored in ChromaDB and the numpy index)
+
+  So the asymmetry is:
+  - User types a question → embed with search_query: prefix → produces a query vector
+  - The index stores question+answer pairs → embedded with search_document: prefix → produces document vectors
+  - Retrieval = cosine similarity between the query vector and all document vectors
+
+  The reason for different prefixes: nomic-embed-text-v1.5 was trained knowing that a short question and a full answer document are different kinds
+  of text. Using the correct prefix signals to the model which role it's encoding, so the geometry works out — short queries land near the relevant
+  long documents in vector space, instead of landing near other short sentences.
+
+  Without prefixes, a question embeds into the same space as if it were a document, which can reduce match quality because the model was trained to
+  expect asymmetry.
+
+  The document side contains both the question AND the answer — not just the answer. That's intentional: it means "how does malloc work?" also
+  matches docs where the stored question is "explain heap allocation", because the stored question reinforces the semantic neighborhood.

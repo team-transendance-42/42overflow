@@ -1,0 +1,33 @@
+ np.linalg.norm(va) / np.linalg.norm(vb)
+
+  What: Computes the L2 norm (Euclidean length) of the vector:
+
+  ||va|| = sqrt(va[0]² + va[1]² + ... + va[767]²)
+
+  Why it's here: Cosine similarity is defined as:
+
+  cos(θ) = dot(a, b) / (||a|| * ||b||)
+
+  The denominator normalizes both vectors to unit length before
+  comparing — this removes magnitude and only measures direction. Two
+  vectors pointing in the same direction in 768-dimensional space have
+  cosine = 1.0, regardless of how long they are.
+
+  Why numpy vs. Python: np.linalg.norm dispatches a single BLAS C call
+  that computes sqrt(sum(x²)) over the contiguous float32 memory block
+  in one pass. A pure Python equivalent (math.sqrt(sum(x**2 for x in
+  va))) would do 768 Python bytecode iterations. Numpy is ~1000x faster
+  here.
+
+  Edge case: If the norm is 0.0, the vector is the zero vector (all
+  elements are 0). The next two lines catch this:
+  if norm_a == 0.0 or norm_b == 0.0:
+      return 0.0
+  Without that guard, dot(va, vb) / (0.0 * norm_b) would be 0/0 = NaN —
+  undefined, and again infectious.
+
+  ---
+  In summary: nan_to_num is a sanitization step before the math;
+  linalg.norm computes the vector's length so the subsequent division
+  produces a clean [-1, 1] similarity score instead of a raw dot product
+  whose scale depends on how long the vectors are.

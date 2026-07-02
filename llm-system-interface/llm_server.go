@@ -30,9 +30,10 @@ func main() {
 	router.Use(middleware.RateLimiter)
 
 	// url: what client calls
-	router.HandleFunc("/ai-assist/gemini", handlers.GenerateGeminiText).Methods("POST")
-	router.HandleFunc("/ai-assist/ollama", handlers.GenerateOllamaText).Methods("POST")
-	router.HandleFunc("/ai-assist/community", handlers.RagAskStreaming).Methods("POST")
+	router.HandleFunc("/api/ai/gemini", handlers.GenerateGeminiText).Methods("POST")
+	router.HandleFunc("/api/ai/ollama", handlers.GenerateOllamaText).Methods("POST")
+	router.HandleFunc("/api/ai/community", handlers.RagAskStreaming).Methods("POST")
+	router.HandleFunc("/admin/clear-rag-cache", handlers.ClearRAGCacheHandler).Methods("POST")
 
 	log.Println("Server running on port 8081")
 	log.Fatal(http.ListenAndServe(":8081", router))

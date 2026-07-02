@@ -564,7 +564,7 @@
             let result: string;
 
             if (llmMode === 'community') {
-                const res = await fetch('/api/community', {
+                const res = await fetch('/api/ai/community', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt }),
@@ -573,7 +573,7 @@
                 if (!res.ok) throw new Error(await res.text() || 'Community service unavailable');
                 result = await parseSSEStream(res);
             } else {
-                const endpoint = llmMode === 'gemini' ? '/api/ai-assist' : '/api/ollama';
+                const endpoint = llmMode === 'gemini' ? '/api/ai/gemini' : '/api/ai/ollama';
                 const fallbackError = llmMode === 'gemini' ? 'Server error' : 'Ollama service unavailable';
                 const historySnapshot = history.slice(0, MAX_HISTORY).reverse();
                 result = await streamChat(endpoint, prompt, fallbackError, controller.signal, historySnapshot);
@@ -646,7 +646,7 @@ async function sendToWhisper(blob: Blob) {
 	Location: lives only in browser RAM, no file system path;The Whisper backend receives it as a multipart form upload and reads the bytes directly — it may or may not save it temporarily on its end. */
 
     try {
-        const response = await fetch('/api/stt', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
+        const response = await fetch('/api/ai/stt', { //The Whisper backend at main.py defines the /convert_audio endpoint. It expects a multipart form upload with a field named file — which is exactly what formData.append('file', blob, 'recording.wav') sends.
             method: 'POST',
             body: formData
         });

@@ -142,26 +142,15 @@ func StartCleanup() {
 //   - Global: shared token bucket across all clients (10 req/min, burst 5) to protect upstream API quota.
 //   - Per-client: individual token bucket keyed by IP (5 req/min, burst 2) with a daily cap of 20 requests.
 //
-// Sets X-RateLimit-* response headers and returns 429 on limit breach. CORS preflight (OPTIONS) is bypassed.
+// Sets X-RateLimit-* response headers and returns 429 on limit breach.
 func RateLimiter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodOptions { // if method is OPTIONS, skip rate limiting and just return 200 OK for CORS preflight requests
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		// Health check probes must never consume rate-limit tokens.
 		// Docker hits /healthz every 10s from 127.0.0.1; the per-student
 		// limit (5/min) would eventually deplete that bucket → 429 →
 		// container marked unhealthy even while serving requests fine.
 		if r.URL.Path == "/healthz" {
 			next.ServeHTTP(w, r)
-			return
-		}
-
-		// --- global cap: check before per-student to protect Gemini API quota ---todo
-		if !globalLimiter.Allow() {
-			http.Error(w, "Server busy, try again shortly", http.StatusTooManyRequests)
 			return
 		}
 
@@ -179,6 +168,9 @@ func RateLimiter(next http.Handler) http.Handler {
 		w.Header().Set("X-RateLimit-Minute", "5")
 		w.Header().Set("X-RateLimit-Day", strconv.Itoa(perStudentDailyMax))
 
+		// No defer mu.Unlock() here — mu must be released BEFORE calling next.ServeHTTP.
+		// Using defer would hold the lock for the entire downstream handler, serialising all requests.
+		// Each return path unlocks explicitly; the happy path unlocks before ServeHTTP.
 		mu.Lock()
 		// re-check day rollover inside the lock (getLimiter may have run slightly earlier)
 		today := now.Format("2006-01-02")
@@ -195,13 +187,21 @@ func RateLimiter(next http.Handler) http.Handler {
 			return
 		}
 
-		// --- per-minute rate check --- todo: test do we see this text?
+		// --- per-minute rate check ---
 		if !entry.limiter.Allow() {
 			remaining := perStudentDailyMax - entry.dailyCnt
 			w.Header().Set("X-RateLimit-Day-Remaining", strconv.Itoa(remaining))
 			w.Header().Set("Retry-After", "30")
 			mu.Unlock()
 			http.Error(w, "Rate limit exceeded (5/min)", http.StatusTooManyRequests)
+			return
+		}
+
+		// Global cap checked after per-student gates: over-quota/throttled requests must not
+		// consume shared API quota tokens. rate.Limiter is goroutine-safe so calling inside mu is fine.
+		if !globalLimiter.Allow() {
+			mu.Unlock()
+			http.Error(w, "Server busy, try again shortly", http.StatusTooManyRequests)
 			return
 		}
 
